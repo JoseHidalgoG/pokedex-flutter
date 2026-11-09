@@ -1,0 +1,72 @@
+{
+  "data": {
+    "pokemon": [
+      {
+        "id": 1,
+        "name": "bulbasaur",
+        "pokemontypes": [
+          {
+            "slot": 1,
+            "type": {
+              "name": "grass"
+            }
+          },
+          {
+            "slot": 2,
+            "type": {
+              "name": "poison"
+            }
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "name": "ivysaur",
+        "pokemontypes": [
+          {
+            "slot": 1,
+            "type": {
+              "name": "grass"
+            }
+          },
+          {
+            "slot": 2,
+            "type": {
+              "name": "poison"
+            }
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "name": "venusaur",
+        "pokemontypes": [
+          {
+            "slot": 1,
+            "type": {
+              "name": "grass"
+            }
+          },
+          {
+            "slot": 2,
+            "type": {
+              "name": "poison"
+            }
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "name": "charmander",
+        "pokemontypes": [
+          {
+            "slot": 1,
+            "type": {
+              "name": "fire"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
