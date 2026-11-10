@@ -105,7 +105,6 @@ class ConnectivityBanner extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Encabezado
                 const Text(
                   'Pokédex',
                   style: TextStyle(
@@ -117,7 +116,6 @@ class ConnectivityBanner extends ConsumerWidget {
 
                 const SizedBox(height: 8),
 
-                // Indicador de conectividad
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -169,7 +167,6 @@ class ConnectivityBanner extends ConsumerWidget {
                   ),
                 ),
 
-                // Progreso de sincronización
                 if (isSyncing) ...[
                   const SizedBox(height: 6),
                   ClipRRect(

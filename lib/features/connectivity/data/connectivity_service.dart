@@ -70,8 +70,6 @@ class ConnectivityService {
       try {
         final status = await checkStatus();
 
-        // Evita emitir resultados antiguos si hay varias
-        // comprobaciones ejecutándose simultáneamente.
         if (!controller.isClosed && currentSequence == checkSequence) {
           controller.add(status);
         }
@@ -92,7 +90,6 @@ class ConnectivityService {
         emitCurrentStatus();
       },
       onCancel: () async {
-        // Invalida cualquier comprobación que siga ejecutándose.
         checkSequence++;
         await connectivitySubscription?.cancel();
       },
