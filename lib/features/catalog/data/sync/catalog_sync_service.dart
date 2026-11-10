@@ -6,8 +6,8 @@ import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_reques
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_pagination.dart';
 
-const catalogPageSize = 50;
 const catalogFreshnessWindow = Duration(hours: 24);
 
 typedef InternetAccessCheck = Future<bool> Function();

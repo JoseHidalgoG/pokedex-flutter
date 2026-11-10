@@ -5,6 +5,7 @@ import 'package:pokedex_flutter/features/connectivity/presentation/connectivity_
 
 import 'package:pokedex_flutter/features/catalog/data/catalog_data_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/screens/catalog_screen.dart';
 
 void main() {
   runApp(
@@ -47,12 +48,8 @@ class MainApp extends StatelessWidget {
           ),
         );
       },
-      home: const Scaffold(
-        backgroundColor: Color(0xFFFAFAFA),
-        body: Center(
-          child: Text('Pokédex'),
-        ),
-      ),
+
+      home: const CatalogScreen(),
     );
   }
 }

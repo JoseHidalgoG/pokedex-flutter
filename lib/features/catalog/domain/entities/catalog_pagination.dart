@@ -1,0 +1,1 @@
+const catalogPageSize = 50;
