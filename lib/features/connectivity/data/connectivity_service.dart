@@ -1,57 +1,82 @@
 import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
+import 'package:graphql/client.dart';
+
 import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status.dart';
 
 class ConnectivityService {
   final Connectivity _connectivity;
-  final InternetConnection _internetConnection;
+  final GraphQLClient _graphQLClient;
 
   ConnectivityService({
     Connectivity? connectivity,
-    InternetConnection? internetConnection,
-  })  : _connectivity = connectivity ?? Connectivity(),
-        _internetConnection =
-            internetConnection ?? InternetConnection();
+    required this._graphQLClient,
+  }) : _connectivity = connectivity ?? Connectivity();
+
+  static const _healthCheckTimeout = Duration(seconds: 5);
+
+  static final _healthCheckQuery = gql('''
+    query ConnectivityHealthCheck {
+      pokemon(limit: 1) {
+        id
+      }
+    }
+  ''');
 
   Future<ConnectivityStatus> checkStatus() async {
     final results = await _connectivity.checkConnectivity();
 
     final hasNetwork = results.any(
-          (result) => result != ConnectivityResult.none,
+      (result) => result != ConnectivityResult.none,
     );
 
     if (!hasNetwork) {
       return ConnectivityStatus.offline;
     }
 
-    final hasInternet =
-    await _internetConnection.hasInternetAccess;
+    try {
+      final result = await _graphQLClient
+          .query(
+            QueryOptions(
+              document: _healthCheckQuery,
+              fetchPolicy: FetchPolicy.noCache,
+            ),
+          )
+          .timeout(_healthCheckTimeout);
 
-    if (!hasInternet) {
+      final pokemon = result.data?['pokemon'];
+
+      final apiResponded = result.exception == null && pokemon is List;
+
+      return apiResponded
+          ? ConnectivityStatus.online
+          : ConnectivityStatus.serviceUnavailable;
+    } catch (_) {
       return ConnectivityStatus.serviceUnavailable;
     }
-
-    return ConnectivityStatus.online;
   }
 
   Stream<ConnectivityStatus> watchStatus() {
     late StreamController<ConnectivityStatus> controller;
 
-    StreamSubscription<List<ConnectivityResult>>?
-    connectivitySubscription;
+    StreamSubscription<List<ConnectivityResult>>? connectivitySubscription;
 
-    StreamSubscription<InternetStatus>? internetSubscription;
+    var checkSequence = 0;
 
     Future<void> emitCurrentStatus() async {
+      final currentSequence = ++checkSequence;
+
       try {
         final status = await checkStatus();
 
-        if (!controller.isClosed) {
+        // Evita emitir resultados antiguos si hay varias
+        // comprobaciones ejecutándose simultáneamente.
+        if (!controller.isClosed && currentSequence == checkSequence) {
           controller.add(status);
         }
       } catch (error, stackTrace) {
-        if (!controller.isClosed) {
+        if (!controller.isClosed && currentSequence == checkSequence) {
           controller.addError(error, stackTrace);
         }
       }
@@ -59,23 +84,17 @@ class ConnectivityService {
 
     controller = StreamController<ConnectivityStatus>(
       onListen: () {
-        connectivitySubscription =
-            _connectivity.onConnectivityChanged.listen(
-                  (_) => emitCurrentStatus(),
-              onError: controller.addError,
-            );
-
-        internetSubscription =
-            _internetConnection.onStatusChange.listen(
-                  (_) => emitCurrentStatus(),
-              onError: controller.addError,
-            );
+        connectivitySubscription = _connectivity.onConnectivityChanged.listen(
+          (_) => emitCurrentStatus(),
+          onError: controller.addError,
+        );
 
         emitCurrentStatus();
       },
       onCancel: () async {
+        // Invalida cualquier comprobación que siga ejecutándose.
+        checkSequence++;
         await connectivitySubscription?.cancel();
-        await internetSubscription?.cancel();
       },
     );
 
