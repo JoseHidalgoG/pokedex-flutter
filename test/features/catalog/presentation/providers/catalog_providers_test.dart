@@ -27,6 +27,9 @@ class InMemoryCatalogRepository implements CatalogRepository {
 
   @override
   Future<void> syncCatalog() async => syncRequests++;
+
+  @override
+  Future<DateTime?> getLastSyncedAt() async => null;
 }
 
 void main() {
