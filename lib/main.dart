@@ -32,17 +32,23 @@ class MainApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
+
       builder: (context, child) {
-        return Column(
-          children: [
-            const ConnectivityBanner(),
-            Expanded(
-              child: child ?? const SizedBox.shrink(),
-            ),
-          ],
+        return ColoredBox(
+          color: const Color(0xFFFAFAFA),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const ConnectivityBanner(),
+              Expanded(
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ],
+          ),
         );
       },
       home: const Scaffold(
+        backgroundColor: Color(0xFFFAFAFA),
         body: Center(
           child: Text('Pokédex'),
         ),
