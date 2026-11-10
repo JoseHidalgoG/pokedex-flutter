@@ -5,6 +5,9 @@ import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_rep
 import 'package:pokedex_flutter/features/catalog/domain/usecases/sync_catalog.dart';
 import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog.dart';
 import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog_sync_status.dart';
+import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog_page.dart';
+import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog_count.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_pagination.dart';
 
 final catalogRepositoryProvider = Provider<CatalogRepository>(
   (ref) => throw UnimplementedError(
@@ -37,3 +40,23 @@ final lastCatalogSyncProvider = FutureProvider<DateTime?>((ref) async {
   final repository = ref.watch(catalogRepositoryProvider);
   return repository.getLastSyncedAt();
 });
+
+final watchCatalogPageProvider = Provider<WatchCatalogPage>(
+      (ref) => WatchCatalogPage(ref.watch(catalogRepositoryProvider)),
+);
+
+final watchCatalogCountProvider = Provider<WatchCatalogCount>(
+      (ref) => WatchCatalogCount(ref.watch(catalogRepositoryProvider)),
+);
+
+final catalogPageProvider =
+StreamProvider.family<List<Pokemon>, int>((ref, page) {
+  return ref.watch(watchCatalogPageProvider)(
+    page: page,
+    pageSize: catalogPageSize,
+  );
+});
+
+final catalogCountProvider = StreamProvider<int>(
+      (ref) => ref.watch(watchCatalogCountProvider)(),
+);

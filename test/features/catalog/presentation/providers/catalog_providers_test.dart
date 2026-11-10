@@ -1,3 +1,4 @@
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
@@ -8,16 +9,38 @@ import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_
 class InMemoryCatalogRepository implements CatalogRepository {
   int syncRequests = 0;
 
+  final List<Pokemon> _pokemon = const [
+    Pokemon(
+      id: 25,
+      name: 'pikachu',
+      imageUrl: 'https://example.com/25.png',
+      typeNames: ['electric'],
+    ),
+  ];
+
   @override
   Stream<List<Pokemon>> watchCatalog() {
-    return Stream.value(const [
-      Pokemon(
-        id: 25,
-        name: 'pikachu',
-        imageUrl: 'https://example.com/25.png',
-        typeNames: ['electric'],
-      ),
-    ]);
+    return Stream.value(_pokemon);
+  }
+
+  @override
+  Stream<List<Pokemon>> watchCatalogPage({
+    required int page,
+    required int pageSize,
+  }) {
+    final offset = (page - 1) * pageSize;
+
+    final pagePokemon = _pokemon
+        .skip(offset)
+        .take(pageSize)
+        .toList();
+
+    return Stream.value(pagePokemon);
+  }
+
+  @override
+  Stream<int> watchCatalogCount() {
+    return Stream.value(_pokemon.length);
   }
 
   @override
@@ -26,7 +49,9 @@ class InMemoryCatalogRepository implements CatalogRepository {
   }
 
   @override
-  Future<void> syncCatalog() async => syncRequests++;
+  Future<void> syncCatalog() async {
+    syncRequests++;
+  }
 
   @override
   Future<DateTime?> getLastSyncedAt() async => null;
@@ -38,8 +63,11 @@ void main() {
 
   setUp(() {
     repository = InMemoryCatalogRepository();
+
     container = ProviderContainer.test(
-      overrides: [catalogRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        catalogRepositoryProvider.overrideWithValue(repository),
+      ],
     );
   });
 
@@ -49,6 +77,22 @@ void main() {
     final catalog = await container.read(catalogProvider.future);
 
     expect([for (final pokemon in catalog) pokemon.name], ['pikachu']);
+  });
+
+  test('catalogPageProvider emite los Pokémon de la página solicitada', () async {
+    container.listen(catalogPageProvider(1), (_, _) {});
+
+    final catalog = await container.read(catalogPageProvider(1).future);
+
+    expect([for (final pokemon in catalog) pokemon.name], ['pikachu']);
+  });
+
+  test('catalogCountProvider emite el total de Pokémon', () async {
+    container.listen(catalogCountProvider, (_, _) {});
+
+    final count = await container.read(catalogCountProvider.future);
+
+    expect(count, 1);
   });
 
   test('catalogSyncStatusProvider emite el estado del repositorio', () async {

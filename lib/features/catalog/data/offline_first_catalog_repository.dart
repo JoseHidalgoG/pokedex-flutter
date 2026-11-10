@@ -22,6 +22,28 @@ class OfflineFirstCatalogRepository implements CatalogRepository {
   }
 
   @override
+  Stream<List<Pokemon>> watchCatalogPage({
+    required int page,
+    required int pageSize,
+  }) {
+    return _catalogDao
+        .watchCatalogPage(
+      limit: pageSize,
+      offset: page * pageSize,
+    )
+        .map(
+          (entries) => [
+        for (final entry in entries) entry.toPokemon(),
+      ],
+    );
+  }
+
+  @override
+  Stream<int> watchCatalogCount() {
+    return _catalogDao.watchCatalogCount();
+  }
+
+  @override
   Stream<CatalogSyncStatus> watchSyncStatus() => _syncService.watchStatus();
 
   @override

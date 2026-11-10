@@ -4,6 +4,13 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 abstract interface class CatalogRepository {
   Stream<List<Pokemon>> watchCatalog();
 
+  Stream<List<Pokemon>> watchCatalogPage({
+    required int page,
+    required int pageSize,
+  });
+
+  Stream<int> watchCatalogCount();
+
   Stream<CatalogSyncStatus> watchSyncStatus();
 
   Future<void> syncCatalog();
