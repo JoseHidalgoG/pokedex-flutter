@@ -8,7 +8,7 @@ import 'package:pokedex_flutter/features/connectivity/domain/connectivity_reposi
 import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status.dart';
 import 'package:pokedex_flutter/core/network/pokeapi_graphql_client_provider.dart';
 
-const _connectivityDebounceDuration = Duration(seconds: 2);
+const _connectivityDebounceDuration = Duration(milliseconds: 800);
 
 final connectivityServiceProvider = Provider<ConnectivityService>((ref) {
   final graphQLClient = ref.watch(pokeApiGraphQLClientProvider);
