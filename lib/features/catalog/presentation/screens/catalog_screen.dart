@@ -158,6 +158,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     );
 
     final countAsync = ref.watch(catalogCountProvider);
+    countAsync.whenData(_ensureValidPage);
     final syncStatusAsync = ref.watch(catalogSyncStatusProvider);
 
     final syncStatus = syncStatusAsync.when(
@@ -228,4 +229,24 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       ),
     );
   }
+
+
+  void _ensureValidPage(int totalItems) {
+    final totalPages = (totalItems / catalogPageSize).ceil();
+
+    final lastValidPage = totalPages > 0
+        ? totalPages - 1
+        : 0;
+
+    if (_currentPage > lastValidPage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
+        setState(() {
+          _currentPage = lastValidPage;
+        });
+      });
+    }
+  }
+
 }
