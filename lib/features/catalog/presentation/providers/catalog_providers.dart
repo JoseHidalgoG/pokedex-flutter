@@ -31,3 +31,9 @@ final catalogProvider = StreamProvider<List<Pokemon>>(
 final catalogSyncStatusProvider = StreamProvider<CatalogSyncStatus>(
   (ref) => ref.watch(watchCatalogSyncStatusProvider)(),
 );
+
+final lastCatalogSyncProvider = FutureProvider<DateTime?>((ref) async {
+  ref.watch(catalogSyncStatusProvider);
+  final repository = ref.watch(catalogRepositoryProvider);
+  return repository.getLastSyncedAt();
+});
