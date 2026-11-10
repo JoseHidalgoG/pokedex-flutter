@@ -26,4 +26,10 @@ class OfflineFirstCatalogRepository implements CatalogRepository {
 
   @override
   Future<void> syncCatalog() => _syncService.syncCatalog();
+
+  @override
+  Future<DateTime?> getLastSyncedAt() async {
+    final progress = await _catalogDao.readCatalogSyncProgress();
+    return progress?.lastSyncedAt;
+  }
 }
