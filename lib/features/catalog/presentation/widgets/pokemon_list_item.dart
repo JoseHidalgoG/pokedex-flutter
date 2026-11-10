@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_type_chip.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_cached_image.dart';
 
 class PokemonListItem extends StatelessWidget {
   const PokemonListItem({
@@ -28,19 +29,9 @@ class PokemonListItem extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              SizedBox(
-                width: 76,
-                height: 76,
-                child: Image.network(
-                  pokemon.imageUrl,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(
-                      Icons.catching_pokemon,
-                      size: 48,
-                    );
-                  },
-                ),
+              PokemonCachedImage(
+                imageUrl: pokemon.imageUrl,
+                size: 76,
               ),
               const SizedBox(width: 12),
               Expanded(
