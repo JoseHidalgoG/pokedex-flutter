@@ -1,5 +1,6 @@
 import 'package:async/async.dart';
 import 'package:drift/native.dart';
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/core/database/app_database.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
@@ -271,4 +272,55 @@ void main() {
     expect(ids, hasLength(120));
     expect(ids.toSet(), hasLength(120));
   });
+
+
+  test('emite fallo si la comprobación de Internet lanza una excepción', () async {
+    final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
+
+    final syncService = syncServiceOver(
+      remoteCatalog,
+      hasInternetAccess: () async {
+        throw StateError('No se pudo comprobar la conexión');
+      },
+    );
+
+    await expectLater(
+      syncService.syncCatalog(),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(remoteCatalog.requestedOffsets, isEmpty);
+
+    expect(
+      syncService.currentStatus,
+      failedBecauseOf(CatalogSyncFailureReason.requestFailed),
+    );
+  });
+
+
+  test('marca sincronización en curso antes de comprobar Internet', () async {
+    final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
+    final connectionCheck = Completer<bool>();
+
+    final syncService = syncServiceOver(
+      remoteCatalog,
+      hasInternetAccess: () => connectionCheck.future,
+    );
+
+    final sync = syncService.syncCatalog();
+
+    expect(
+      syncService.currentStatus,
+      isA<CatalogSyncInProgress>(),
+    );
+
+    connectionCheck.complete(false);
+    await sync;
+
+    expect(
+      syncService.currentStatus,
+      failedBecauseOf(CatalogSyncFailureReason.noConnection),
+    );
+  });
+
 }

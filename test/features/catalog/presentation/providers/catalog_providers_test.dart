@@ -1,4 +1,3 @@
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
@@ -9,14 +8,16 @@ import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_
 class InMemoryCatalogRepository implements CatalogRepository {
   int syncRequests = 0;
 
-  final List<Pokemon> _pokemon = const [
-    Pokemon(
-      id: 25,
-      name: 'pikachu',
-      imageUrl: 'https://example.com/25.png',
-      typeNames: ['electric'],
+  final List<Pokemon> _pokemon = List.generate(
+    51,
+        (index) => Pokemon(
+      id: index + 1,
+      name: 'pokemon${index + 1}',
+      imageUrl: 'https://example.com/${index + 1}.png',
+      typeNames: const ['normal'],
     ),
-  ];
+  );
+
 
   @override
   Stream<List<Pokemon>> watchCatalog() {
@@ -28,7 +29,7 @@ class InMemoryCatalogRepository implements CatalogRepository {
     required int page,
     required int pageSize,
   }) {
-    final offset = (page - 1) * pageSize;
+    final offset = page * pageSize;
 
     final pagePokemon = _pokemon
         .skip(offset)
@@ -76,15 +77,21 @@ void main() {
 
     final catalog = await container.read(catalogProvider.future);
 
-    expect([for (final pokemon in catalog) pokemon.name], ['pikachu']);
+    expect(catalog, hasLength(51));
+    expect(catalog.first.name, 'pokemon1');
+    expect(catalog.last.name, 'pokemon51');
   });
 
-  test('catalogPageProvider emite los Pokémon de la página solicitada', () async {
-    container.listen(catalogPageProvider(1), (_, _) {});
+  test('catalogPageProvider devuelve la primera página desde el índice 0', () async {
+    container.listen(catalogPageProvider(0), (_, _) {});
 
-    final catalog = await container.read(catalogPageProvider(1).future);
+    final catalog = await container.read(
+      catalogPageProvider(0).future,
+    );
 
-    expect([for (final pokemon in catalog) pokemon.name], ['pikachu']);
+    expect(catalog, hasLength(50));
+    expect(catalog.first.id, 1);
+    expect(catalog.last.id, 50);
   });
 
   test('catalogCountProvider emite el total de Pokémon', () async {
@@ -92,7 +99,7 @@ void main() {
 
     final count = await container.read(catalogCountProvider.future);
 
-    expect(count, 1);
+    expect(count, 51);
   });
 
   test('catalogSyncStatusProvider emite el estado del repositorio', () async {
@@ -107,5 +114,26 @@ void main() {
     await container.read(syncCatalogProvider)();
 
     expect(repository.syncRequests, 1);
+  });
+
+
+  test('la paginación divide 51 Pokémon en páginas de 50 y 1', () async {
+    container.listen(catalogPageProvider(0), (_, _) {});
+    container.listen(catalogPageProvider(1), (_, _) {});
+
+    final firstPage = await container.read(
+      catalogPageProvider(0).future,
+    );
+
+    final secondPage = await container.read(
+      catalogPageProvider(1).future,
+    );
+
+    expect(firstPage.length, 50);
+    expect(firstPage.first.id, 1);
+    expect(firstPage.last.id, 50);
+
+    expect(secondPage.length, 1);
+    expect(secondPage.first.id, 51);
   });
 }

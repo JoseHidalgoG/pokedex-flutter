@@ -6,6 +6,7 @@ import 'package:pokedex_flutter/features/connectivity/presentation/connectivity_
 import 'package:pokedex_flutter/features/catalog/data/catalog_data_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/screens/catalog_screen.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/catalog_sync_coordinator.dart';
 
 void main() {
   runApp(
@@ -34,22 +35,29 @@ class MainApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
+
       builder: (context, child) {
         return ColoredBox(
           color: const Color(0xFFFAFAFA),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const ConnectivityBanner(),
-              Expanded(
-                child: child ?? const SizedBox.shrink(),
-              ),
-            ],
+          child: SafeArea(
+            top: true,
+            bottom: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const ConnectivityBanner(),
+                Expanded(
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              ],
+            ),
           ),
         );
       },
 
-      home: const CatalogScreen(),
+      home: const CatalogSyncCoordinator(
+        child: CatalogScreen(),
+      ),
     );
   }
 }
