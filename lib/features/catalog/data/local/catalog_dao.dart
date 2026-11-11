@@ -68,17 +68,18 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
       ..orderBy([OrderingTerm.asc(pokemonTable.id)])
       ..limit(limit, offset: offset);
 
-    final query = select(pokemonTable).join([
-      leftOuterJoin(
-        pokemonTypesTable,
-        pokemonTypesTable.pokemonId.equalsExp(pokemonTable.id),
-      ),
-    ])
-      ..where(pokemonTable.id.isInQuery(pageIds))
-      ..orderBy([
-        OrderingTerm.asc(pokemonTable.id),
-        OrderingTerm.asc(pokemonTypesTable.slot),
-      ]);
+    final query =
+        select(pokemonTable).join([
+            leftOuterJoin(
+              pokemonTypesTable,
+              pokemonTypesTable.pokemonId.equalsExp(pokemonTable.id),
+            ),
+          ])
+          ..where(pokemonTable.id.isInQuery(pageIds))
+          ..orderBy([
+            OrderingTerm.asc(pokemonTable.id),
+            OrderingTerm.asc(pokemonTypesTable.slot),
+          ]);
 
     return query.watch().map(_groupTypesByPokemon);
   }
@@ -86,8 +87,7 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   Stream<int> watchCatalogCount() {
     final countExpression = pokemonTable.id.count();
 
-    return (selectOnly(pokemonTable)
-      ..addColumns([countExpression]))
+    return (selectOnly(pokemonTable)..addColumns([countExpression]))
         .watchSingle()
         .map((row) => row.read(countExpression) ?? 0);
   }

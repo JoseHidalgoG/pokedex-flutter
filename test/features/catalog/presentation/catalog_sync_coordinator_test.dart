@@ -12,8 +12,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_
 import 'package:pokedex_flutter/features/connectivity/connectivity_providers.dart';
 import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status.dart';
 
-class MockCatalogRepository extends Mock
-    implements CatalogRepository {}
+class MockCatalogRepository extends Mock implements CatalogRepository {}
 
 void main() {
   late MockCatalogRepository mockRepository;
@@ -22,12 +21,9 @@ void main() {
   setUp(() {
     mockRepository = MockCatalogRepository();
 
-    connectivityController =
-    StreamController<ConnectivityStatus>.broadcast();
+    connectivityController = StreamController<ConnectivityStatus>.broadcast();
 
-    when(
-          () => mockRepository.syncCatalog(),
-    ).thenAnswer((_) async {});
+    when(() => mockRepository.syncCatalog()).thenAnswer((_) async {});
   });
 
   tearDown(() async {
@@ -39,17 +35,15 @@ void main() {
       ProviderScope(
         overrides: [
           syncCatalogProvider.overrideWith(
-                (ref) => SyncCatalog(mockRepository),
+            (ref) => SyncCatalog(mockRepository),
           ),
           connectivityStatusProvider.overrideWith(
-                (ref) => connectivityController.stream,
+            (ref) => connectivityController.stream,
           ),
         ],
         child: const MaterialApp(
           home: CatalogSyncCoordinator(
-            child: Scaffold(
-              body: Text('Catálogo de prueba'),
-            ),
+            child: Scaffold(body: Text('Catálogo de prueba')),
           ),
         ),
       ),
@@ -58,68 +52,51 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets(
-    'inicia la sincronización al abrir la aplicación',
-        (tester) async {
-      await pumpCoordinator(tester);
+  testWidgets('inicia la sincronización al abrir la aplicación', (
+    tester,
+  ) async {
+    await pumpCoordinator(tester);
 
-      verify(
-            () => mockRepository.syncCatalog(),
-      ).called(1);
-    },
-  );
+    verify(() => mockRepository.syncCatalog()).called(1);
+  });
 
-  testWidgets(
-    'sincroniza nuevamente cuando se recupera Internet',
-        (tester) async {
-      await pumpCoordinator(tester);
+  testWidgets('sincroniza nuevamente cuando se recupera Internet', (
+    tester,
+  ) async {
+    await pumpCoordinator(tester);
 
-      verify(
-            () => mockRepository.syncCatalog(),
-      ).called(1);
+    verify(() => mockRepository.syncCatalog()).called(1);
 
-      connectivityController.add(ConnectivityStatus.offline);
-      await tester.pump();
-      await tester.pump();
+    connectivityController.add(ConnectivityStatus.offline);
+    await tester.pump();
+    await tester.pump();
 
-      verifyNever(
-            () => mockRepository.syncCatalog(),
-      );
+    verifyNever(() => mockRepository.syncCatalog());
 
-      connectivityController.add(ConnectivityStatus.online);
-      await tester.pump();
-      await tester.pump();
+    connectivityController.add(ConnectivityStatus.online);
+    await tester.pump();
+    await tester.pump();
 
-      verify(
-            () => mockRepository.syncCatalog(),
-      ).called(1);
-    },
-  );
+    verify(() => mockRepository.syncCatalog()).called(1);
+  });
 
-  testWidgets(
-    'no sincroniza nuevamente si la conexión sigue online',
-        (tester) async {
-      await pumpCoordinator(tester);
+  testWidgets('no sincroniza nuevamente si la conexión sigue online', (
+    tester,
+  ) async {
+    await pumpCoordinator(tester);
 
-      verify(
-            () => mockRepository.syncCatalog(),
-      ).called(1);
+    verify(() => mockRepository.syncCatalog()).called(1);
 
-      connectivityController.add(ConnectivityStatus.online);
-      await tester.pump();
-      await tester.pump();
+    connectivityController.add(ConnectivityStatus.online);
+    await tester.pump();
+    await tester.pump();
 
-      verifyNever(
-            () => mockRepository.syncCatalog(),
-      );
+    verifyNever(() => mockRepository.syncCatalog());
 
-      connectivityController.add(ConnectivityStatus.online);
-      await tester.pump();
-      await tester.pump();
+    connectivityController.add(ConnectivityStatus.online);
+    await tester.pump();
+    await tester.pump();
 
-      verifyNever(
-            () => mockRepository.syncCatalog(),
-      );
-    },
-  );
+    verifyNever(() => mockRepository.syncCatalog());
+  });
 }

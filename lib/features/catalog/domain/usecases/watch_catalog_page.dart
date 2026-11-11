@@ -6,13 +6,7 @@ class WatchCatalogPage {
 
   final CatalogRepository _repository;
 
-  Stream<List<Pokemon>> call({
-    required int page,
-    required int pageSize,
-  }) {
-    return _repository.watchCatalogPage(
-      page: page,
-      pageSize: pageSize,
-    );
+  Stream<List<Pokemon>> call({required int page, required int pageSize}) {
+    return _repository.watchCatalogPage(page: page, pageSize: pageSize);
   }
 }

@@ -27,15 +27,8 @@ class OfflineFirstCatalogRepository implements CatalogRepository {
     required int pageSize,
   }) {
     return _catalogDao
-        .watchCatalogPage(
-      limit: pageSize,
-      offset: page * pageSize,
-    )
-        .map(
-          (entries) => [
-        for (final entry in entries) entry.toPokemon(),
-      ],
-    );
+        .watchCatalogPage(limit: pageSize, offset: page * pageSize)
+        .map((entries) => [for (final entry in entries) entry.toPokemon()]);
   }
 
   @override

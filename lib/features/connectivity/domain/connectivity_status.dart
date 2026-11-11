@@ -1,5 +1,1 @@
-enum ConnectivityStatus {
-  online,
-  offline,
-  serviceUnavailable,
-}
+enum ConnectivityStatus { online, offline, serviceUnavailable }

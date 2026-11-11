@@ -112,6 +112,65 @@ void main() {
     expect(await catalogUpdates.next, [1, 4, 7]);
   });
 
+  test(
+    'emite solo los Pokémon de la página pedida aunque tengan varios tipos',
+    () async {
+      await savePage([squirtle, bulbasaur, charmander]);
+
+      final firstPage = await catalogDao
+          .watchCatalogPage(limit: 2, offset: 0)
+          .first;
+
+      expect(idsOf(firstPage), [1, 4]);
+      expect(firstPage.first.typeNames, ['grass', 'poison']);
+    },
+  );
+
+  test('la última página trae solo los Pokémon que quedan', () async {
+    await savePage([bulbasaur, charmander, squirtle]);
+
+    final lastPage = await catalogDao
+        .watchCatalogPage(limit: 2, offset: 2)
+        .first;
+    final pageAfterTheEnd = await catalogDao
+        .watchCatalogPage(limit: 2, offset: 4)
+        .first;
+
+    expect(idsOf(lastPage), [7]);
+    expect(pageAfterTheEnd, isEmpty);
+  });
+
+  test('vuelve a emitir la página cuando se guardan Pokémon en ella', () async {
+    final pageUpdates = StreamQueue(
+      catalogDao.watchCatalogPage(limit: 2, offset: 0).map(idsOf),
+    );
+    addTearDown(pageUpdates.cancel);
+
+    expect(await pageUpdates.next, isEmpty);
+
+    await savePage([charmander, squirtle]);
+    expect(await pageUpdates.next, [4, 7]);
+
+    await savePage([bulbasaur], nextOffset: 100);
+    expect(await pageUpdates.next, [1, 4]);
+  });
+
+  test(
+    'cuenta Pokémon y no filas de tipos, y se actualiza al guardar',
+    () async {
+      final countUpdates = StreamQueue(catalogDao.watchCatalogCount());
+      addTearDown(countUpdates.cancel);
+
+      expect(await countUpdates.next, 0);
+
+      await savePage([bulbasaur, charmander]);
+      expect(await countUpdates.next, 2);
+
+      await savePage([squirtle], nextOffset: 100);
+      expect(await countUpdates.next, 3);
+    },
+  );
+
   test('guarda el siguiente offset junto con la página', () async {
     await savePage([bulbasaur, charmander, squirtle], nextOffset: 50);
 

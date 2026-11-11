@@ -32,9 +32,8 @@ void main() {
   });
 
   test('returns offline when there is no network connection', () async {
-    when(() => mockConnectivity.checkConnectivity()).thenAnswer(
-          (_) async => [ConnectivityResult.none],
-    );
+    when(() => mockConnectivity.checkConnectivity())
+        .thenAnswer((_) async => [ConnectivityResult.none]);
 
     final result = await service.checkStatus();
 
@@ -45,12 +44,11 @@ void main() {
   });
 
   test('returns online when PokeAPI responds successfully', () async {
-    when(() => mockConnectivity.checkConnectivity()).thenAnswer(
-          (_) async => [ConnectivityResult.wifi],
-    );
+    when(() => mockConnectivity.checkConnectivity())
+        .thenAnswer((_) async => [ConnectivityResult.wifi]);
 
     when(() => mockGraphQLClient.query(any())).thenAnswer(
-          (_) async => QueryResult(
+      (_) async => QueryResult(
         options: QueryOptions(
           document: gql('''
         query {
@@ -78,13 +76,11 @@ void main() {
   });
 
   test('returns serviceUnavailable when the GraphQL request fails', () async {
-    when(() => mockConnectivity.checkConnectivity()).thenAnswer(
-          (_) async => [ConnectivityResult.wifi],
-    );
+    when(() => mockConnectivity.checkConnectivity())
+        .thenAnswer((_) async => [ConnectivityResult.wifi]);
 
-    when(() => mockGraphQLClient.query(any())).thenThrow(
-      Exception('PokeAPI is unavailable'),
-    );
+    when(() => mockGraphQLClient.query(any()))
+        .thenThrow(Exception('PokeAPI is unavailable'));
 
     final result = await service.checkStatus();
 

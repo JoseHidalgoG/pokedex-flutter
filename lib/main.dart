@@ -13,7 +13,7 @@ void main() {
     ProviderScope(
       overrides: [
         catalogRepositoryProvider.overrideWith(
-              (ref) => ref.watch(offlineFirstCatalogRepositoryProvider),
+          (ref) => ref.watch(offlineFirstCatalogRepositoryProvider),
         ),
       ],
       child: const MainApp(),
@@ -29,12 +29,9 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       title: 'Pokédex',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.red,
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.red),
         useMaterial3: true,
       ),
-
 
       builder: (context, child) {
         return ColoredBox(
@@ -46,18 +43,14 @@ class MainApp extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const ConnectivityBanner(),
-                Expanded(
-                  child: child ?? const SizedBox.shrink(),
-                ),
+                Expanded(child: child ?? const SizedBox.shrink()),
               ],
             ),
           ),
         );
       },
 
-      home: const CatalogSyncCoordinator(
-        child: CatalogScreen(),
-      ),
+      home: const CatalogSyncCoordinator(child: CatalogScreen()),
     );
   }
 }

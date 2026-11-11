@@ -50,7 +50,6 @@ class CatalogSyncService {
 
   Future<void> dispose() => _statusChanges.close();
 
-
   Future<void> _synchronize() async {
     _emit(const CatalogSyncInProgress());
 
@@ -65,11 +64,7 @@ class CatalogSyncService {
       final hasInternet = await _hasInternetAccess();
 
       if (!hasInternet) {
-        _emit(
-          const CatalogSyncFailed(
-            CatalogSyncFailureReason.noConnection,
-          ),
-        );
+        _emit(const CatalogSyncFailed(CatalogSyncFailureReason.noConnection));
         return;
       }
 
@@ -88,16 +83,10 @@ class CatalogSyncService {
       _emit(CatalogSyncFailed(reason));
 
       try {
-        await _catalogDao.recordCatalogSyncFailure(
-          failure.toString(),
-        );
+        await _catalogDao.recordCatalogSyncFailure(failure.toString());
       } catch (_) {}
     } catch (_) {
-      _emit(
-        const CatalogSyncFailed(
-          CatalogSyncFailureReason.requestFailed,
-        ),
-      );
+      _emit(const CatalogSyncFailed(CatalogSyncFailureReason.requestFailed));
       rethrow;
     }
   }

@@ -1,16 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:pokedex_flutter/core/database/app_database_provider.dart';
 import 'package:pokedex_flutter/core/network/pokeapi_graphql_client_provider.dart';
 import 'package:pokedex_flutter/features/catalog/data/offline_first_catalog_repository.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
+import 'package:pokedex_flutter/features/connectivity/connectivity_providers.dart';
+import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status.dart';
 
-final catalogInternetAccessCheckProvider = Provider<InternetAccessCheck>(
-  (ref) =>
-      () => InternetConnection().hasInternetAccess,
-);
+final catalogInternetAccessCheckProvider = Provider<InternetAccessCheck>((ref) {
+  final connectivityRepository = ref.watch(connectivityRepositoryProvider);
+  return () async =>
+      await connectivityRepository.checkStatus() != ConnectivityStatus.offline;
+});
 
 final catalogSyncServiceProvider = Provider<CatalogSyncService>((ref) {
   final syncService = CatalogSyncService(

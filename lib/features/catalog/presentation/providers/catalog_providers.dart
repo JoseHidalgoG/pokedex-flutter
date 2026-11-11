@@ -42,15 +42,17 @@ final lastCatalogSyncProvider = FutureProvider<DateTime?>((ref) async {
 });
 
 final watchCatalogPageProvider = Provider<WatchCatalogPage>(
-      (ref) => WatchCatalogPage(ref.watch(catalogRepositoryProvider)),
+  (ref) => WatchCatalogPage(ref.watch(catalogRepositoryProvider)),
 );
 
 final watchCatalogCountProvider = Provider<WatchCatalogCount>(
-      (ref) => WatchCatalogCount(ref.watch(catalogRepositoryProvider)),
+  (ref) => WatchCatalogCount(ref.watch(catalogRepositoryProvider)),
 );
 
-final catalogPageProvider =
-StreamProvider.family<List<Pokemon>, int>((ref, page) {
+final catalogPageProvider = StreamProvider.family<List<Pokemon>, int>((
+  ref,
+  page,
+) {
   return ref.watch(watchCatalogPageProvider)(
     page: page,
     pageSize: catalogPageSize,
@@ -58,5 +60,5 @@ StreamProvider.family<List<Pokemon>, int>((ref, page) {
 });
 
 final catalogCountProvider = StreamProvider<int>(
-      (ref) => ref.watch(watchCatalogCountProvider)(),
+  (ref) => ref.watch(watchCatalogCountProvider)(),
 );
