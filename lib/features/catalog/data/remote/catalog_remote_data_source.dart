@@ -3,10 +3,16 @@ import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_query.
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_request_failed.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 
+const catalogPageRequestTimeout = Duration(seconds: 30);
+
 class CatalogRemoteDataSource {
-  CatalogRemoteDataSource(this._client);
+  CatalogRemoteDataSource(
+    this._client, {
+    this._requestTimeout = catalogPageRequestTimeout,
+  });
 
   final GraphQLClient _client;
+  final Duration _requestTimeout;
 
   Future<List<PokemonDto>> fetchCatalogPage({
     required int limit,
@@ -16,6 +22,7 @@ class CatalogRemoteDataSource {
       QueryOptions(
         document: catalogPageQuery,
         variables: {'limit': limit, 'offset': offset},
+        queryRequestTimeout: _requestTimeout,
       ),
     );
     final exception = result.exception;
