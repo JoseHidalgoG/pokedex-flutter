@@ -1,7 +1,8 @@
 # ADR-0001: Base de datos local como única fuente de verdad
 
-- **Estado:** Propuesto
+- **Estado:** Aceptado
 - **Fecha:** 2026-11-04
+- **Aceptado:** 2026-11-10
 
 ## Contexto
 
@@ -13,10 +14,16 @@ La API GraphQL de PokeAPI (`https://graphql.pokeapi.co/v1beta2`) tiene límite d
 
 La base SQLite local, gestionada con Drift, es la única fuente de datos de la interfaz.
 
-- La capa `presentation` solo lee `Stream`s expuestos por los casos de uso del dominio, que a su vez leen de la base local.
-- Un servicio de sincronización (`CatalogSyncService`) descarga el catálogo por páginas desde GraphQL y lo guarda en la base con upsert por `id`, en una transacción por página.
-- El progreso de la sincronización se guarda en la tabla `sync_metadata`, para reanudarla tras un reinicio.
-- La sincronización se dispara al abrir la app, al recuperar la conexión y al pulsar «Reintentar», siempre en segundo plano.
+- La capa `presentation` solo conoce los casos de uso y el contrato `CatalogRepository` del dominio; nunca importa `data` ni `graphql`. Los datos del catálogo le llegan como `Stream`s que leen de la base local.
+- `CatalogSyncService` descarga el catálogo por páginas de 50 (`catalogPageSize`) desde GraphQL y lo guarda con upsert por `id`, en una transacción por página (`CatalogDao.saveCatalogPage`).
+- El progreso se guarda en la tabla `sync_metadata` (`nextOffset`, `isComplete`, `lastSyncedAt`, `lastError`), para reanudar la descarga tras un corte o un reinicio.
+- Si el catálogo está completo y se sincronizó hace menos de 24 horas (`catalogFreshnessWindow`), la sincronización no descarga nada.
+- Si llegan varias peticiones de sincronización a la vez, todas esperan a la misma ejecución en curso.
+- El servicio publica su estado como `CatalogSyncStatus`: `CatalogSyncIdle`, `CatalogSyncInProgress`, `CatalogSyncSucceeded` o `CatalogSyncFailed`, este último con el motivo `noConnection` o `requestFailed`.
+- La sincronización se dispara siempre en segundo plano:
+  - al abrir la app, desde `CatalogSyncCoordinator`;
+  - al recuperar la conexión, cuando `connectivityStatusProvider` pasa de un estado distinto de `online` a `online`;
+  - al pulsar «Reintentar» en `CatalogScreen`.
 
 ## Alternativas consideradas
 
@@ -27,6 +34,7 @@ La base SQLite local, gestionada con Drift, es la única fuente de datos de la i
 ## Consecuencias
 
 - La interfaz se comporta igual con o sin conexión; solo cambia si llegan datos nuevos.
-- Los datos pueden quedar desactualizados entre sincronizaciones; se acepta porque el catálogo de Pokémon cambia muy poco.
+- Si la sincronización falla y ya hay datos guardados, la lista sigue visible y un `SnackBar` avisa del fallo; sin datos, se muestra el estado de error con «Reintentar».
+- Los datos pueden quedar desactualizados hasta 24 horas; se acepta porque el catálogo de Pokémon cambia muy poco.
 - Se necesitan migraciones de esquema (`MigrationStrategy`) cuando se añadan columnas en la entrega final.
-- La lógica de sincronización queda aislada en un solo servicio, lo que facilita añadir reintentos con backoff y el estado «Sincronizando» más adelante.
+- La lógica de sincronización queda aislada en un solo servicio, lo que facilita añadir reintentos con backoff más adelante.
