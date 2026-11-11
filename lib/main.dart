@@ -34,7 +34,7 @@ class MainApp extends StatelessWidget {
       ),
 
       builder: (context, child) {
-        return ColoredBox(
+        return Material(
           color: const Color(0xFFFAFAFA),
           child: SafeArea(
             top: true,
