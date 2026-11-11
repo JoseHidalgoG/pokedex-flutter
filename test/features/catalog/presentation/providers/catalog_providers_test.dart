@@ -7,6 +7,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_
 
 class InMemoryCatalogRepository implements CatalogRepository {
   int syncRequests = 0;
+  bool? lastForceValue;
 
   final List<Pokemon> _pokemon = List.generate(
     51,
@@ -46,8 +47,9 @@ class InMemoryCatalogRepository implements CatalogRepository {
   }
 
   @override
-  Future<void> syncCatalog() async {
+  Future<void> syncCatalog({bool force = false}) async {
     syncRequests++;
+    lastForceValue = force;
   }
 
   @override
@@ -125,5 +127,19 @@ void main() {
 
     expect(secondPage.length, 1);
     expect(secondPage.first.id, 51);
+  });
+
+  test('syncCatalogProvider utiliza force false por defecto', () async {
+    await container.read(syncCatalogProvider)();
+
+    expect(repository.syncRequests, 1);
+    expect(repository.lastForceValue, false);
+  });
+
+  test('syncCatalogProvider permite forzar la sincronización', () async {
+    await container.read(syncCatalogProvider)(force: true);
+
+    expect(repository.syncRequests, 1);
+    expect(repository.lastForceValue, true);
   });
 }

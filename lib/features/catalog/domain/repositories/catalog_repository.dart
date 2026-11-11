@@ -13,7 +13,7 @@ abstract interface class CatalogRepository {
 
   Stream<CatalogSyncStatus> watchSyncStatus();
 
-  Future<void> syncCatalog();
+  Future<void> syncCatalog({bool force = false});
 
   Future<DateTime?> getLastSyncedAt();
 }

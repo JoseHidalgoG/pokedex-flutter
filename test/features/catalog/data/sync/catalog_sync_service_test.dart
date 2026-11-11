@@ -319,4 +319,85 @@ void main() {
       failedBecauseOf(CatalogSyncFailureReason.noConnection),
     );
   });
+
+  test('force true vuelve a descargar un catálogo reciente', () async {
+    final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
+
+    await saveAlreadyDownloaded(
+      remoteCatalog,
+      count: 120,
+      isComplete: true,
+      savedAt: now.subtract(const Duration(hours: 2)),
+    );
+
+    final syncService = syncServiceOver(remoteCatalog);
+
+    await syncService.syncCatalog(force: true);
+
+    final progress = await catalogDao.readCatalogSyncProgress();
+
+    expect(remoteCatalog.requestedOffsets, [0, 50, 100]);
+    expect(await savedPokemonIds(), hasLength(120));
+    expect(progress?.isComplete, isTrue);
+    expect(progress?.lastSyncedAt, now);
+    expect(syncService.currentStatus, isA<CatalogSyncSucceeded>());
+  });
+
+  test('force true sin Internet conserva el catálogo local', () async {
+    final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
+
+    await saveAlreadyDownloaded(
+      remoteCatalog,
+      count: 120,
+      isComplete: true,
+      savedAt: now.subtract(const Duration(hours: 2)),
+    );
+
+    final syncService = syncServiceOver(
+      remoteCatalog,
+      hasInternetAccess: () async => false,
+    );
+
+    await syncService.syncCatalog(force: true);
+
+    expect(remoteCatalog.requestedOffsets, isEmpty);
+    expect(await savedPokemonIds(), hasLength(120));
+
+    expect(
+      syncService.currentStatus,
+      failedBecauseOf(CatalogSyncFailureReason.noConnection),
+    );
+  });
+
+  test('force true conserva los datos cuando PokéAPI falla', () async {
+    final remoteCatalog = FakePokeApiCatalog(
+      pokemonCount: 120,
+      failingOffset: 0,
+    );
+
+    await saveAlreadyDownloaded(
+      remoteCatalog,
+      count: 120,
+      isComplete: true,
+      savedAt: now.subtract(const Duration(hours: 2)),
+    );
+
+    final syncService = syncServiceOver(
+      remoteCatalog,
+      hasInternetAccess: () async => true,
+    );
+
+    await syncService.syncCatalog(force: true);
+
+    final progress = await catalogDao.readCatalogSyncProgress();
+
+    expect(remoteCatalog.requestedOffsets, [0]);
+    expect(await savedPokemonIds(), hasLength(120));
+    expect(progress?.lastError, contains('503'));
+
+    expect(
+      syncService.currentStatus,
+      failedBecauseOf(CatalogSyncFailureReason.requestFailed),
+    );
+  });
 }

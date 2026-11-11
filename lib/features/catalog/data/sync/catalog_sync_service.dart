@@ -42,21 +42,21 @@ class CatalogSyncService {
     });
   }
 
-  Future<void> syncCatalog() {
-    return _runningSync ??= _synchronize().whenComplete(
-      () => _runningSync = null,
+  Future<void> syncCatalog({bool force = false}) {
+    return _runningSync ??= _synchronize(force: force).whenComplete(
+          () => _runningSync = null,
     );
   }
 
   Future<void> dispose() => _statusChanges.close();
 
-  Future<void> _synchronize() async {
+  Future<void> _synchronize({required bool force}) async {
     _emit(const CatalogSyncInProgress());
 
     try {
       final progress = await _catalogDao.readCatalogSyncProgress();
 
-      if (_isFreshAndComplete(progress)) {
+      if (!force && _isFreshAndComplete(progress)) {
         _emit(const CatalogSyncSucceeded());
         return;
       }
