@@ -22,7 +22,10 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   Future<void> _retrySync() async {
     try {
       await ref.read(syncCatalogProvider)();
-    } catch (_) {}
+    } catch (_) {
+      // El servicio de sincronización reporta el error
+      // mediante catalogSyncStatusProvider.
+    }
   }
 
   void _onSyncStatusChanged(CatalogSyncStatus? status) {
@@ -188,8 +191,28 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           const CatalogSyncFailed(CatalogSyncFailureReason.requestFailed),
     );
 
+    final isSyncing = syncStatus is CatalogSyncInProgress;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Pokédex'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Pokédex'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: isSyncing ? 'Sincronizando...' : 'Sincronizar catálogo',
+            onPressed: isSyncing ? null : _retrySync,
+            icon: isSyncing
+                ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            )
+                : const Icon(Icons.sync),
+          ),
+        ],
+      ),
       body: catalogAsync.when(
         data: (pokemonList) {
           if (pokemonList.isNotEmpty) {
