@@ -5,5 +5,6 @@ class SyncCatalog {
 
   final CatalogRepository _repository;
 
-  Future<void> call() => _repository.syncCatalog();
+  Future<void> call({bool force = false}) =>
+      _repository.syncCatalog(force: force);
 }

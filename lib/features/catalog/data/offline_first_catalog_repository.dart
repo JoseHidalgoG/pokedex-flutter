@@ -40,7 +40,8 @@ class OfflineFirstCatalogRepository implements CatalogRepository {
   Stream<CatalogSyncStatus> watchSyncStatus() => _syncService.watchStatus();
 
   @override
-  Future<void> syncCatalog() => _syncService.syncCatalog();
+  Future<void> syncCatalog({bool force = false}) =>
+      _syncService.syncCatalog(force: force);
 
   @override
   Future<DateTime?> getLastSyncedAt() async {

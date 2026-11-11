@@ -26,10 +26,9 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
   Future<void> _retrySync() async {
     try {
-      await ref.read(syncCatalogProvider)();
+      await ref.read(syncCatalogProvider)(force: true);
     } catch (_) {
-      // El servicio de sincronización reporta el error
-      // mediante catalogSyncStatusProvider.
+      // El servicio reporta el fallo mediante catalogSyncStatusProvider.
     }
   }
 
