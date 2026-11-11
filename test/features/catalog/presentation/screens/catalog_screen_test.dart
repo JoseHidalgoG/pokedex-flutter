@@ -64,7 +64,13 @@ void main() {
       syncStatus: const CatalogSyncInProgress(),
     );
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(Center),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Cargando catálogo'), findsOneWidget);
   });
 
