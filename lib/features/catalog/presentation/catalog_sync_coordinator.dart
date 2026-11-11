@@ -6,10 +6,7 @@ import 'package:pokedex_flutter/features/connectivity/connectivity_providers.dar
 import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status.dart';
 
 class CatalogSyncCoordinator extends ConsumerStatefulWidget {
-  const CatalogSyncCoordinator({
-    super.key,
-    required this.child,
-  });
+  const CatalogSyncCoordinator({super.key, required this.child});
 
   final Widget child;
 
@@ -37,19 +34,19 @@ class _CatalogSyncCoordinatorState
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue<ConnectivityStatus>>(
-      connectivityStatusProvider,
-          (previous, next) {
-        final previousStatus = previous?.asData?.value;
-        final nextStatus = next.asData?.value;
+    ref.listen<AsyncValue<ConnectivityStatus>>(connectivityStatusProvider, (
+      previous,
+      next,
+    ) {
+      final previousStatus = previous?.asData?.value;
+      final nextStatus = next.asData?.value;
 
-        if (previousStatus != null &&
-            previousStatus != ConnectivityStatus.online &&
-            nextStatus == ConnectivityStatus.online) {
-          _syncCatalog();
-        }
-      },
-    );
+      if (previousStatus != null &&
+          previousStatus != ConnectivityStatus.online &&
+          nextStatus == ConnectivityStatus.online) {
+        _syncCatalog();
+      }
+    });
 
     return widget.child;
   }

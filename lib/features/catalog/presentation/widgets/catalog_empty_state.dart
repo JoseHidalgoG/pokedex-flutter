@@ -36,10 +36,7 @@ class CatalogEmptyState extends StatelessWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-            ),
+            Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: onAction,

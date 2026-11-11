@@ -4,22 +4,17 @@ import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_ty
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_cached_image.dart';
 
 class PokemonDetailScreen extends StatelessWidget {
-  const PokemonDetailScreen({
-    super.key,
-    required this.pokemon,
-  });
+  const PokemonDetailScreen({super.key, required this.pokemon});
 
   final Pokemon pokemon;
 
   @override
   Widget build(BuildContext context) {
-    final capitalizedName = pokemon.name[0].toUpperCase() +
-        pokemon.name.substring(1);
+    final capitalizedName =
+        pokemon.name[0].toUpperCase() + pokemon.name.substring(1);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(capitalizedName),
-      ),
+      appBar: AppBar(title: Text(capitalizedName)),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),

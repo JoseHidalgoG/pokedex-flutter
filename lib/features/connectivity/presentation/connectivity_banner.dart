@@ -61,7 +61,7 @@ class ConnectivityBanner extends ConsumerWidget {
             case ConnectivityStatus.serviceUnavailable:
               title = 'Servicio no disponible';
               subtitle =
-              'Red activa, API sin respuesta · datos locales · $lastSyncText';
+                  'Red activa, API sin respuesta · datos locales · $lastSyncText';
 
               icon = Icons.warning_amber_rounded;
               color = const Color(0xFF805300);
@@ -70,7 +70,7 @@ class ConnectivityBanner extends ConsumerWidget {
 
           if (syncStatus is CatalogSyncFailed) {
             subtitle =
-            syncStatus.reason == CatalogSyncFailureReason.noConnection
+                syncStatus.reason == CatalogSyncFailureReason.noConnection
                 ? 'No se pudo sincronizar · Sin conexión'
                 : 'No se pudo sincronizar · Se conservan los datos locales';
           }
@@ -81,18 +81,12 @@ class ConnectivityBanner extends ConsumerWidget {
           label: '$title. $subtitle',
           child: Container(
             width: double.infinity,
-            margin: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 10,
-            ),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: const Color(0xFFFAFAFA),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: const Color(0xFFDCE0E7),
-                width: 1,
-              ),
+              border: Border.all(color: const Color(0xFFDCE0E7), width: 1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.04),
@@ -131,11 +125,7 @@ class ConnectivityBanner extends ConsumerWidget {
                     children: [
                       Padding(
                         padding: const EdgeInsets.only(top: 1),
-                        child: Icon(
-                          icon,
-                          color: color,
-                          size: 17,
-                        ),
+                        child: Icon(icon, color: color, size: 17),
                       ),
                       const SizedBox(width: 8),
                       Expanded(

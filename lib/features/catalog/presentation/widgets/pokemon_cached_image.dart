@@ -25,20 +25,14 @@ class PokemonCachedImage extends StatelessWidget {
       child: CachedNetworkImage(
         imageUrl: imageUrl,
         fit: BoxFit.contain,
-        placeholder: (context, url) => const Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-          ),
-        ),
+        placeholder: (context, url) =>
+            const Center(child: CircularProgressIndicator(strokeWidth: 2)),
         errorWidget: (context, url, error) => _buildFallback(),
       ),
     );
   }
 
   Widget _buildFallback() {
-    return Icon(
-      Icons.catching_pokemon,
-      size: errorIconSize,
-    );
+    return Icon(Icons.catching_pokemon, size: errorIconSize);
   }
 }

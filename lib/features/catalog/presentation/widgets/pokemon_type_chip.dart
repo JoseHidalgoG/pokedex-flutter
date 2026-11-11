@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 
 class PokemonTypeChip extends StatelessWidget {
-  const PokemonTypeChip({
-    super.key,
-    required this.typeName,
-  });
+  const PokemonTypeChip({super.key, required this.typeName});
 
   final String typeName;
 
@@ -35,10 +32,7 @@ class PokemonTypeChip extends StatelessWidget {
     final color = _typeColors[normalizedName] ?? Colors.grey;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 5,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(20),

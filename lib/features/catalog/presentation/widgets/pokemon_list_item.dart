@@ -18,10 +18,7 @@ class PokemonListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 6,
-      ),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
@@ -29,10 +26,7 @@ class PokemonListItem extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              PokemonCachedImage(
-                imageUrl: pokemon.imageUrl,
-                size: 76,
-              ),
+              PokemonCachedImage(imageUrl: pokemon.imageUrl, size: 76),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -44,11 +38,9 @@ class PokemonListItem extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      pokemon.name[0].toUpperCase() +
-                          pokemon.name.substring(1),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      pokemon.name[0].toUpperCase() + pokemon.name.substring(1),
+                      style: Theme.of(context).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -56,9 +48,7 @@ class PokemonListItem extends StatelessWidget {
                       runSpacing: 4,
                       children: pokemon.typeNames
                           .take(2)
-                          .map(
-                            (type) => PokemonTypeChip(typeName: type),
-                      )
+                          .map((type) => PokemonTypeChip(typeName: type))
                           .toList(),
                     ),
                   ],

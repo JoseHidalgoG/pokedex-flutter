@@ -5,9 +5,7 @@ import 'package:pokedex_flutter/features/connectivity/data/connectivity_service.
 class ConnectivityRepositoryImpl implements ConnectivityRepository {
   final ConnectivityService _connectivityService;
 
-  ConnectivityRepositoryImpl({
-    required this._connectivityService,
-  });
+  ConnectivityRepositoryImpl({required this._connectivityService});
 
   @override
   Future<ConnectivityStatus> checkStatus() {
