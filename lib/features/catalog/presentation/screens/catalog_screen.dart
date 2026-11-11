@@ -17,49 +17,62 @@ class CatalogScreen extends ConsumerStatefulWidget {
 
 class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   int _currentPage = 0;
+  bool _syncFailureReported = false;
 
-  Future<void> _retrySync(
-      BuildContext context,
-      WidgetRef ref,
-      ) async {
+  Future<void> _retrySync() async {
     try {
       await ref.read(syncCatalogProvider)();
-    } catch (_) {
-      if (!context.mounted) return;
+    } catch (_) {}
+  }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo sincronizar el catálogo. Inténtalo nuevamente.'),
-        ),
-      );
+  void _onSyncStatusChanged(CatalogSyncStatus? status) {
+    if (status is CatalogSyncInProgress) {
+      _syncFailureReported = false;
     }
+    _reportSyncFailureOverVisibleCatalog();
+  }
+
+  void _reportSyncFailureOverVisibleCatalog() {
+    final syncStatus = ref.read(catalogSyncStatusProvider).asData?.value;
+    final visiblePokemon =
+        ref.read(catalogPageProvider(_currentPage)).asData?.value ?? const [];
+
+    if (_syncFailureReported ||
+        syncStatus is! CatalogSyncFailed ||
+        visiblePokemon.isEmpty) {
+      return;
+    }
+
+    _syncFailureReported = true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_syncFailureMessage(syncStatus.reason))),
+    );
+  }
+
+  String _syncFailureMessage(CatalogSyncFailureReason reason) {
+    return switch (reason) {
+      CatalogSyncFailureReason.noConnection =>
+        'Sin conexión: se muestran los Pokémon guardados.',
+      CatalogSyncFailureReason.requestFailed =>
+        'No se pudo sincronizar el catálogo. Inténtalo nuevamente.',
+    };
   }
 
   Widget _buildPagination(int totalItems) {
-    final totalPages =
-    (totalItems / catalogPageSize).ceil();
+    final totalPages = (totalItems / catalogPageSize).ceil();
 
     if (totalPages <= 1) {
       return const SizedBox.shrink();
     }
 
-    final maxStart = (totalPages - 5)
-        .clamp(0, totalPages)
-        .toInt();
+    final maxStart = (totalPages - 5).clamp(0, totalPages).toInt();
 
-    final startPage = (_currentPage - 2)
-        .clamp(0, maxStart)
-        .toInt();
+    final startPage = (_currentPage - 2).clamp(0, maxStart).toInt();
 
-    final endPage = (startPage + 5)
-        .clamp(0, totalPages)
-        .toInt();
+    final endPage = (startPage + 5).clamp(0, totalPages).toInt();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 12,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -81,9 +94,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   backgroundColor: page == _currentPage
                       ? Theme.of(context).colorScheme.primary
                       : null,
-                  foregroundColor: page == _currentPage
-                      ? Colors.white
-                      : null,
+                  foregroundColor: page == _currentPage ? Colors.white : null,
                   minimumSize: const Size(40, 40),
                   padding: EdgeInsets.zero,
                 ),
@@ -104,15 +115,22 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
   Widget _buildLoading() {
     return const Center(
-      child: CircularProgressIndicator(),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 16),
+          Text('Cargando catálogo'),
+        ],
+      ),
     );
   }
 
   Widget _buildEmptyState(
-      BuildContext context,
-      WidgetRef ref, {
-        required bool hasError,
-      }) {
+    BuildContext context,
+    WidgetRef ref, {
+    required bool hasError,
+  }) {
     return CatalogEmptyState(
       icon: hasError ? Icons.cloud_off : Icons.catching_pokemon,
       title: hasError
@@ -122,14 +140,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           ? 'Comprueba tu conexión e inténtalo nuevamente.'
           : 'Todavía no hay Pokémon guardados en el catálogo.',
       actionLabel: 'Reintentar',
-      onAction: () => _retrySync(context, ref),
+      onAction: _retrySync,
     );
   }
 
-  Widget _buildPokemonList(
-      BuildContext context,
-      List<Pokemon> pokemonList,
-      ) {
+  Widget _buildPokemonList(BuildContext context, List<Pokemon> pokemonList) {
     return ListView.builder(
       itemCount: pokemonList.length,
       itemBuilder: (context, index) {
@@ -140,9 +155,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => PokemonDetailScreen(
-                  pokemon: pokemon,
-                ),
+                builder: (_) => PokemonDetailScreen(pokemon: pokemon),
               ),
             );
           },
@@ -153,9 +166,16 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final catalogAsync = ref.watch(
-      catalogPageProvider(_currentPage),
+    ref.listen<AsyncValue<CatalogSyncStatus>>(
+      catalogSyncStatusProvider,
+      (_, next) => _onSyncStatusChanged(next.asData?.value),
     );
+    ref.listen<AsyncValue<List<Pokemon>>>(
+      catalogPageProvider(_currentPage),
+      (_, _) => _reportSyncFailureOverVisibleCatalog(),
+    );
+
+    final catalogAsync = ref.watch(catalogPageProvider(_currentPage));
 
     final countAsync = ref.watch(catalogCountProvider);
     countAsync.whenData(_ensureValidPage);
@@ -164,35 +184,23 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     final syncStatus = syncStatusAsync.when(
       data: (status) => status,
       loading: () => const CatalogSyncInProgress(),
-      error: (_, _) => const CatalogSyncFailed(
-        CatalogSyncFailureReason.requestFailed,
-      ),
+      error: (_, _) =>
+          const CatalogSyncFailed(CatalogSyncFailureReason.requestFailed),
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pokédex'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Pokédex'), centerTitle: true),
       body: catalogAsync.when(
         data: (pokemonList) {
           if (pokemonList.isNotEmpty) {
             return Column(
               children: [
-                Expanded(
-                  child: _buildPokemonList(
-                    context,
-                    pokemonList,
-                  ),
-                ),
+                Expanded(child: _buildPokemonList(context, pokemonList)),
                 countAsync.when(
-                  data: (totalItems) =>
-                      _buildPagination(totalItems),
+                  data: (totalItems) => _buildPagination(totalItems),
                   loading: () => const SizedBox(
                     height: 64,
-                    child: Center(
-                      child: CircularProgressIndicator(),
-                    ),
+                    child: Center(child: CircularProgressIndicator()),
                   ),
                   error: (_, _) => const SizedBox.shrink(),
                 ),
@@ -205,38 +213,23 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           }
 
           if (syncStatus is CatalogSyncFailed) {
-            return _buildEmptyState(
-              context,
-              ref,
-              hasError: true,
-            );
+            return _buildEmptyState(context, ref, hasError: true);
           }
 
-          return _buildEmptyState(
-            context,
-            ref,
-            hasError: false,
-          );
+          return _buildEmptyState(context, ref, hasError: false);
         },
         loading: () => _buildLoading(),
         error: (error, stackTrace) {
-          return _buildEmptyState(
-            context,
-            ref,
-            hasError: true,
-          );
+          return _buildEmptyState(context, ref, hasError: true);
         },
       ),
     );
   }
 
-
   void _ensureValidPage(int totalItems) {
     final totalPages = (totalItems / catalogPageSize).ceil();
 
-    final lastValidPage = totalPages > 0
-        ? totalPages - 1
-        : 0;
+    final lastValidPage = totalPages > 0 ? totalPages - 1 : 0;
 
     if (_currentPage > lastValidPage) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -248,5 +241,4 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       });
     }
   }
-
 }
