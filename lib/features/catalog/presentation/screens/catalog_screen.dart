@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
@@ -7,6 +9,9 @@ import 'package:pokedex_flutter/features/catalog/presentation/screens/pokemon_de
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/catalog_empty_state.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_list_item.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_pagination.dart';
+
+const _maxVisiblePageButtons = 5;
+const _pageButtonSpacing = 6.0;
 
 class CatalogScreen extends ConsumerStatefulWidget {
   const CatalogScreen({super.key});
@@ -68,52 +73,79 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       return const SizedBox.shrink();
     }
 
-    final maxStart = (totalPages - 5).clamp(0, totalPages).toInt();
-
-    final startPage = (_currentPage - 2).clamp(0, maxStart).toInt();
-
-    final endPage = (startPage + 5).clamp(0, totalPages).toInt();
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            tooltip: 'Página anterior',
-            onPressed: _currentPage > 0
-                ? () => setState(() => _currentPage--)
-                : null,
-            icon: const Icon(Icons.chevron_left),
-          ),
-          for (var page = startPage; page < endPage; page++)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: TextButton(
-                onPressed: () {
-                  setState(() => _currentPage = page);
-                },
-                style: TextButton.styleFrom(
-                  backgroundColor: page == _currentPage
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                  foregroundColor: page == _currentPage ? Colors.white : null,
-                  minimumSize: const Size(40, 40),
-                  padding: EdgeInsets.zero,
-                ),
-                child: Text('${page + 1}'),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final visiblePageButtons = _visiblePageButtonsFor(
+            availableWidth: constraints.maxWidth,
+            totalPages: totalPages,
+          );
+
+          final startPage = (_currentPage - visiblePageButtons ~/ 2)
+              .clamp(0, totalPages - visiblePageButtons)
+              .toInt();
+
+          final endPage = startPage + visiblePageButtons;
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                tooltip: 'Página anterior',
+                onPressed: _currentPage > 0
+                    ? () => setState(() => _currentPage--)
+                    : null,
+                icon: const Icon(Icons.chevron_left),
               ),
-            ),
-          IconButton(
-            tooltip: 'Página siguiente',
-            onPressed: _currentPage < totalPages - 1
-                ? () => setState(() => _currentPage++)
-                : null,
-            icon: const Icon(Icons.chevron_right),
-          ),
-        ],
+              for (var page = startPage; page < endPage; page++)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: _pageButtonSpacing / 2,
+                  ),
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() => _currentPage = page);
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: page == _currentPage
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                      foregroundColor: page == _currentPage
+                          ? Colors.white
+                          : null,
+                      minimumSize: const Size(40, 40),
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: Text('${page + 1}'),
+                  ),
+                ),
+              IconButton(
+                tooltip: 'Página siguiente',
+                onPressed: _currentPage < totalPages - 1
+                    ? () => setState(() => _currentPage++)
+                    : null,
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
+          );
+        },
       ),
     );
+  }
+
+  int _visiblePageButtonsFor({
+    required double availableWidth,
+    required int totalPages,
+  }) {
+    final widthForPageButtons =
+        availableWidth - 2 * kMinInteractiveDimension;
+    final fittingPageButtons =
+        widthForPageButtons ~/ (kMinInteractiveDimension + _pageButtonSpacing);
+
+    return fittingPageButtons
+        .clamp(1, math.min(_maxVisiblePageButtons, totalPages))
+        .toInt();
   }
 
   Widget _buildLoading() {

@@ -28,13 +28,14 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Pokédex',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.red),
         useMaterial3: true,
       ),
 
       builder: (context, child) {
-        return ColoredBox(
+        return Material(
           color: const Color(0xFFFAFAFA),
           child: SafeArea(
             top: true,
