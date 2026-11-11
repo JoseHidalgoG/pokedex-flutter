@@ -123,6 +123,10 @@ stateDiagram-v2
 
 `ConnectivityService` no se fía solo del sistema operativo: tener Wi-Fi no garantiza que la API responda. Por eso distingue tres estados. `connectivityStatusProvider` ignora los cambios que duran menos de 800 ms, y `CatalogSyncCoordinator` sincroniza cuando el estado pasa a `online`.
 
+Mientras el estado es `serviceUnavailable`, el servicio repite la consulta de prueba cada 15 s, porque la API puede volver sin que cambie la red. En cuanto responde, el estado pasa a `online` y el catálogo se sincroniza sin reiniciar la aplicación. En `online` y `offline` no repite la consulta.
+
+La consulta de prueba espera como máximo 5 s, para que el banner reaccione rápido. Cada página del catálogo espera hasta 30 s (`catalogPageRequestTimeout`), porque trae 50 Pokémon con sus tipos y puede tardar más en una red móvil.
+
 ```mermaid
 flowchart TD
   Change[connectivity_plus avisa de un cambio] --> Network{¿Hay alguna red?}
@@ -130,6 +134,7 @@ flowchart TD
   Network -- sí --> Health["Consulta GraphQL de prueba<br/>pokemon(limit: 1), máximo 5 s"]
   Health -- responde --> Online[online]
   Health -- error o tiempo agotado --> Unavailable[serviceUnavailable]
+  Unavailable -. cada 15 s .-> Health
   Offline --> Debounce[Debounce de 800 ms]
   Online --> Debounce
   Unavailable --> Debounce

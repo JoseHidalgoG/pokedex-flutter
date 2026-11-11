@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:graphql/client.dart';
 import 'package:pokedex_flutter/core/network/pokeapi_graphql_client.dart';
@@ -34,6 +36,16 @@ Stream<Response> replyWithSavedPage() {
       response: savedResponse,
     ),
   );
+}
+
+Stream<Response> replyWithSavedPageAfter(Duration delay) {
+  return Stream.fromFuture(
+    Future.delayed(delay, () => replyWithSavedPage().single),
+  );
+}
+
+Stream<Response> neverReply() {
+  return Stream.fromFuture(Completer<Response>().future);
 }
 
 void main() {
@@ -121,6 +133,49 @@ void main() {
         dataSource.fetchCatalogPage(limit: 50, offset: 0),
         throwsA(isA<CatalogPageRequestFailed>()),
       );
+    },
+  );
+
+  test('acepta una página que tarda más de 5 segundos en llegar', () {
+    fakeAsync((async) {
+      final dataSource = dataSourceOver(
+        ScriptedPokeApiLink(
+          () => replyWithSavedPageAfter(const Duration(seconds: 6)),
+        ),
+      );
+
+      List<PokemonDto>? page;
+      dataSource
+          .fetchCatalogPage(limit: 4, offset: 0)
+          .then((receivedPage) => page = receivedPage);
+
+      async.elapse(const Duration(seconds: 6));
+
+      expect(idsOf(page!), [1, 2, 3, 4]);
+    });
+  });
+
+  test(
+    'lanza CatalogPageRequestFailed cuando PokeAPI no responde a tiempo',
+    () {
+      fakeAsync((async) {
+        final tooLate = catalogPageRequestTimeout + const Duration(seconds: 1);
+        final dataSource = dataSourceOver(ScriptedPokeApiLink(neverReply));
+
+        Object? failure;
+        dataSource
+            .fetchCatalogPage(limit: 50, offset: 0)
+            .then(
+              (_) {},
+              onError: (Object error) {
+                failure = error;
+              },
+            );
+
+        async.elapse(tooLate);
+
+        expect(failure, isA<CatalogPageRequestFailed>());
+      });
     },
   );
 }

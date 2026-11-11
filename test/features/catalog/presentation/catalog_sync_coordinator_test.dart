@@ -99,4 +99,24 @@ void main() {
 
     verifyNever(() => mockRepository.syncCatalog());
   });
+
+  testWidgets('sincroniza cuando el servicio vuelve a estar disponible', (
+    tester,
+  ) async {
+    await pumpCoordinator(tester);
+
+    verify(() => mockRepository.syncCatalog()).called(1);
+
+    connectivityController.add(ConnectivityStatus.serviceUnavailable);
+    await tester.pump();
+    await tester.pump();
+
+    verifyNever(() => mockRepository.syncCatalog());
+
+    connectivityController.add(ConnectivityStatus.online);
+    await tester.pump();
+    await tester.pump();
+
+    verify(() => mockRepository.syncCatalog()).called(1);
+  });
 }

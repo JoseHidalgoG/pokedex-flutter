@@ -9,10 +9,18 @@ class ConnectivityService {
   final Connectivity _connectivity;
   final GraphQLClient _graphQLClient;
 
+  final Duration _unavailableServiceRecheckInterval;
+
   ConnectivityService({
     Connectivity? connectivity,
     required this._graphQLClient,
+    this._unavailableServiceRecheckInterval =
+        defaultUnavailableServiceRecheckInterval,
   }) : _connectivity = connectivity ?? Connectivity();
+
+  static const defaultUnavailableServiceRecheckInterval = Duration(
+    seconds: 15,
+  );
 
   static const _healthCheckTimeout = Duration(seconds: 5);
 
@@ -61,17 +69,28 @@ class ConnectivityService {
     late StreamController<ConnectivityStatus> controller;
 
     StreamSubscription<List<ConnectivityResult>>? connectivitySubscription;
+    Timer? unavailableServiceRecheck;
 
     var checkSequence = 0;
 
     Future<void> emitCurrentStatus() async {
+      unavailableServiceRecheck?.cancel();
       final currentSequence = ++checkSequence;
 
       try {
         final status = await checkStatus();
 
-        if (!controller.isClosed && currentSequence == checkSequence) {
-          controller.add(status);
+        if (controller.isClosed || currentSequence != checkSequence) {
+          return;
+        }
+
+        controller.add(status);
+
+        if (status == ConnectivityStatus.serviceUnavailable) {
+          unavailableServiceRecheck = Timer(
+            _unavailableServiceRecheckInterval,
+            emitCurrentStatus,
+          );
         }
       } catch (error, stackTrace) {
         if (!controller.isClosed && currentSequence == checkSequence) {
@@ -91,6 +110,7 @@ class ConnectivityService {
       },
       onCancel: () async {
         checkSequence++;
+        unavailableServiceRecheck?.cancel();
         await connectivitySubscription?.cancel();
       },
     );
