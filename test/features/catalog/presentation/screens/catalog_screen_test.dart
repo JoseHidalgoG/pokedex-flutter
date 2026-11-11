@@ -140,6 +140,32 @@ void main() {
     expect(find.text('#0001'), findsOneWidget);
   });
 
+  testWidgets(
+    'la paginación cabe en un teléfono estrecho con el catálogo completo',
+    (tester) async {
+      const narrowPhoneWidth = 360.0;
+      tester.view.devicePixelRatio = 3;
+      tester.view.physicalSize = const Size(narrowPhoneWidth * 3, 740 * 3);
+      addTearDown(tester.view.reset);
+
+      final fullCatalog = List.generate(
+        1025,
+        (index) => Pokemon(
+          id: index + 1,
+          name: 'pokemon${index + 1}',
+          imageUrl: '',
+          typeNames: const ['normal'],
+        ),
+      );
+
+      await pumpCatalog(tester, pokemon: fullCatalog);
+
+      final nextPageButton = tester.getRect(find.byTooltip('Página siguiente'));
+      expect(nextPageButton.right, lessThanOrEqualTo(narrowPhoneWidth));
+      expect(find.text('1'), findsOneWidget);
+    },
+  );
+
   testWidgets('abre el detalle al seleccionar un Pokémon', (tester) async {
     await pumpCatalog(tester, pokemon: [pikachu]);
 
