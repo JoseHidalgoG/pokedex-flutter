@@ -1,4 +1,5 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:graphql/client.dart';
 import 'package:mocktail/mocktail.dart';
@@ -87,5 +88,122 @@ void main() {
     expect(result, ConnectivityStatus.serviceUnavailable);
 
     verify(() => mockGraphQLClient.query(any())).called(1);
+  });
+
+  group('al observar el estado', () {
+    const recheckInterval = Duration(seconds: 15);
+
+    late ConnectivityService watchingService;
+
+    QueryResult healthyPokeApiResult() {
+      return QueryResult(
+        options: QueryOptions(document: gql('query { pokemon { id } }')),
+        source: QueryResultSource.network,
+        data: {
+          'pokemon': [
+            {'id': 1},
+          ],
+        },
+        context: const Context(),
+      );
+    }
+
+    void givenNetwork(ConnectivityResult network) {
+      when(
+        () => mockConnectivity.checkConnectivity(),
+      ).thenAnswer((_) async => [network]);
+    }
+
+    setUp(() {
+      when(
+        () => mockConnectivity.onConnectivityChanged,
+      ).thenAnswer((_) => const Stream.empty());
+
+      watchingService = ConnectivityService(
+        connectivity: mockConnectivity,
+        graphQLClient: mockGraphQLClient,
+        unavailableServiceRecheckInterval: recheckInterval,
+      );
+    });
+
+    test('vuelve a consultar la API mientras el servicio no está disponible', () {
+      fakeAsync((async) {
+        givenNetwork(ConnectivityResult.wifi);
+        var pokeApiIsBack = false;
+        when(() => mockGraphQLClient.query(any())).thenAnswer((_) async {
+          if (!pokeApiIsBack) {
+            throw Exception('PokeAPI no responde');
+          }
+          return healthyPokeApiResult();
+        });
+
+        final statuses = <ConnectivityStatus>[];
+        final subscription = watchingService.watchStatus().listen(
+          statuses.add,
+        );
+        async.flushMicrotasks();
+
+        expect(statuses, [ConnectivityStatus.serviceUnavailable]);
+
+        pokeApiIsBack = true;
+        async.elapse(recheckInterval);
+
+        expect(statuses, [
+          ConnectivityStatus.serviceUnavailable,
+          ConnectivityStatus.online,
+        ]);
+
+        subscription.cancel();
+      });
+    });
+
+    test('no vuelve a consultar la API mientras está en línea', () {
+      fakeAsync((async) {
+        givenNetwork(ConnectivityResult.wifi);
+        when(
+          () => mockGraphQLClient.query(any()),
+        ).thenAnswer((_) async => healthyPokeApiResult());
+
+        final subscription = watchingService.watchStatus().listen((_) {});
+        async.elapse(recheckInterval * 3);
+
+        verify(() => mockGraphQLClient.query(any())).called(1);
+
+        subscription.cancel();
+      });
+    });
+
+    test('no consulta la API mientras no hay red', () {
+      fakeAsync((async) {
+        givenNetwork(ConnectivityResult.none);
+
+        final statuses = <ConnectivityStatus>[];
+        final subscription = watchingService.watchStatus().listen(
+          statuses.add,
+        );
+        async.elapse(recheckInterval * 3);
+
+        expect(statuses, [ConnectivityStatus.offline]);
+        verifyNever(() => mockGraphQLClient.query(any()));
+
+        subscription.cancel();
+      });
+    });
+
+    test('deja de consultar la API cuando nadie observa el estado', () {
+      fakeAsync((async) {
+        givenNetwork(ConnectivityResult.wifi);
+        when(
+          () => mockGraphQLClient.query(any()),
+        ).thenThrow(Exception('PokeAPI no responde'));
+
+        final subscription = watchingService.watchStatus().listen((_) {});
+        async.flushMicrotasks();
+        subscription.cancel();
+        async.elapse(recheckInterval * 3);
+
+        verify(() => mockGraphQLClient.query(any())).called(1);
+      });
+    });
   });
 }
