@@ -1,0 +1,290 @@
+{
+  "_meta": {
+    "description": "This file contains a serialized version of schema entities for drift.",
+    "version": "1.3.0"
+  },
+  "options": {
+    "store_date_time_values_as_text": false
+  },
+  "entities": [
+    {
+      "id": 0,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "pokemon",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "name",
+            "getter_name": "name",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "image_url",
+            "getter_name": "imageUrl",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "updated_at",
+            "getter_name": "updatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [],
+        "explicit_pk": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": 1,
+      "references": [
+        0
+      ],
+      "type": "table",
+      "data": {
+        "name": "pokemon_types",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "pokemon_id",
+            "getter_name": "pokemonId",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "REFERENCES pokemon (id) ON DELETE CASCADE",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "REFERENCES pokemon (id) ON DELETE CASCADE"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "pokemon",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": null,
+                  "on_delete": "cascade"
+                }
+              }
+            ]
+          },
+          {
+            "name": "slot",
+            "getter_name": "slot",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "type_name",
+            "getter_name": "typeName",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [],
+        "explicit_pk": [
+          "pokemon_id",
+          "slot"
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "sync_metadata",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "key",
+            "getter_name": "key",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "next_offset",
+            "getter_name": "nextOffset",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "total_count",
+            "getter_name": "totalCount",
+            "moor_type": "int",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_complete",
+            "getter_name": "isComplete",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "CHECK (\"is_complete\" IN (0, 1))",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "CHECK (\"is_complete\" IN (0, 1))"
+            },
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_synced_at",
+            "getter_name": "lastSyncedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_error",
+            "getter_name": "lastError",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [],
+        "explicit_pk": [
+          "key"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "favorites",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "pokemon_id",
+            "getter_name": "pokemonId",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "created_at",
+            "getter_name": "createdAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [],
+        "explicit_pk": [
+          "pokemon_id"
+        ]
+      }
+    }
+  ],
+  "fixed_sql": [
+    {
+      "name": "pokemon",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"pokemon\" (\"id\" INTEGER NOT NULL, \"name\" TEXT NOT NULL, \"image_url\" TEXT NOT NULL, \"updated_at\" INTEGER NOT NULL, PRIMARY KEY (\"id\"));"
+        }
+      ]
+    },
+    {
+      "name": "pokemon_types",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"pokemon_types\" (\"pokemon_id\" INTEGER NOT NULL REFERENCES pokemon (id) ON DELETE CASCADE, \"slot\" INTEGER NOT NULL, \"type_name\" TEXT NOT NULL, PRIMARY KEY (\"pokemon_id\", \"slot\"));"
+        }
+      ]
+    },
+    {
+      "name": "sync_metadata",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"sync_metadata\" (\"key\" TEXT NOT NULL, \"next_offset\" INTEGER NOT NULL DEFAULT 0, \"total_count\" INTEGER NULL, \"is_complete\" INTEGER NOT NULL DEFAULT 0 CHECK (\"is_complete\" IN (0, 1)), \"last_synced_at\" INTEGER NULL, \"last_error\" TEXT NULL, PRIMARY KEY (\"key\"));"
+        }
+      ]
+    },
+    {
+      "name": "favorites",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"favorites\" (\"pokemon_id\" INTEGER NOT NULL, \"created_at\" INTEGER NOT NULL, PRIMARY KEY (\"pokemon_id\"));"
+        }
+      ]
+    }
+  ]
+}
