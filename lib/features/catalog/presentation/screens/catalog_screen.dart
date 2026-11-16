@@ -27,9 +27,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   Future<void> _retrySync() async {
     try {
       await ref.read(syncCatalogProvider)(force: true);
-    } catch (_) {
-      // El servicio reporta el fallo mediante catalogSyncStatusProvider.
-    }
+    } catch (_) {}
   }
 
   void _onSyncStatusChanged(CatalogSyncStatus? status) {
@@ -137,8 +135,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     required double availableWidth,
     required int totalPages,
   }) {
-    final widthForPageButtons =
-        availableWidth - 2 * kMinInteractiveDimension;
+    final widthForPageButtons = availableWidth - 2 * kMinInteractiveDimension;
     final fittingPageButtons =
         widthForPageButtons ~/ (kMinInteractiveDimension + _pageButtonSpacing);
 
@@ -234,12 +231,10 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             onPressed: isSyncing ? null : _retrySync,
             icon: isSyncing
                 ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-              ),
-            )
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.sync),
           ),
         ],

@@ -18,9 +18,7 @@ class ConnectivityService {
         defaultUnavailableServiceRecheckInterval,
   }) : _connectivity = connectivity ?? Connectivity();
 
-  static const defaultUnavailableServiceRecheckInterval = Duration(
-    seconds: 15,
-  );
+  static const defaultUnavailableServiceRecheckInterval = Duration(seconds: 15);
 
   static const _healthCheckTimeout = Duration(seconds: 5);
 
