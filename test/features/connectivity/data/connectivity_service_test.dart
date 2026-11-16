@@ -109,15 +109,13 @@ void main() {
     }
 
     void givenNetwork(ConnectivityResult network) {
-      when(
-        () => mockConnectivity.checkConnectivity(),
-      ).thenAnswer((_) async => [network]);
+      when(() => mockConnectivity.checkConnectivity())
+          .thenAnswer((_) async => [network]);
     }
 
     setUp(() {
-      when(
-        () => mockConnectivity.onConnectivityChanged,
-      ).thenAnswer((_) => const Stream.empty());
+      when(() => mockConnectivity.onConnectivityChanged)
+          .thenAnswer((_) => const Stream.empty());
 
       watchingService = ConnectivityService(
         connectivity: mockConnectivity,
@@ -126,43 +124,45 @@ void main() {
       );
     });
 
-    test('vuelve a consultar la API mientras el servicio no está disponible', () {
-      fakeAsync((async) {
-        givenNetwork(ConnectivityResult.wifi);
-        var pokeApiIsBack = false;
-        when(() => mockGraphQLClient.query(any())).thenAnswer((_) async {
-          if (!pokeApiIsBack) {
-            throw Exception('PokeAPI no responde');
-          }
-          return healthyPokeApiResult();
+    test(
+      'vuelve a consultar la API mientras el servicio no está disponible',
+      () {
+        fakeAsync((async) {
+          givenNetwork(ConnectivityResult.wifi);
+          var pokeApiIsBack = false;
+          when(() => mockGraphQLClient.query(any())).thenAnswer((_) async {
+            if (!pokeApiIsBack) {
+              throw Exception('PokeAPI no responde');
+            }
+            return healthyPokeApiResult();
+          });
+
+          final statuses = <ConnectivityStatus>[];
+          final subscription = watchingService.watchStatus().listen(
+            statuses.add,
+          );
+          async.flushMicrotasks();
+
+          expect(statuses, [ConnectivityStatus.serviceUnavailable]);
+
+          pokeApiIsBack = true;
+          async.elapse(recheckInterval);
+
+          expect(statuses, [
+            ConnectivityStatus.serviceUnavailable,
+            ConnectivityStatus.online,
+          ]);
+
+          subscription.cancel();
         });
-
-        final statuses = <ConnectivityStatus>[];
-        final subscription = watchingService.watchStatus().listen(
-          statuses.add,
-        );
-        async.flushMicrotasks();
-
-        expect(statuses, [ConnectivityStatus.serviceUnavailable]);
-
-        pokeApiIsBack = true;
-        async.elapse(recheckInterval);
-
-        expect(statuses, [
-          ConnectivityStatus.serviceUnavailable,
-          ConnectivityStatus.online,
-        ]);
-
-        subscription.cancel();
-      });
-    });
+      },
+    );
 
     test('no vuelve a consultar la API mientras está en línea', () {
       fakeAsync((async) {
         givenNetwork(ConnectivityResult.wifi);
-        when(
-          () => mockGraphQLClient.query(any()),
-        ).thenAnswer((_) async => healthyPokeApiResult());
+        when(() => mockGraphQLClient.query(any()))
+            .thenAnswer((_) async => healthyPokeApiResult());
 
         final subscription = watchingService.watchStatus().listen((_) {});
         async.elapse(recheckInterval * 3);
@@ -178,9 +178,7 @@ void main() {
         givenNetwork(ConnectivityResult.none);
 
         final statuses = <ConnectivityStatus>[];
-        final subscription = watchingService.watchStatus().listen(
-          statuses.add,
-        );
+        final subscription = watchingService.watchStatus().listen(statuses.add);
         async.elapse(recheckInterval * 3);
 
         expect(statuses, [ConnectivityStatus.offline]);
@@ -193,9 +191,8 @@ void main() {
     test('deja de consultar la API cuando nadie observa el estado', () {
       fakeAsync((async) {
         givenNetwork(ConnectivityResult.wifi);
-        when(
-          () => mockGraphQLClient.query(any()),
-        ).thenThrow(Exception('PokeAPI no responde'));
+        when(() => mockGraphQLClient.query(any()))
+            .thenThrow(Exception('PokeAPI no responde'));
 
         final subscription = watchingService.watchStatus().listen((_) {});
         async.flushMicrotasks();

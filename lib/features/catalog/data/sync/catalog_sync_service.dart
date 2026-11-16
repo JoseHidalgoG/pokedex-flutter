@@ -43,9 +43,8 @@ class CatalogSyncService {
   }
 
   Future<void> syncCatalog({bool force = false}) {
-    return _runningSync ??= _synchronize(force: force).whenComplete(
-          () => _runningSync = null,
-    );
+    return _runningSync ??= _synchronize(force: force)
+        .whenComplete(() => _runningSync = null);
   }
 
   Future<void> dispose() => _statusChanges.close();
