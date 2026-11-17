@@ -223,4 +223,27 @@ void main() {
 
     expect([for (final favorite in favorites) favorite.pokemonId], [4]);
   });
+
+  test('el esquema crea los índices de búsqueda, filtros y ranking', () async {
+    final indexes = await database
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'index' "
+          "AND name NOT LIKE 'sqlite_autoindex_%'",
+        )
+        .map((row) => row.read<String>('name'))
+        .get();
+
+    expect(
+      indexes,
+      containsAll([
+        'pokemon_name_nocase',
+        'pokemon_generation_id',
+        'pokemon_base_stat_total',
+        'pokemon_species_id',
+        'pokemon_types_by_type',
+        'pokemon_moves_by_version_and_method',
+        'trivia_results_by_score',
+      ]),
+    );
+  });
 }
