@@ -42,6 +42,13 @@ class InMemoryCatalogRepository implements CatalogRepository {
   }
 
   @override
+  Stream<List<Pokemon>> watchPokemonByIds(List<int> ids) {
+    return Stream.value([
+      for (final id in ids) ..._pokemon.where((pokemon) => pokemon.id == id),
+    ]);
+  }
+
+  @override
   Stream<CatalogSyncStatus> watchSyncStatus() {
     return Stream.value(const CatalogSyncInProgress());
   }
@@ -98,6 +105,18 @@ void main() {
 
     expect(count, 51);
   });
+
+  test(
+    'watchPokemonByIdsProvider entrega los Pokémon que pide la funcionalidad',
+    () async {
+      final watchPokemonByIds = container.read(watchPokemonByIdsProvider);
+
+      final requested = await watchPokemonByIds([3, 1]).first;
+
+      expect([for (final pokemon in requested) pokemon.id], [3, 1]);
+      expect(requested.first.name, 'pokemon3');
+    },
+  );
 
   test('catalogSyncStatusProvider emite el estado del repositorio', () async {
     container.listen(catalogSyncStatusProvider, (_, _) {});
