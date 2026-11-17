@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:graphql/client.dart';
@@ -9,16 +10,23 @@ class ConnectivityService {
   final Connectivity _connectivity;
   final GraphQLClient _graphQLClient;
 
-  final Duration _unavailableServiceRecheckInterval;
+  final List<Duration> _unavailableServiceRecheckDelays;
 
   ConnectivityService({
     Connectivity? connectivity,
     required this._graphQLClient,
-    this._unavailableServiceRecheckInterval =
-        defaultUnavailableServiceRecheckInterval,
-  }) : _connectivity = connectivity ?? Connectivity();
+    this._unavailableServiceRecheckDelays =
+        defaultUnavailableServiceRecheckDelays,
+  }) : assert(_unavailableServiceRecheckDelays.isNotEmpty),
+       _connectivity = connectivity ?? Connectivity();
 
-  static const defaultUnavailableServiceRecheckInterval = Duration(seconds: 15);
+  static const defaultUnavailableServiceRecheckDelays = [
+    Duration(seconds: 15),
+    Duration(seconds: 30),
+    Duration(seconds: 60),
+    Duration(seconds: 120),
+    Duration(minutes: 5),
+  ];
 
   static const _healthCheckTimeout = Duration(seconds: 5);
 
@@ -70,6 +78,7 @@ class ConnectivityService {
     Timer? unavailableServiceRecheck;
 
     var checkSequence = 0;
+    var consecutiveUnavailableChecks = 0;
 
     Future<void> emitCurrentStatus() async {
       unavailableServiceRecheck?.cancel();
@@ -86,9 +95,12 @@ class ConnectivityService {
 
         if (status == ConnectivityStatus.serviceUnavailable) {
           unavailableServiceRecheck = Timer(
-            _unavailableServiceRecheckInterval,
+            _delayBeforeRecheck(consecutiveUnavailableChecks),
             emitCurrentStatus,
           );
+          consecutiveUnavailableChecks++;
+        } else {
+          consecutiveUnavailableChecks = 0;
         }
       } catch (error, stackTrace) {
         if (!controller.isClosed && currentSequence == checkSequence) {
@@ -97,10 +109,15 @@ class ConnectivityService {
       }
     }
 
+    void recheckFromFirstDelayAfterNetworkChange(List<ConnectivityResult> _) {
+      consecutiveUnavailableChecks = 0;
+      emitCurrentStatus();
+    }
+
     controller = StreamController<ConnectivityStatus>(
       onListen: () {
         connectivitySubscription = _connectivity.onConnectivityChanged.listen(
-          (_) => emitCurrentStatus(),
+          recheckFromFirstDelayAfterNetworkChange,
           onError: controller.addError,
         );
 
@@ -114,5 +131,10 @@ class ConnectivityService {
     );
 
     return controller.stream;
+  }
+
+  Duration _delayBeforeRecheck(int consecutiveUnavailableChecks) {
+    final delays = _unavailableServiceRecheckDelays;
+    return delays[min(consecutiveUnavailableChecks, delays.length - 1)];
   }
 }
