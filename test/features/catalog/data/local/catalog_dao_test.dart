@@ -171,6 +171,61 @@ void main() {
     },
   );
 
+  test(
+    'emite solo los Pokémon pedidos, con sus tipos en orden de slot',
+    () async {
+      await savePage([bulbasaur, charmander, squirtle]);
+
+      final requested = await catalogDao.watchPokemonByIds([1, 7]).first;
+
+      expect(idsOf(requested), [1, 7]);
+      expect(requested.first.name, 'bulbasaur');
+      expect(requested.first.imageUrl, 'https://example.com/1.png');
+      expect(requested.first.typeNames, ['grass', 'poison']);
+      expect(requested.last.typeNames, ['water']);
+    },
+  );
+
+  test('emite los Pokémon en el orden en que se pidieron los ids', () async {
+    await savePage([bulbasaur, charmander, squirtle]);
+
+    final requested = await catalogDao.watchPokemonByIds([7, 1, 4]).first;
+
+    expect(idsOf(requested), [7, 1, 4]);
+  });
+
+  test(
+    'omite los ids que no están en el catálogo y no repite los duplicados',
+    () async {
+      await savePage([bulbasaur, charmander]);
+
+      final requested = await catalogDao.watchPokemonByIds([4, 25, 4]).first;
+
+      expect(idsOf(requested), [4]);
+    },
+  );
+
+  test('una lista de ids vacía emite una lista vacía', () async {
+    await savePage([bulbasaur]);
+
+    expect(await catalogDao.watchPokemonByIds(const []).first, isEmpty);
+  });
+
+  test('vuelve a emitir cuando se guardan los Pokémon pedidos', () async {
+    final requestedUpdates = StreamQueue(
+      catalogDao.watchPokemonByIds([1, 4]).map(idsOf),
+    );
+    addTearDown(requestedUpdates.cancel);
+
+    expect(await requestedUpdates.next, isEmpty);
+
+    await savePage([bulbasaur]);
+    expect(await requestedUpdates.next, [1]);
+
+    await savePage([charmander, squirtle], nextOffset: 100);
+    expect(await requestedUpdates.next, [1, 4]);
+  });
+
   test('guarda el siguiente offset junto con la página', () async {
     await savePage([bulbasaur, charmander, squirtle], nextOffset: 50);
 

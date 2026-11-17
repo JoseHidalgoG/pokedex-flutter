@@ -7,6 +7,7 @@ import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog.d
 import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog_sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog_page.dart';
 import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog_count.dart';
+import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_pokemon_by_ids.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_pagination.dart';
 
 final catalogRepositoryProvider = Provider<CatalogRepository>(
@@ -61,4 +62,8 @@ final catalogPageProvider = StreamProvider.family<List<Pokemon>, int>((
 
 final catalogCountProvider = StreamProvider<int>(
   (ref) => ref.watch(watchCatalogCountProvider)(),
+);
+
+final watchPokemonByIdsProvider = Provider<WatchPokemonByIds>(
+  (ref) => WatchPokemonByIds(ref.watch(catalogRepositoryProvider)),
 );

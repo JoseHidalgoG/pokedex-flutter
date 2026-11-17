@@ -77,6 +77,40 @@ void main() {
   });
 
   test(
+    'watchPokemonByIds entrega Pokémon de dominio en el orden pedido',
+    () async {
+      await database.catalogDao.saveCatalogPage(
+        entries: const [
+          CatalogEntry(
+            id: 1,
+            name: 'bulbasaur',
+            imageUrl: 'https://example.com/1.png',
+            typeNames: ['grass', 'poison'],
+          ),
+          CatalogEntry(
+            id: 25,
+            name: 'pikachu',
+            imageUrl: 'https://example.com/25.png',
+            typeNames: ['electric'],
+          ),
+        ],
+        nextOffset: 50,
+        isComplete: false,
+        savedAt: DateTime(2026, 11, 9),
+      );
+
+      final requested = await repository.watchPokemonByIds([25, 1]).first;
+
+      expect(idsOf(requested), [25, 1]);
+      final pikachu = requested.first;
+      expect(pikachu.name, 'pikachu');
+      expect(pikachu.imageUrl, 'https://example.com/25.png');
+      expect(pikachu.typeNames, ['electric']);
+      expect(requested.last.typeNames, ['grass', 'poison']);
+    },
+  );
+
+  test(
     'el catálogo se actualiza cuando la sincronización guarda una página',
     () async {
       final catalogUpdates = StreamQueue(repository.watchCatalog().map(idsOf));

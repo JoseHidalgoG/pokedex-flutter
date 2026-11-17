@@ -11,6 +11,8 @@ abstract interface class CatalogRepository {
 
   Stream<int> watchCatalogCount();
 
+  Stream<List<Pokemon>> watchPokemonByIds(List<int> ids);
+
   Stream<CatalogSyncStatus> watchSyncStatus();
 
   Future<void> syncCatalog({bool force = false});
