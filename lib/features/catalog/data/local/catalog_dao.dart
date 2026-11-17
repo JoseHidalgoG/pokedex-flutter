@@ -46,17 +46,7 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   }
 
   Stream<List<CatalogEntry>> watchCatalog() {
-    final pokemonWithTypes =
-        select(pokemonTable).join([
-          leftOuterJoin(
-            pokemonTypesTable,
-            pokemonTypesTable.pokemonId.equalsExp(pokemonTable.id),
-          ),
-        ])..orderBy([
-          OrderingTerm.asc(pokemonTable.id),
-          OrderingTerm.asc(pokemonTypesTable.slot),
-        ]);
-    return pokemonWithTypes.watch().map(_groupTypesByPokemon);
+    return _pokemonWithTypes().watch().map(_groupTypesByPokemon);
   }
 
   Stream<List<CatalogEntry>> watchCatalogPage({
@@ -68,20 +58,19 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
       ..orderBy([OrderingTerm.asc(pokemonTable.id)])
       ..limit(limit, offset: offset);
 
-    final query =
-        select(pokemonTable).join([
-            leftOuterJoin(
-              pokemonTypesTable,
-              pokemonTypesTable.pokemonId.equalsExp(pokemonTable.id),
-            ),
-          ])
-          ..where(pokemonTable.id.isInQuery(pageIds))
-          ..orderBy([
-            OrderingTerm.asc(pokemonTable.id),
-            OrderingTerm.asc(pokemonTypesTable.slot),
-          ]);
+    final query = _pokemonWithTypes()
+      ..where(pokemonTable.id.isInQuery(pageIds));
 
     return query.watch().map(_groupTypesByPokemon);
+  }
+
+  Stream<List<CatalogEntry>> watchPokemonByIds(List<int> ids) {
+    final query = _pokemonWithTypes()..where(pokemonTable.id.isIn(ids));
+
+    return query
+        .watch()
+        .map(_groupTypesByPokemon)
+        .map((entries) => _inRequestedOrder(entries, ids));
   }
 
   Stream<int> watchCatalogCount() {
@@ -124,6 +113,26 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
         typeName: typeName,
       );
     }
+  }
+
+  JoinedSelectStatement<HasResultSet, dynamic> _pokemonWithTypes() {
+    return select(pokemonTable).join([
+      leftOuterJoin(
+        pokemonTypesTable,
+        pokemonTypesTable.pokemonId.equalsExp(pokemonTable.id),
+      ),
+    ])..orderBy([
+      OrderingTerm.asc(pokemonTable.id),
+      OrderingTerm.asc(pokemonTypesTable.slot),
+    ]);
+  }
+
+  List<CatalogEntry> _inRequestedOrder(
+    List<CatalogEntry> entries,
+    List<int> requestedIds,
+  ) {
+    final entriesById = {for (final entry in entries) entry.id: entry};
+    return [for (final id in requestedIds.toSet()) ?entriesById[id]];
   }
 
   List<CatalogEntry> _groupTypesByPokemon(List<TypedResult> joinedRows) {
