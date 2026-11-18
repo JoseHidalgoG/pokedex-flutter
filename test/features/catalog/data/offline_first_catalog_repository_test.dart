@@ -7,7 +7,7 @@ import 'package:pokedex_flutter/features/catalog/data/offline_first_catalog_repo
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
-import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 
 class SinglePagePokeApiCatalog implements CatalogRemoteDataSource {
@@ -121,10 +121,7 @@ void main() {
       await repository.syncCatalog();
 
       expect(await catalogUpdates.next, [1, 4]);
-      expect(
-        await repository.watchSyncStatus().first,
-        isA<CatalogSyncSucceeded>(),
-      );
+      expect(await repository.watchSyncStatus().first, isA<SyncRevalidated>());
     },
   );
 }

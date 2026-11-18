@@ -90,7 +90,7 @@ sequenceDiagram
   Sync->>Dao: readCatalogSyncProgress()
   Dao-->>Sync: sync_metadata
   alt catálogo completo y sincronizado hace menos de 24 h
-    Sync-->>Repo: CatalogSyncSucceeded
+    Sync-->>Repo: SyncIdle, sin llamar a PokeAPI
   else falta descargar
     Sync->>Sync: comprobar conexión
     loop hasta recibir menos de 50 Pokémon
@@ -99,7 +99,7 @@ sequenceDiagram
       Sync->>Dao: saveCatalogPage() en una transacción
       Dao-->>Screen: watchCatalogPage emite la lista nueva
     end
-    Sync-->>Repo: CatalogSyncSucceeded
+    Sync-->>Repo: SyncRevalidated(ahora)
   end
 ```
 
@@ -107,17 +107,32 @@ Si la descarga se corta, `sync_metadata.next_offset` guarda dónde se quedó y l
 
 ## Estados de la sincronización
 
-`CatalogSyncService` publica un `CatalogSyncStatus`. La pantalla y el banner lo leen para mostrar «Cargando catálogo», «Sincronizando...», el estado de error o el `SnackBar` de fallo.
+`CatalogSyncService` publica un `SyncStatus`, un tipo sellado en Dart puro de `core/sync/domain`. La pantalla y el banner lo leen para mostrar «Cargando catálogo», «Sincronizando...», el estado de error o el `SnackBar` de fallo.
+
+`SyncRevalidated` solo aparece cuando los datos acaban de llegar de PokeAPI en esta sesión. Si el catálogo está fresco y no hace falta llamar, el estado vuelve a `SyncIdle`.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> CatalogSyncIdle
-  CatalogSyncIdle --> CatalogSyncInProgress: syncCatalog()
-  CatalogSyncInProgress --> CatalogSyncSucceeded: catálogo fresco o descarga completa
-  CatalogSyncInProgress --> CatalogSyncFailed: noConnection o requestFailed
-  CatalogSyncSucceeded --> CatalogSyncInProgress: reconexión
-  CatalogSyncFailed --> CatalogSyncInProgress: Reintentar o reconexión
+  [*] --> SyncIdle
+  SyncIdle --> SyncFullPassInProgress: syncCatalog()
+  SyncFullPassInProgress --> SyncIdle: catálogo fresco, sin llamadas
+  SyncFullPassInProgress --> SyncRevalidated: descarga completa
+  SyncFullPassInProgress --> SyncFailed: SyncFailure
+  SyncRevalidated --> SyncFullPassInProgress: reconexión
+  SyncFailed --> SyncFullPassInProgress: Reintentar o reconexión
 ```
+
+`SyncFailed` lleva el `SyncFailure` que explica el fallo. `data` lo traduce desde las excepciones de GraphQL, así que ni `presentation` ni `domain` conocen `OperationException`.
+
+| Fallo | Cuándo ocurre | `isRetryable` |
+| --- | --- | --- |
+| `NoConnection` | No llega ninguna respuesta HTTP: sin red, DNS o conexión cortada | `false`; espera la reconexión |
+| `RequestTimeout` | PokeAPI no responde dentro del límite de la consulta | `true` |
+| `RateLimited` | HTTP 429, con su `Retry-After` en segundos si lo trae | `true` |
+| `ServerError` | HTTP 5xx, aunque el cuerpo no sea JSON | `true` |
+| `PartialResponse` | Llegan `data` y `errors` a la vez; no se guarda nada | `true` |
+| `QueryError` | Llegan `errors` sin `data`, un HTTP 4xx o un error inesperado | `false` |
+| `InvalidResponse` | El cuerpo no se puede leer o no trae la lista esperada | `true` |
 
 ## Conectividad
 

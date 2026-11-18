@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
@@ -49,8 +49,8 @@ class InMemoryCatalogRepository implements CatalogRepository {
   }
 
   @override
-  Stream<CatalogSyncStatus> watchSyncStatus() {
-    return Stream.value(const CatalogSyncInProgress());
+  Stream<SyncStatus> watchSyncStatus() {
+    return Stream.value(const SyncFullPassInProgress());
   }
 
   @override
@@ -123,7 +123,7 @@ void main() {
 
     final status = await container.read(catalogSyncStatusProvider.future);
 
-    expect(status, isA<CatalogSyncInProgress>());
+    expect(status, isA<SyncFullPassInProgress>());
   });
 
   test('syncCatalogProvider llama a syncCatalog del repositorio', () async {

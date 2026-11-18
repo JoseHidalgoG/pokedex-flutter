@@ -6,7 +6,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:graphql/client.dart';
 import 'package:pokedex_flutter/core/network/pokeapi_graphql_client.dart';
-import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_request_failed.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 
@@ -85,7 +85,7 @@ void main() {
     });
   });
 
-  test('lanza CatalogPageRequestFailed cuando falla la red', () async {
+  test('lanza ServerError cuando PokeAPI responde 503', () async {
     final dataSource = dataSourceOver(
       ScriptedPokeApiLink(
         () => Stream.error(
@@ -96,45 +96,67 @@ void main() {
 
     expect(
       dataSource.fetchCatalogPage(limit: 50, offset: 0),
-      throwsA(isA<CatalogPageRequestFailed>()),
-    );
-  });
-
-  test('lanza CatalogPageRequestFailed cuando la respuesta trae errores de GraphQL', () async {
-    final dataSource = dataSourceOver(
-      ScriptedPokeApiLink(
-        () => Stream.value(
-          const Response(
-            errors: [GraphQLError(message: "field 'pokemon' not found")],
-            response: {},
-          ),
-        ),
-      ),
-    );
-
-    expect(
-      dataSource.fetchCatalogPage(limit: 50, offset: 0),
-      throwsA(isA<CatalogPageRequestFailed>()),
+      throwsA(const ServerError(503)),
     );
   });
 
   test(
-    'lanza CatalogPageRequestFailed cuando la respuesta no trae la lista',
+    'lanza QueryError cuando la respuesta solo trae errores de GraphQL',
     () async {
       final dataSource = dataSourceOver(
         ScriptedPokeApiLink(
           () => Stream.value(
-            const Response(data: {'pokemon': null}, response: {}),
+            const Response(
+              errors: [GraphQLError(message: "field 'pokemon' not found")],
+              response: {},
+            ),
           ),
         ),
       );
 
       expect(
         dataSource.fetchCatalogPage(limit: 50, offset: 0),
-        throwsA(isA<CatalogPageRequestFailed>()),
+        throwsA(const QueryError("field 'pokemon' not found")),
       );
     },
   );
+
+  test(
+    'lanza PartialResponse y no devuelve nada cuando llegan datos con errores',
+    () async {
+      final savedPage = savedCatalogPageResponse();
+      final dataSource = dataSourceOver(
+        ScriptedPokeApiLink(
+          () => Stream.value(
+            Response(
+              data: savedPage['data'] as Map<String, Object?>?,
+              errors: const [GraphQLError(message: 'tipo no resuelto')],
+              response: savedPage,
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        dataSource.fetchCatalogPage(limit: 4, offset: 0),
+        throwsA(const PartialResponse()),
+      );
+    },
+  );
+
+  test('lanza InvalidResponse cuando la respuesta no trae la lista', () async {
+    final dataSource = dataSourceOver(
+      ScriptedPokeApiLink(
+        () =>
+            Stream.value(const Response(data: {'pokemon': null}, response: {})),
+      ),
+    );
+
+    expect(
+      dataSource.fetchCatalogPage(limit: 50, offset: 0),
+      throwsA(const InvalidResponse()),
+    );
+  });
 
   test('acepta una página que tarda más de 5 segundos en llegar', () {
     fakeAsync((async) {
@@ -155,27 +177,24 @@ void main() {
     });
   });
 
-  test(
-    'lanza CatalogPageRequestFailed cuando PokeAPI no responde a tiempo',
-    () {
-      fakeAsync((async) {
-        final tooLate = catalogPageRequestTimeout + const Duration(seconds: 1);
-        final dataSource = dataSourceOver(ScriptedPokeApiLink(neverReply));
+  test('lanza RequestTimeout cuando PokeAPI no responde a tiempo', () {
+    fakeAsync((async) {
+      final tooLate = catalogPageRequestTimeout + const Duration(seconds: 1);
+      final dataSource = dataSourceOver(ScriptedPokeApiLink(neverReply));
 
-        Object? failure;
-        dataSource
-            .fetchCatalogPage(limit: 50, offset: 0)
-            .then(
-              (_) {},
-              onError: (Object error) {
-                failure = error;
-              },
-            );
+      Object? failure;
+      dataSource
+          .fetchCatalogPage(limit: 50, offset: 0)
+          .then(
+            (_) {},
+            onError: (Object error) {
+              failure = error;
+            },
+          );
 
-        async.elapse(tooLate);
+      async.elapse(tooLate);
 
-        expect(failure, isA<CatalogPageRequestFailed>());
-      });
-    },
-  );
+      expect(failure, const RequestTimeout());
+    });
+  });
 }

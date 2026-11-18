@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pokedex_flutter/features/connectivity/connectivity_providers.dart';
 import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status.dart';
 
-import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
 
 class ConnectivityBanner extends ConsumerWidget {
@@ -25,7 +26,7 @@ class ConnectivityBanner extends ConsumerWidget {
     return connectivityAsync.when(
       data: (connectivityStatus) {
         final syncStatus = syncAsync.asData?.value;
-        final isSyncing = syncStatus is CatalogSyncInProgress;
+        final isSyncing = syncStatus is SyncFullPassInProgress;
 
         late final String title;
         late String subtitle;
@@ -68,9 +69,8 @@ class ConnectivityBanner extends ConsumerWidget {
               backgroundColor = const Color(0xFFFFF1D6);
           }
 
-          if (syncStatus is CatalogSyncFailed) {
-            subtitle =
-                syncStatus.reason == CatalogSyncFailureReason.noConnection
+          if (syncStatus is SyncFailed) {
+            subtitle = syncStatus.failure is NoConnection
                 ? 'No se pudo sincronizar · Sin conexión'
                 : 'No se pudo sincronizar · Se conservan los datos locales';
           }

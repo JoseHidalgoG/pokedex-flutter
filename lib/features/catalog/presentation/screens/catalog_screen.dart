@@ -2,7 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/screens/pokemon_detail_screen.dart';
@@ -30,8 +31,8 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     } catch (_) {}
   }
 
-  void _onSyncStatusChanged(CatalogSyncStatus? status) {
-    if (status is CatalogSyncInProgress) {
+  void _onSyncStatusChanged(SyncStatus? status) {
+    if (status is SyncFullPassInProgress) {
       _syncFailureReported = false;
     }
     _reportSyncFailureOverVisibleCatalog();
@@ -43,23 +44,21 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
         ref.read(catalogPageProvider(_currentPage)).asData?.value ?? const [];
 
     if (_syncFailureReported ||
-        syncStatus is! CatalogSyncFailed ||
+        syncStatus is! SyncFailed ||
         visiblePokemon.isEmpty) {
       return;
     }
 
     _syncFailureReported = true;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(_syncFailureMessage(syncStatus.reason))),
+      SnackBar(content: Text(_syncFailureMessage(syncStatus.failure))),
     );
   }
 
-  String _syncFailureMessage(CatalogSyncFailureReason reason) {
-    return switch (reason) {
-      CatalogSyncFailureReason.noConnection =>
-        'Sin conexión: se muestran los Pokémon guardados.',
-      CatalogSyncFailureReason.requestFailed =>
-        'No se pudo sincronizar el catálogo. Inténtalo nuevamente.',
+  String _syncFailureMessage(SyncFailure failure) {
+    return switch (failure) {
+      NoConnection() => 'Sin conexión: se muestran los Pokémon guardados.',
+      _ => 'No se pudo sincronizar el catálogo. Inténtalo nuevamente.',
     };
   }
 
@@ -197,7 +196,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue<CatalogSyncStatus>>(
+    ref.listen<AsyncValue<SyncStatus>>(
       catalogSyncStatusProvider,
       (_, next) => _onSyncStatusChanged(next.asData?.value),
     );
@@ -214,12 +213,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
     final syncStatus = syncStatusAsync.when(
       data: (status) => status,
-      loading: () => const CatalogSyncInProgress(),
-      error: (_, _) =>
-          const CatalogSyncFailed(CatalogSyncFailureReason.requestFailed),
+      loading: () => const SyncFullPassInProgress(),
+      error: (error, _) => SyncFailed(QueryError('$error')),
     );
 
-    final isSyncing = syncStatus is CatalogSyncInProgress;
+    final isSyncing = syncStatus is SyncFullPassInProgress;
 
     return Scaffold(
       appBar: AppBar(
@@ -257,11 +255,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             );
           }
 
-          if (syncStatus is CatalogSyncInProgress) {
+          if (syncStatus is SyncFullPassInProgress) {
             return _buildLoading();
           }
 
-          if (syncStatus is CatalogSyncFailed) {
+          if (syncStatus is SyncFailed) {
             return _buildEmptyState(context, ref, hasError: true);
           }
 
