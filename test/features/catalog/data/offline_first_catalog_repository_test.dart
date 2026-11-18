@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/core/database/app_database.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/offline_first_catalog_repository.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
@@ -12,17 +13,18 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 
 class SinglePagePokeApiCatalog implements CatalogRemoteDataSource {
   @override
-  Future<List<PokemonDto>> fetchCatalogPage({
+  Future<CatalogBatch> fetchCatalogPage({
     required int limit,
     required int offset,
+    bool withTotal = false,
   }) async {
-    if (offset > 0) {
-      return const [];
-    }
-    return const [
-      PokemonDto(id: 1, name: 'bulbasaur', typeNames: ['grass', 'poison']),
-      PokemonDto(id: 4, name: 'charmander', typeNames: ['fire']),
-    ];
+    return CatalogBatch(
+      pokemon: const [
+        PokemonDto(id: 1, name: 'bulbasaur', typeNames: ['grass', 'poison']),
+        PokemonDto(id: 4, name: 'charmander', typeNames: ['fire']),
+      ],
+      totalCount: withTotal ? 2 : null,
+    );
   }
 }
 

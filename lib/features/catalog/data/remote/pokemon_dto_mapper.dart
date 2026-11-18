@@ -10,8 +10,14 @@ extension PokemonDtoToCatalogEntry on PokemonDto {
     return CatalogEntry(
       id: id,
       name: name,
-      imageUrl: officialArtworkUrlFor(id),
+      imageUrl: officialArtworkUrl ?? officialArtworkUrlFor(id),
       typeNames: typeNames,
+      speciesId: speciesId,
+      generationId: generationId,
+      isDefault: isDefault,
+      heightDm: heightDm,
+      weightHg: weightHg,
+      baseStats: baseStats,
     );
   }
 }

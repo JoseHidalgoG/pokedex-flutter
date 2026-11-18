@@ -1,0 +1,277 @@
+{
+  "data": {
+    "pokemon": [
+      {
+        "id": 1,
+        "name": "bulbasaur",
+        "height": 7,
+        "weight": 69,
+        "is_default": true,
+        "pokemonspecy": {
+          "id": 1,
+          "generation_id": 1
+        },
+        "pokemontypes": [
+          {
+            "slot": 1,
+            "type": {
+              "name": "grass"
+            }
+          },
+          {
+            "slot": 2,
+            "type": {
+              "name": "poison"
+            }
+          }
+        ],
+        "pokemonstats": [
+          {
+            "base_stat": 45,
+            "stat": {
+              "name": "hp"
+            }
+          },
+          {
+            "base_stat": 49,
+            "stat": {
+              "name": "attack"
+            }
+          },
+          {
+            "base_stat": 49,
+            "stat": {
+              "name": "defense"
+            }
+          },
+          {
+            "base_stat": 65,
+            "stat": {
+              "name": "special-attack"
+            }
+          },
+          {
+            "base_stat": 65,
+            "stat": {
+              "name": "special-defense"
+            }
+          },
+          {
+            "base_stat": 45,
+            "stat": {
+              "name": "speed"
+            }
+          }
+        ],
+        "pokemonsprites": [
+          {
+            "sprites": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "name": "ivysaur",
+        "height": 10,
+        "weight": 130,
+        "is_default": true,
+        "pokemonspecy": {
+          "id": 2,
+          "generation_id": 1
+        },
+        "pokemontypes": [
+          {
+            "slot": 1,
+            "type": {
+              "name": "grass"
+            }
+          },
+          {
+            "slot": 2,
+            "type": {
+              "name": "poison"
+            }
+          }
+        ],
+        "pokemonstats": [
+          {
+            "base_stat": 60,
+            "stat": {
+              "name": "hp"
+            }
+          },
+          {
+            "base_stat": 62,
+            "stat": {
+              "name": "attack"
+            }
+          },
+          {
+            "base_stat": 63,
+            "stat": {
+              "name": "defense"
+            }
+          },
+          {
+            "base_stat": 80,
+            "stat": {
+              "name": "special-attack"
+            }
+          },
+          {
+            "base_stat": 80,
+            "stat": {
+              "name": "special-defense"
+            }
+          },
+          {
+            "base_stat": 60,
+            "stat": {
+              "name": "speed"
+            }
+          }
+        ],
+        "pokemonsprites": [
+          {
+            "sprites": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/2.png"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "name": "venusaur",
+        "height": 20,
+        "weight": 1000,
+        "is_default": true,
+        "pokemonspecy": {
+          "id": 3,
+          "generation_id": 1
+        },
+        "pokemontypes": [
+          {
+            "slot": 1,
+            "type": {
+              "name": "grass"
+            }
+          },
+          {
+            "slot": 2,
+            "type": {
+              "name": "poison"
+            }
+          }
+        ],
+        "pokemonstats": [
+          {
+            "base_stat": 80,
+            "stat": {
+              "name": "hp"
+            }
+          },
+          {
+            "base_stat": 82,
+            "stat": {
+              "name": "attack"
+            }
+          },
+          {
+            "base_stat": 83,
+            "stat": {
+              "name": "defense"
+            }
+          },
+          {
+            "base_stat": 100,
+            "stat": {
+              "name": "special-attack"
+            }
+          },
+          {
+            "base_stat": 100,
+            "stat": {
+              "name": "special-defense"
+            }
+          },
+          {
+            "base_stat": 80,
+            "stat": {
+              "name": "speed"
+            }
+          }
+        ],
+        "pokemonsprites": [
+          {
+            "sprites": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/3.png"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "name": "charmander",
+        "height": 6,
+        "weight": 85,
+        "is_default": true,
+        "pokemonspecy": {
+          "id": 4,
+          "generation_id": 1
+        },
+        "pokemontypes": [
+          {
+            "slot": 1,
+            "type": {
+              "name": "fire"
+            }
+          }
+        ],
+        "pokemonstats": [
+          {
+            "base_stat": 39,
+            "stat": {
+              "name": "hp"
+            }
+          },
+          {
+            "base_stat": 52,
+            "stat": {
+              "name": "attack"
+            }
+          },
+          {
+            "base_stat": 43,
+            "stat": {
+              "name": "defense"
+            }
+          },
+          {
+            "base_stat": 60,
+            "stat": {
+              "name": "special-attack"
+            }
+          },
+          {
+            "base_stat": 50,
+            "stat": {
+              "name": "special-defense"
+            }
+          },
+          {
+            "base_stat": 65,
+            "stat": {
+              "name": "speed"
+            }
+          }
+        ],
+        "pokemonsprites": [
+          {
+            "sprites": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png"
+          }
+        ]
+      }
+    ],
+    "pokemon_aggregate": {
+      "aggregate": {
+        "count": 1025
+      }
+    }
+  }
+}
