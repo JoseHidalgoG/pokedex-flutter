@@ -6,12 +6,13 @@ import 'package:pokedex_flutter/features/connectivity/connectivity_providers.dar
 import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status.dart';
 import 'package:pokedex_flutter/features/connectivity/presentation/connectivity_banner.dart';
 
-import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
 
 Widget buildBanner({
   required ConnectivityStatus connectivityStatus,
-  CatalogSyncStatus syncStatus = const CatalogSyncIdle(),
+  SyncStatus syncStatus = const SyncIdle(),
   DateTime? lastSyncAt,
 }) {
   return ProviderScope(
@@ -69,7 +70,7 @@ void main() {
       await tester.pumpWidget(
         buildBanner(
           connectivityStatus: ConnectivityStatus.online,
-          syncStatus: const CatalogSyncInProgress(),
+          syncStatus: const SyncFullPassInProgress(),
         ),
       );
 
@@ -99,9 +100,7 @@ void main() {
       await tester.pumpWidget(
         buildBanner(
           connectivityStatus: ConnectivityStatus.offline,
-          syncStatus: const CatalogSyncFailed(
-            CatalogSyncFailureReason.noConnection,
-          ),
+          syncStatus: const SyncFailed(NoConnection()),
         ),
       );
 

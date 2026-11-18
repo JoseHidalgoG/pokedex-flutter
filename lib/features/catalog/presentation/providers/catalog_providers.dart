@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
 import 'package:pokedex_flutter/features/catalog/domain/usecases/sync_catalog.dart';
@@ -32,7 +32,7 @@ final catalogProvider = StreamProvider<List<Pokemon>>(
   (ref) => ref.watch(watchCatalogProvider)(),
 );
 
-final catalogSyncStatusProvider = StreamProvider<CatalogSyncStatus>(
+final catalogSyncStatusProvider = StreamProvider<SyncStatus>(
   (ref) => ref.watch(watchCatalogSyncStatusProvider)(),
 );
 

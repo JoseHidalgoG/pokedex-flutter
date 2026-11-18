@@ -1,4 +1,4 @@
-import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
 
 class WatchCatalogSyncStatus {
@@ -6,5 +6,5 @@ class WatchCatalogSyncStatus {
 
   final CatalogRepository _repository;
 
-  Stream<CatalogSyncStatus> call() => _repository.watchSyncStatus();
+  Stream<SyncStatus> call() => _repository.watchSyncStatus();
 }

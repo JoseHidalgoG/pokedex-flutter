@@ -1,6 +1,6 @@
 import 'package:graphql/client.dart';
+import 'package:pokedex_flutter/core/sync/data/sync_failure_translator.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_query.dart';
-import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_request_failed.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 
 const catalogPageRequestTimeout = Duration(seconds: 30);
@@ -23,16 +23,17 @@ class CatalogRemoteDataSource {
         document: catalogPageQuery,
         variables: {'limit': limit, 'offset': offset},
         queryRequestTimeout: _requestTimeout,
+        errorPolicy: ErrorPolicy.all,
       ),
     );
     final exception = result.exception;
     if (exception != null) {
-      throw CatalogPageRequestFailed(exception);
+      throw syncFailureFrom(exception, dataReceived: result.data != null);
     }
     try {
       return _pokemonIn(result.data);
     } on FormatException catch (formatError) {
-      throw CatalogPageRequestFailed(formatError);
+      throw syncFailureFrom(formatError);
     }
   }
 

@@ -1,4 +1,4 @@
-import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 
 abstract interface class CatalogRepository {
@@ -13,7 +13,7 @@ abstract interface class CatalogRepository {
 
   Stream<List<Pokemon>> watchPokemonByIds(List<int> ids);
 
-  Stream<CatalogSyncStatus> watchSyncStatus();
+  Stream<SyncStatus> watchSyncStatus();
 
   Future<void> syncCatalog({bool force = false});
 

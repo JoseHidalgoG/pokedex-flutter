@@ -5,7 +5,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/screens/catalog_screen.dart';
@@ -22,7 +23,7 @@ void main() {
   Future<void> pumpCatalog(
     WidgetTester tester, {
     required List<Pokemon> pokemon,
-    CatalogSyncStatus syncStatus = const CatalogSyncSucceeded(),
+    SyncStatus syncStatus = const SyncIdle(),
   }) async {
     final firstPage = pokemon.take(50).toList();
     final secondPage = pokemon.skip(50).take(50).toList();
@@ -61,7 +62,7 @@ void main() {
     await pumpCatalog(
       tester,
       pokemon: [],
-      syncStatus: const CatalogSyncInProgress(),
+      syncStatus: const SyncFullPassInProgress(),
     );
 
     expect(
@@ -80,9 +81,7 @@ void main() {
       await pumpCatalog(
         tester,
         pokemon: [],
-        syncStatus: const CatalogSyncFailed(
-          CatalogSyncFailureReason.noConnection,
-        ),
+        syncStatus: const SyncFailed(NoConnection()),
       );
 
       expect(find.text('No se pudo cargar el catálogo'), findsOneWidget);
@@ -93,11 +92,7 @@ void main() {
   );
 
   testWidgets('muestra un estado vacío cuando no hay Pokémon', (tester) async {
-    await pumpCatalog(
-      tester,
-      pokemon: [],
-      syncStatus: const CatalogSyncSucceeded(),
-    );
+    await pumpCatalog(tester, pokemon: [], syncStatus: const SyncIdle());
 
     expect(find.text('No hay Pokémon disponibles'), findsOneWidget);
 
@@ -190,9 +185,7 @@ void main() {
     await pumpCatalog(
       tester,
       pokemon: [pikachu],
-      syncStatus: const CatalogSyncFailed(
-        CatalogSyncFailureReason.noConnection,
-      ),
+      syncStatus: const SyncFailed(NoConnection()),
     );
 
     expect(find.text('#0025'), findsOneWidget);
@@ -209,7 +202,7 @@ void main() {
   testWidgets(
     'avisa con un SnackBar cuando falla una sincronización sobre la lista visible',
     (tester) async {
-      final syncStatusController = StreamController<CatalogSyncStatus>();
+      final syncStatusController = StreamController<SyncStatus>();
       addTearDown(syncStatusController.close);
 
       await tester.pumpWidget(
@@ -226,15 +219,15 @@ void main() {
         ),
       );
 
-      syncStatusController.add(const CatalogSyncSucceeded());
+      syncStatusController.add(SyncRevalidated(DateTime(2026, 11, 19, 10)));
       await tester.pump();
       await tester.pump();
 
       expect(find.byType(SnackBar), findsNothing);
 
       syncStatusController
-        ..add(const CatalogSyncInProgress())
-        ..add(const CatalogSyncFailed(CatalogSyncFailureReason.requestFailed));
+        ..add(const SyncFullPassInProgress())
+        ..add(const SyncFailed(ServerError(503)));
       await tester.pump();
       await tester.pump();
 
@@ -271,7 +264,7 @@ void main() {
               .overrideWith((ref) => Stream.value(pokemon.skip(50).toList())),
           catalogCountProvider.overrideWith((ref) => countController.stream),
           catalogSyncStatusProvider.overrideWith(
-            (ref) => Stream.value(const CatalogSyncSucceeded()),
+            (ref) => Stream.value(const SyncIdle()),
           ),
         ],
         child: const MaterialApp(home: CatalogScreen()),

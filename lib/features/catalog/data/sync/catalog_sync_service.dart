@@ -1,11 +1,12 @@
 import 'dart:async';
 
 import 'package:pokedex_flutter/core/database/app_database.dart';
+import 'package:pokedex_flutter/core/sync/data/sync_failure_translator.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
-import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_request_failed.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
-import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_pagination.dart';
 
 const catalogFreshnessWindow = Duration(hours: 24);
@@ -25,13 +26,13 @@ class CatalogSyncService {
   final InternetAccessCheck _hasInternetAccess;
   final DateTime Function() _now;
 
-  final _statusChanges = StreamController<CatalogSyncStatus>.broadcast();
-  CatalogSyncStatus _status = const CatalogSyncIdle();
+  final _statusChanges = StreamController<SyncStatus>.broadcast();
+  SyncStatus _status = const SyncIdle();
   Future<void>? _runningSync;
 
-  CatalogSyncStatus get currentStatus => _status;
+  SyncStatus get currentStatus => _status;
 
-  Stream<CatalogSyncStatus> watchStatus() {
+  Stream<SyncStatus> watchStatus() {
     return Stream.multi((listener) {
       listener.add(_status);
       final subscription = _statusChanges.stream.listen(
@@ -50,42 +51,36 @@ class CatalogSyncService {
   Future<void> dispose() => _statusChanges.close();
 
   Future<void> _synchronize({required bool force}) async {
-    _emit(const CatalogSyncInProgress());
+    _emit(const SyncFullPassInProgress());
 
     try {
       final progress = await _catalogDao.readCatalogSyncProgress();
 
       if (!force && _isFreshAndComplete(progress)) {
-        _emit(const CatalogSyncSucceeded());
+        _emit(const SyncIdle());
         return;
       }
 
       final hasInternet = await _hasInternetAccess();
 
       if (!hasInternet) {
-        _emit(const CatalogSyncFailed(CatalogSyncFailureReason.noConnection));
+        _emit(const SyncFailed(NoConnection()));
         return;
       }
 
       await _downloadPagesFrom(_startOffsetFor(progress));
 
-      _emit(const CatalogSyncSucceeded());
-    } on CatalogPageRequestFailed catch (failure) {
-      CatalogSyncFailureReason reason;
+      _emit(SyncRevalidated(_now()));
+    } on SyncFailure catch (failure) {
+      final reportedFailure = await _confirmConnectionBehind(failure);
+
+      _emit(SyncFailed(reportedFailure));
 
       try {
-        reason = await _reasonForFailedRequest();
-      } catch (_) {
-        reason = CatalogSyncFailureReason.requestFailed;
-      }
-
-      _emit(CatalogSyncFailed(reason));
-
-      try {
-        await _catalogDao.recordCatalogSyncFailure(failure.toString());
+        await _catalogDao.recordCatalogSyncFailure(reportedFailure.toString());
       } catch (_) {}
-    } catch (_) {
-      _emit(const CatalogSyncFailed(CatalogSyncFailureReason.requestFailed));
+    } catch (error) {
+      _emit(SyncFailed(syncFailureFrom(error)));
       rethrow;
     }
   }
@@ -126,13 +121,18 @@ class CatalogSyncService {
     }
   }
 
-  Future<CatalogSyncFailureReason> _reasonForFailedRequest() async {
-    return await _hasInternetAccess()
-        ? CatalogSyncFailureReason.requestFailed
-        : CatalogSyncFailureReason.noConnection;
+  Future<SyncFailure> _confirmConnectionBehind(SyncFailure failure) async {
+    if (failure is NoConnection) {
+      return failure;
+    }
+    try {
+      return await _hasInternetAccess() ? failure : const NoConnection();
+    } catch (_) {
+      return failure;
+    }
   }
 
-  void _emit(CatalogSyncStatus status) {
+  void _emit(SyncStatus status) {
     _status = status;
     if (!_statusChanges.isClosed) {
       _statusChanges.add(status);
