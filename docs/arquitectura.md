@@ -72,7 +72,7 @@ flowchart LR
 
 ## Sincronización al abrir la app
 
-`main` llama a `runApp` sin esperar a la red. `CatalogSyncCoordinator` lanza la sincronización en segundo plano y la pantalla se redibuja sola cada vez que se guarda una página.
+`main` llama a `runApp` sin esperar a la red. `CatalogSyncCoordinator` lanza la sincronización en segundo plano y la pantalla se redibuja sola cada vez que se guarda un lote.
 
 ```mermaid
 sequenceDiagram
@@ -89,14 +89,14 @@ sequenceDiagram
   Repo->>Sync: syncCatalog()
   Sync->>Dao: readCatalogSyncProgress()
   Dao-->>Sync: sync_metadata
-  alt catálogo completo y sincronizado hace menos de 24 h
+  alt catálogo completo y última pasada hace menos de 1 h
     Sync-->>Repo: SyncIdle, sin llamar a PokeAPI
   else falta descargar
     Sync->>Sync: comprobar conexión
-    loop hasta recibir menos de 50 Pokémon
-      Sync->>Remote: fetchCatalogPage(limit: 50, offset)
-      Remote-->>Sync: página de PokemonDto
-      Sync->>Dao: saveCatalogPage() en una transacción
+    loop hasta llegar al total o recibir menos de 100 Pokémon
+      Sync->>Remote: fetchCatalogPage(limit: 100, offset, withTotal)
+      Remote-->>Sync: CatalogBatch, con el total solo en el primer lote
+      Sync->>Dao: saveCatalogPage() con huella, en una transacción
       Dao-->>Screen: watchCatalogPage emite la lista nueva
     end
     Sync-->>Repo: SyncRevalidated(ahora)
