@@ -1,41 +1,56 @@
-import 'package:async/async.dart';
-import 'package:drift/native.dart';
-
 import 'dart:async';
 
+import 'package:async/async.dart';
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/core/database/app_database.dart';
-import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
+import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
 
+typedef CatalogPageRequest = ({int offset, bool withTotal});
+
 class FakePokeApiCatalog implements CatalogRemoteDataSource {
   FakePokeApiCatalog({required int pokemonCount, this.failingOffset})
     : _catalog = [
         for (var id = 1; id <= pokemonCount; id++)
-          PokemonDto(id: id, name: 'pokemon-$id', typeNames: const ['normal']),
+          PokemonDto(
+            id: id,
+            name: 'pokemon-$id',
+            typeNames: const ['normal'],
+            baseStats: const {'hp': 50, 'speed': 50},
+          ),
       ];
 
   final List<PokemonDto> _catalog;
   final int? failingOffset;
-  final requestedOffsets = <int>[];
+  final requests = <CatalogPageRequest>[];
+
+  List<int> get requestedOffsets => [
+    for (final request in requests) request.offset,
+  ];
 
   List<PokemonDto> pokemonUpTo(int count) => _catalog.take(count).toList();
 
   @override
-  Future<List<PokemonDto>> fetchCatalogPage({
+  Future<CatalogBatch> fetchCatalogPage({
     required int limit,
     required int offset,
+    bool withTotal = false,
   }) async {
-    requestedOffsets.add(offset);
+    requests.add((offset: offset, withTotal: withTotal));
     if (offset == failingOffset) {
       throw const ServerError(503);
     }
-    return _catalog.skip(offset).take(limit).toList();
+    return CatalogBatch(
+      pokemon: _catalog.skip(offset).take(limit).toList(),
+      totalCount: withTotal ? _catalog.length : null,
+    );
   }
 }
 
@@ -79,6 +94,7 @@ void main() {
     required int count,
     required bool isComplete,
     required DateTime savedAt,
+    int? totalCount,
   }) {
     return catalogDao.saveCatalogPage(
       entries: [
@@ -88,6 +104,7 @@ void main() {
       nextOffset: count,
       isComplete: isComplete,
       savedAt: savedAt,
+      totalCount: totalCount,
     );
   }
 
@@ -96,54 +113,116 @@ void main() {
     return [for (final row in rows) row.id];
   }
 
-  test('descarga todas las páginas hasta recibir una incompleta', () async {
+  test(
+    'descarga los 1025 Pokémon en 11 llamadas y solo la primera pide el total',
+    () async {
+      final remoteCatalog = FakePokeApiCatalog(pokemonCount: 1025);
+
+      await syncServiceOver(remoteCatalog).syncCatalog();
+      final progress = await catalogDao.readCatalogSyncProgress();
+
+      expect(remoteCatalog.requestedOffsets, [
+        for (var offset = 0; offset <= 1000; offset += 100) offset,
+      ]);
+      expect(
+        [for (final request in remoteCatalog.requests) request.withTotal],
+        [true, for (var call = 2; call <= 11; call++) false],
+      );
+      expect(await savedPokemonIds(), hasLength(1025));
+      expect(progress?.totalCount, 1025);
+      expect(progress?.nextOffset, 1025);
+      expect(progress?.isComplete, isTrue);
+    },
+  );
+
+  test(
+    'se detiene al llegar al total sin pedir un lote vacío al final',
+    () async {
+      final remoteCatalog = FakePokeApiCatalog(pokemonCount: 200);
+
+      await syncServiceOver(remoteCatalog).syncCatalog();
+      final progress = await catalogDao.readCatalogSyncProgress();
+
+      expect(remoteCatalog.requestedOffsets, [0, 100]);
+      expect(progress?.isComplete, isTrue);
+    },
+  );
+
+  test('descarga lotes hasta recibir uno incompleto', () async {
     final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
 
     await syncServiceOver(remoteCatalog).syncCatalog();
     final progress = await catalogDao.readCatalogSyncProgress();
 
-    expect(remoteCatalog.requestedOffsets, [0, 50, 100]);
+    expect(remoteCatalog.requestedOffsets, [0, 100]);
     expect(await savedPokemonIds(), hasLength(120));
     expect(progress?.nextOffset, 120);
     expect(progress?.isComplete, isTrue);
   });
 
   test(
-    'marca el catálogo completo cuando la última página llega vacía',
+    'continúa desde el offset guardado sin volver a pedir el total conocido',
     () async {
-      final remoteCatalog = FakePokeApiCatalog(pokemonCount: 100);
+      final remoteCatalog = FakePokeApiCatalog(pokemonCount: 250);
+      await saveAlreadyDownloaded(
+        remoteCatalog,
+        count: 100,
+        isComplete: false,
+        savedAt: now.subtract(const Duration(minutes: 5)),
+        totalCount: 250,
+      );
 
       await syncServiceOver(remoteCatalog).syncCatalog();
-      final progress = await catalogDao.readCatalogSyncProgress();
 
-      expect(remoteCatalog.requestedOffsets, [0, 50, 100]);
-      expect(await savedPokemonIds(), hasLength(100));
-      expect(progress?.isComplete, isTrue);
+      expect(remoteCatalog.requests, [
+        (offset: 100, withTotal: false),
+        (offset: 200, withTotal: false),
+      ]);
+      expect(await savedPokemonIds(), hasLength(250));
     },
   );
 
-  test('continúa desde el offset guardado tras reiniciar', () async {
-    final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
+  test('al continuar sin total guardado lo pide en el primer lote', () async {
+    final remoteCatalog = FakePokeApiCatalog(pokemonCount: 250);
     await saveAlreadyDownloaded(
       remoteCatalog,
-      count: 50,
+      count: 100,
       isComplete: false,
       savedAt: now.subtract(const Duration(minutes: 5)),
     );
 
     await syncServiceOver(remoteCatalog).syncCatalog();
 
-    expect(remoteCatalog.requestedOffsets, [50, 100]);
-    expect(await savedPokemonIds(), hasLength(120));
+    expect(remoteCatalog.requests, [
+      (offset: 100, withTotal: true),
+      (offset: 200, withTotal: false),
+    ]);
   });
 
-  test('no pide nada si el catálogo está completo y se sincronizó hace menos de 24 h', () async {
+  test('termina cuando un lote llega incompleto aunque el total guardado sea mayor', () async {
+    final remoteCatalog = FakePokeApiCatalog(pokemonCount: 150);
+    await saveAlreadyDownloaded(
+      remoteCatalog,
+      count: 100,
+      isComplete: false,
+      savedAt: now.subtract(const Duration(minutes: 5)),
+      totalCount: 300,
+    );
+
+    await syncServiceOver(remoteCatalog).syncCatalog();
+    final progress = await catalogDao.readCatalogSyncProgress();
+
+    expect(remoteCatalog.requestedOffsets, [100]);
+    expect(progress?.isComplete, isTrue);
+  });
+
+  test('no pide nada si el catálogo está completo y la última pasada tiene menos de 1 h', () async {
     final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
     await saveAlreadyDownloaded(
       remoteCatalog,
       count: 120,
       isComplete: true,
-      savedAt: now.subtract(const Duration(hours: 23)),
+      savedAt: now.subtract(const Duration(minutes: 59)),
     );
     final syncService = syncServiceOver(remoteCatalog);
 
@@ -153,19 +232,23 @@ void main() {
     expect(syncService.currentStatus, isA<SyncIdle>());
   });
 
-  test('vuelve a empezar desde el inicio cuando la sincronización completa tiene más de 24 h', () async {
+  test('vuelve a empezar desde el inicio cuando la última pasada completa tiene más de 1 h', () async {
     final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
     await saveAlreadyDownloaded(
       remoteCatalog,
       count: 120,
       isComplete: true,
-      savedAt: now.subtract(const Duration(hours: 25)),
+      savedAt: now.subtract(const Duration(minutes: 61)),
+      totalCount: 120,
     );
 
     await syncServiceOver(remoteCatalog).syncCatalog();
     final progress = await catalogDao.readCatalogSyncProgress();
 
-    expect(remoteCatalog.requestedOffsets, [0, 50, 100]);
+    expect(remoteCatalog.requests, [
+      (offset: 0, withTotal: true),
+      (offset: 100, withTotal: false),
+    ]);
     expect(progress?.isComplete, isTrue);
     expect(progress?.lastSyncedAt, now);
   });
@@ -174,7 +257,7 @@ void main() {
     final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
     await saveAlreadyDownloaded(
       remoteCatalog,
-      count: 50,
+      count: 100,
       isComplete: false,
       savedAt: now,
     );
@@ -186,23 +269,23 @@ void main() {
     await syncService.syncCatalog();
 
     expect(remoteCatalog.requestedOffsets, isEmpty);
-    expect(await savedPokemonIds(), hasLength(50));
+    expect(await savedPokemonIds(), hasLength(100));
     expect(syncService.currentStatus, failedWith(const NoConnection()));
   });
 
-  test('ante un error guarda last_error, se detiene y conserva las páginas ya guardadas', () async {
+  test('ante un error guarda last_error, se detiene y conserva los lotes ya guardados', () async {
     final remoteCatalog = FakePokeApiCatalog(
-      pokemonCount: 120,
-      failingOffset: 50,
+      pokemonCount: 250,
+      failingOffset: 100,
     );
     final syncService = syncServiceOver(remoteCatalog);
 
     await syncService.syncCatalog();
     final progress = await catalogDao.readCatalogSyncProgress();
 
-    expect(remoteCatalog.requestedOffsets, [0, 50]);
-    expect(await savedPokemonIds(), hasLength(50));
-    expect(progress?.nextOffset, 50);
+    expect(remoteCatalog.requestedOffsets, [0, 100]);
+    expect(await savedPokemonIds(), hasLength(100));
+    expect(progress?.nextOffset, 100);
     expect(progress?.isComplete, isFalse);
     expect(progress?.lastError, contains('503'));
     expect(syncService.currentStatus, failedWith(const ServerError(503)));
@@ -210,8 +293,8 @@ void main() {
 
   test('informa falta de conexión cuando la red se pierde a mitad de la sincronización', () async {
     final remoteCatalog = FakePokeApiCatalog(
-      pokemonCount: 120,
-      failingOffset: 50,
+      pokemonCount: 250,
+      failingOffset: 100,
     );
     final connectionAnswers = [true, false].iterator;
     final syncService = syncServiceOver(
@@ -236,7 +319,7 @@ void main() {
     await Future.wait([firstSync, secondSync]);
 
     expect(identical(firstSync, secondSync), isTrue);
-    expect(remoteCatalog.requestedOffsets, [0, 50, 100]);
+    expect(remoteCatalog.requestedOffsets, [0, 100]);
   });
 
   test(
@@ -268,7 +351,7 @@ void main() {
         remoteCatalog,
         count: 120,
         isComplete: true,
-        savedAt: now.subtract(const Duration(hours: 1)),
+        savedAt: now.subtract(const Duration(minutes: 30)),
       );
       final syncService = syncServiceOver(remoteCatalog);
       final statusUpdates = StreamQueue(syncService.watchStatus());
@@ -288,11 +371,11 @@ void main() {
     final syncService = syncServiceOver(remoteCatalog);
 
     await syncService.syncCatalog();
-    now = now.add(const Duration(hours: 25));
+    now = now.add(const Duration(hours: 2));
     await syncService.syncCatalog();
     final ids = await savedPokemonIds();
 
-    expect(remoteCatalog.requestedOffsets, [0, 50, 100, 0, 50, 100]);
+    expect(remoteCatalog.requestedOffsets, [0, 100, 0, 100]);
     expect(ids, hasLength(120));
     expect(ids.toSet(), hasLength(120));
   });
@@ -343,7 +426,7 @@ void main() {
       remoteCatalog,
       count: 120,
       isComplete: true,
-      savedAt: now.subtract(const Duration(hours: 2)),
+      savedAt: now.subtract(const Duration(minutes: 10)),
     );
 
     final syncService = syncServiceOver(remoteCatalog);
@@ -352,7 +435,7 @@ void main() {
 
     final progress = await catalogDao.readCatalogSyncProgress();
 
-    expect(remoteCatalog.requestedOffsets, [0, 50, 100]);
+    expect(remoteCatalog.requestedOffsets, [0, 100]);
     expect(await savedPokemonIds(), hasLength(120));
     expect(progress?.isComplete, isTrue);
     expect(progress?.lastSyncedAt, now);
@@ -366,7 +449,7 @@ void main() {
       remoteCatalog,
       count: 120,
       isComplete: true,
-      savedAt: now.subtract(const Duration(hours: 2)),
+      savedAt: now.subtract(const Duration(minutes: 10)),
     );
 
     final syncService = syncServiceOver(
@@ -392,7 +475,7 @@ void main() {
       remoteCatalog,
       count: 120,
       isComplete: true,
-      savedAt: now.subtract(const Duration(hours: 2)),
+      savedAt: now.subtract(const Duration(minutes: 10)),
     );
 
     final syncService = syncServiceOver(

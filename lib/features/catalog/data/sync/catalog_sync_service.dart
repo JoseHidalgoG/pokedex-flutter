@@ -5,11 +5,10 @@ import 'package:pokedex_flutter/core/sync/data/sync_failure_translator.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
-import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_pagination.dart';
-
-const catalogFreshnessWindow = Duration(hours: 24);
+import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_constants.dart';
 
 typedef InternetAccessCheck = Future<bool> Function();
 
@@ -68,7 +67,7 @@ class CatalogSyncService {
         return;
       }
 
-      await _downloadPagesFrom(_startOffsetFor(progress));
+      await _downloadBatchesAfter(progress);
 
       _emit(SyncRevalidated(_now()));
     } on SyncFailure catch (failure) {
@@ -90,7 +89,7 @@ class CatalogSyncService {
       isComplete: true,
       lastSyncedAt: final DateTime lastSyncedAt,
     )) {
-      return _now().difference(lastSyncedAt) < catalogFreshnessWindow;
+      return _now().difference(lastSyncedAt) < catalogFullPassFreshness;
     }
     return false;
   }
@@ -102,23 +101,43 @@ class CatalogSyncService {
     return progress.nextOffset;
   }
 
-  Future<void> _downloadPagesFrom(int startOffset) async {
-    var nextOffset = startOffset;
-    var reachedEnd = false;
-    while (!reachedEnd) {
-      final page = await _remoteDataSource.fetchCatalogPage(
-        limit: catalogPageSize,
+  Future<void> _downloadBatchesAfter(SyncMetadataRow? progress) async {
+    var nextOffset = _startOffsetFor(progress);
+    var totalCount = nextOffset == 0 ? null : progress?.totalCount;
+    var isComplete = false;
+    while (!isComplete) {
+      final batch = await _remoteDataSource.fetchCatalogPage(
+        limit: catalogRemoteBatchSize,
         offset: nextOffset,
+        withTotal: totalCount == null,
       );
-      nextOffset += page.length;
-      reachedEnd = page.length < catalogPageSize;
-      await _catalogDao.saveCatalogPage(
-        entries: [for (final pokemon in page) pokemon.toCatalogEntry()],
+      totalCount = batch.totalCount ?? totalCount;
+      nextOffset += batch.pokemon.length;
+      isComplete = _isLastBatch(
+        batch,
         nextOffset: nextOffset,
-        isComplete: reachedEnd,
+        totalCount: totalCount,
+      );
+      await _catalogDao.saveCatalogPage(
+        entries: [
+          for (final pokemon in batch.pokemon) pokemon.toCatalogEntry(),
+        ],
+        nextOffset: nextOffset,
+        isComplete: isComplete,
         savedAt: _now(),
+        totalCount: batch.totalCount,
       );
     }
+  }
+
+  bool _isLastBatch(
+    CatalogBatch batch, {
+    required int nextOffset,
+    required int? totalCount,
+  }) {
+    final cameBackShort = batch.pokemon.length < catalogRemoteBatchSize;
+    final reachedTotal = totalCount != null && nextOffset >= totalCount;
+    return cameBackShort || reachedTotal;
   }
 
   Future<SyncFailure> _confirmConnectionBehind(SyncFailure failure) async {

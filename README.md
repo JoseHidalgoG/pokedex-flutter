@@ -46,7 +46,7 @@ Para evitar cambios visuales demasiado frecuentes, el estado de conectividad uti
 
 La aplicación solicita una sincronización al iniciarse y cuando detecta que se ha recuperado la conexión.
 
-El servicio de sincronización comprueba la antigüedad de los datos y puede omitir descargas innecesarias cuando el catálogo ya se encuentra actualizado dentro de un período de 24 horas.
+El servicio de sincronización descarga el catálogo en lotes de 100 Pokémon y omite la descarga cuando la última pasada completa tiene menos de 1 hora. Con cada Pokémon guarda la huella SHA-256 de sus datos tal como llegaron de PokeAPI.
 
 ### Caché de imágenes
 

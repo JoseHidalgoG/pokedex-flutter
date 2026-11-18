@@ -1,14 +1,14 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:graphql/client.dart';
 import 'package:pokedex_flutter/core/network/pokeapi_graphql_client.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
-import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
+
+import '../../../../fixtures/catalog_batch_fixture.dart';
 
 class ScriptedPokeApiLink extends Link {
   ScriptedPokeApiLink(this._reply);
@@ -23,13 +23,8 @@ class ScriptedPokeApiLink extends Link {
   }
 }
 
-Map<String, Object?> savedCatalogPageResponse() {
-  final fixture = File('test/fixtures/catalog_page_response.json');
-  return jsonDecode(fixture.readAsStringSync()) as Map<String, Object?>;
-}
-
 Stream<Response> replyWithSavedPage() {
-  final savedResponse = savedCatalogPageResponse();
+  final savedResponse = savedCatalogBatchResponse();
   return Stream.value(
     Response(
       data: savedResponse['data'] as Map<String, Object?>?,
@@ -53,8 +48,8 @@ void main() {
     return CatalogRemoteDataSource(createPokeApiGraphQLClient(link: link));
   }
 
-  List<int> idsOf(List<PokemonDto> pokemon) => [
-    for (final dto in pokemon) dto.id,
+  List<int> idsOf(CatalogBatch batch) => [
+    for (final dto in batch.pokemon) dto.id,
   ];
 
   test(
@@ -64,25 +59,59 @@ void main() {
         ScriptedPokeApiLink(replyWithSavedPage),
       );
 
-      final page = await dataSource.fetchCatalogPage(limit: 4, offset: 0);
+      final batch = await dataSource.fetchCatalogPage(limit: 4, offset: 0);
 
-      expect(idsOf(page), [1, 2, 3, 4]);
-      expect(page.first.name, 'bulbasaur');
-      expect(page.first.typeNames, ['grass', 'poison']);
-      expect(page.last.name, 'charmander');
-      expect(page.last.typeNames, ['fire']);
+      expect(idsOf(batch), [1, 2, 3, 4]);
+      expect(batch.pokemon.first.name, 'bulbasaur');
+      expect(batch.pokemon.first.typeNames, ['grass', 'poison']);
+      expect(batch.pokemon.first.baseStats, hasLength(6));
+      expect(batch.pokemon.last.name, 'charmander');
+      expect(batch.pokemon.last.typeNames, ['fire']);
     },
   );
 
-  test('envía el limit y el offset pedidos', () async {
+  test('envía el limit, el offset y si pide el total', () async {
     final link = ScriptedPokeApiLink(replyWithSavedPage);
 
-    await dataSourceOver(link).fetchCatalogPage(limit: 50, offset: 100);
+    await dataSourceOver(link).fetchCatalogPage(limit: 100, offset: 200);
 
     expect(link.receivedRequests.single.variables, {
-      'limit': 50,
-      'offset': 100,
+      'limit': 100,
+      'offset': 200,
+      'withTotal': false,
     });
+  });
+
+  test('devuelve el total de Pokémon cuando lo pide', () async {
+    final link = ScriptedPokeApiLink(replyWithSavedPage);
+
+    final batch = await dataSourceOver(link)
+        .fetchCatalogPage(limit: 4, offset: 0, withTotal: true);
+
+    expect(link.receivedRequests.single.variables['withTotal'], isTrue);
+    expect(batch.totalCount, 1025);
+  });
+
+  test('no devuelve total cuando no lo pide', () async {
+    final batch = await dataSourceOver(ScriptedPokeApiLink(replyWithSavedPage))
+        .fetchCatalogPage(limit: 4, offset: 0);
+
+    expect(batch.totalCount, isNull);
+  });
+
+  test('lanza InvalidResponse si pidió el total y no llegó', () async {
+    final dataSource = dataSourceOver(
+      ScriptedPokeApiLink(
+        () => Stream.value(
+          const Response(data: {'pokemon': <Object?>[]}, response: {}),
+        ),
+      ),
+    );
+
+    expect(
+      dataSource.fetchCatalogPage(limit: 100, offset: 0, withTotal: true),
+      throwsA(const InvalidResponse()),
+    );
   });
 
   test('lanza ServerError cuando PokeAPI responde 503', () async {
@@ -124,7 +153,7 @@ void main() {
   test(
     'lanza PartialResponse y no devuelve nada cuando llegan datos con errores',
     () async {
-      final savedPage = savedCatalogPageResponse();
+      final savedPage = savedCatalogBatchResponse();
       final dataSource = dataSourceOver(
         ScriptedPokeApiLink(
           () => Stream.value(
@@ -166,14 +195,14 @@ void main() {
         ),
       );
 
-      List<PokemonDto>? page;
+      CatalogBatch? batch;
       dataSource
           .fetchCatalogPage(limit: 4, offset: 0)
-          .then((receivedPage) => page = receivedPage);
+          .then((receivedBatch) => batch = receivedBatch);
 
       async.elapse(const Duration(seconds: 6));
 
-      expect(idsOf(page!), [1, 2, 3, 4]);
+      expect(idsOf(batch!), [1, 2, 3, 4]);
     });
   });
 

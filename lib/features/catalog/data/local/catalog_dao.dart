@@ -1,11 +1,19 @@
 import 'package:drift/drift.dart';
 import 'package:pokedex_flutter/core/database/app_database.dart';
+import 'package:pokedex_flutter/features/catalog/data/catalog_fingerprint.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_tables.dart';
 
 part 'catalog_dao.g.dart';
 
-@DriftAccessor(tables: [PokemonTable, PokemonTypesTable, SyncMetadataTable])
+@DriftAccessor(
+  tables: [
+    PokemonTable,
+    PokemonTypesTable,
+    PokemonStatsTable,
+    SyncMetadataTable,
+  ],
+)
 class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   CatalogDao(super.attachedDatabase);
 
@@ -18,20 +26,8 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     required DateTime savedAt,
     int? totalCount,
   }) {
-    final pokemonIdsInPage = [for (final entry in entries) entry.id];
     return transaction(() async {
-      await (delete(
-        pokemonTypesTable,
-      )..where((type) => type.pokemonId.isIn(pokemonIdsInPage))).go();
-      await batch((batch) {
-        batch
-          ..insertAllOnConflictUpdate(pokemonTable, [
-            for (final entry in entries) _pokemonRowOf(entry, savedAt),
-          ])
-          ..insertAll(pokemonTypesTable, [
-            for (final entry in entries) ..._typeRowsOf(entry),
-          ]);
-      });
+      await _upsertEntries(entries, savedAt: savedAt);
       await into(syncMetadataTable).insertOnConflictUpdate(
         SyncMetadataTableCompanion(
           key: const Value(catalogSyncKey),
@@ -96,12 +92,44 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     );
   }
 
+  Future<void> _upsertEntries(
+    List<CatalogEntry> entries, {
+    required DateTime savedAt,
+  }) async {
+    final pokemonIds = [for (final entry in entries) entry.id];
+    await (delete(
+      pokemonTypesTable,
+    )..where((type) => type.pokemonId.isIn(pokemonIds))).go();
+    await (delete(
+      pokemonStatsTable,
+    )..where((stat) => stat.pokemonId.isIn(pokemonIds))).go();
+    await batch((batch) {
+      batch
+        ..insertAllOnConflictUpdate(pokemonTable, [
+          for (final entry in entries) _pokemonRowOf(entry, savedAt),
+        ])
+        ..insertAll(pokemonTypesTable, [
+          for (final entry in entries) ..._typeRowsOf(entry),
+        ])
+        ..insertAll(pokemonStatsTable, [
+          for (final entry in entries) ..._statRowsOf(entry),
+        ]);
+    });
+  }
+
   PokemonTableCompanion _pokemonRowOf(CatalogEntry entry, DateTime savedAt) {
     return PokemonTableCompanion.insert(
       id: Value(entry.id),
       name: entry.name,
       imageUrl: entry.imageUrl,
       updatedAt: savedAt,
+      speciesId: Value(entry.speciesId),
+      generationId: Value(entry.generationId),
+      isDefault: Value(entry.isDefault),
+      heightDm: Value(entry.heightDm),
+      weightHg: Value(entry.weightHg),
+      baseStatTotal: Value(entry.baseStatTotal),
+      remoteFingerprint: Value(catalogFingerprintOf(entry)),
     );
   }
 
@@ -111,6 +139,17 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
         pokemonId: entry.id,
         slot: index + 1,
         typeName: typeName,
+      );
+    }
+  }
+
+  Iterable<PokemonStatsTableCompanion> _statRowsOf(CatalogEntry entry) sync* {
+    for (final MapEntry(key: statName, value: baseStat)
+        in entry.baseStats.entries) {
+      yield PokemonStatsTableCompanion.insert(
+        pokemonId: entry.id,
+        statName: statName,
+        baseStat: baseStat,
       );
     }
   }
