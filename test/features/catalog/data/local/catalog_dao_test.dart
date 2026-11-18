@@ -3,6 +3,7 @@ import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/core/database/app_database.dart';
+import 'package:pokedex_flutter/features/catalog/data/catalog_fingerprint.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 
@@ -11,18 +12,32 @@ const bulbasaur = CatalogEntry(
   name: 'bulbasaur',
   imageUrl: 'https://example.com/1.png',
   typeNames: ['grass', 'poison'],
+  speciesId: 1,
+  generationId: 1,
+  heightDm: 7,
+  weightHg: 69,
+  baseStats: {
+    'hp': 45,
+    'attack': 49,
+    'defense': 49,
+    'special-attack': 65,
+    'special-defense': 65,
+    'speed': 45,
+  },
 );
 const charmander = CatalogEntry(
   id: 4,
   name: 'charmander',
   imageUrl: 'https://example.com/4.png',
   typeNames: ['fire'],
+  baseStats: {'hp': 39, 'speed': 65},
 );
 const squirtle = CatalogEntry(
   id: 7,
   name: 'squirtle',
   imageUrl: 'https://example.com/7.png',
   typeNames: ['water'],
+  baseStats: {'hp': 44, 'speed': 43},
 );
 
 void main() {
@@ -41,13 +56,28 @@ void main() {
     List<CatalogEntry> entries, {
     int nextOffset = 50,
     bool isComplete = false,
+    int? totalCount,
   }) {
     return catalogDao.saveCatalogPage(
       entries: entries,
       nextOffset: nextOffset,
       isComplete: isComplete,
       savedAt: savedAt,
+      totalCount: totalCount,
     );
+  }
+
+  Future<PokemonRow> savedPokemonRow(int id) {
+    return (database.select(
+      database.pokemonTable,
+    )..where((pokemon) => pokemon.id.equals(id))).getSingle();
+  }
+
+  Future<Map<String, int>> savedStatsOf(int pokemonId) async {
+    final rows = await (database.select(
+      database.pokemonStatsTable,
+    )..where((stat) => stat.pokemonId.equals(pokemonId))).get();
+    return {for (final row in rows) row.statName: row.baseStat};
   }
 
   Future<int> countRowsIn(TableInfo<Table, Object?> table) {
@@ -58,13 +88,67 @@ void main() {
     for (final entry in entries) entry.id,
   ];
 
-  test('no guarda duplicados cuando la misma página llega dos veces', () async {
+  test('guardar el mismo lote tres veces no duplica Pokémon, tipos ni estadísticas', () async {
+    await savePage([bulbasaur, charmander, squirtle]);
     await savePage([bulbasaur, charmander, squirtle]);
     await savePage([bulbasaur, charmander, squirtle]);
 
     expect(await countRowsIn(database.pokemonTable), 3);
     expect(await countRowsIn(database.pokemonTypesTable), 4);
+    expect(await countRowsIn(database.pokemonStatsTable), 10);
   });
+
+  test(
+    'guarda especie, generación, medidas, total y huella de cada Pokémon',
+    () async {
+      await savePage([bulbasaur]);
+
+      final row = await savedPokemonRow(1);
+
+      expect(row.speciesId, 1);
+      expect(row.generationId, 1);
+      expect(row.isDefault, isTrue);
+      expect(row.heightDm, 7);
+      expect(row.weightHg, 69);
+      expect(row.baseStatTotal, 318);
+      expect(row.remoteFingerprint, catalogFingerprintOf(bulbasaur));
+      expect(await savedStatsOf(1), bulbasaur.baseStats);
+    },
+  );
+
+  test(
+    'reemplaza las estadísticas y la huella cuando el Pokémon vuelve cambiado',
+    () async {
+      const changedBulbasaur = CatalogEntry(
+        id: 1,
+        name: 'bulbasaur',
+        imageUrl: 'https://example.com/1.png',
+        typeNames: ['grass', 'poison'],
+        baseStats: {'hp': 50, 'attack': 49},
+      );
+      await savePage([bulbasaur]);
+
+      await savePage([changedBulbasaur]);
+      final row = await savedPokemonRow(1);
+
+      expect(await savedStatsOf(1), {'hp': 50, 'attack': 49});
+      expect(row.baseStatTotal, 99);
+      expect(row.remoteFingerprint, catalogFingerprintOf(changedBulbasaur));
+    },
+  );
+
+  test(
+    'guarda el total del primer lote y lo conserva en los siguientes',
+    () async {
+      await savePage([bulbasaur], nextOffset: 100, totalCount: 1025);
+      await savePage([charmander], nextOffset: 200);
+
+      final progress = await catalogDao.readCatalogSyncProgress();
+
+      expect(progress?.totalCount, 1025);
+      expect(progress?.nextOffset, 200);
+    },
+  );
 
   test(
     'reemplaza los tipos de un Pokémon cuando vuelve a llegar con otros',
