@@ -202,6 +202,21 @@ void main() {
     expect(syncFailureFrom(const ServerError(502)), const ServerError(502));
   });
 
+  test(
+    'deja pasar CallBudgetExhausted aunque llegue envuelto en UnknownException',
+    () {
+      final exhausted = CallBudgetExhausted(DateTime(2026, 11, 20, 11));
+
+      final failure = syncFailureFrom(
+        OperationException(
+          linkException: UnknownException(exhausted, StackTrace.current),
+        ),
+      );
+
+      expect(failure, exhausted);
+    },
+  );
+
   test('un error desconocido es QueryError y no se reintenta', () {
     final failure = syncFailureFrom(StateError('base de datos cerrada'));
 
