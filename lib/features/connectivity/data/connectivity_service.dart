@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:graphql/client.dart';
 
+import 'package:pokedex_flutter/core/network/call_budget_link.dart';
+import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
 import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status.dart';
 
 class ConnectivityService {
@@ -55,6 +57,7 @@ class ConnectivityService {
             QueryOptions(
               document: _healthCheckQuery,
               fetchPolicy: FetchPolicy.noCache,
+              context: withCallPriority(CallPriority.user),
             ),
           )
           .timeout(_healthCheckTimeout);

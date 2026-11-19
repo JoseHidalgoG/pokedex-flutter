@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:graphql/client.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:pokedex_flutter/core/network/call_budget_link.dart';
+import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
 import 'package:pokedex_flutter/features/connectivity/data/connectivity_service.dart';
 import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status.dart';
 
@@ -76,6 +78,23 @@ void main() {
     expect(result, ConnectivityStatus.online);
 
     verify(() => mockGraphQLClient.query(any())).called(1);
+  });
+
+  test('la consulta de salud gasta del presupuesto del usuario', () async {
+    when(() => mockConnectivity.checkConnectivity())
+        .thenAnswer((_) async => [ConnectivityResult.wifi]);
+    when(() => mockGraphQLClient.query(any()))
+        .thenThrow(Exception('PokeAPI no responde'));
+
+    await service.checkStatus();
+    final healthCheck =
+        verify(() => mockGraphQLClient.query(captureAny())).captured.single
+            as QueryOptions;
+
+    expect(
+      healthCheck.context.entry<CallPriorityEntry>()?.priority,
+      CallPriority.user,
+    );
   });
 
   test('returns serviceUnavailable when the GraphQL request fails', () async {
