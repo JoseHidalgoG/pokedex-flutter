@@ -3,6 +3,7 @@ import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/core/database/app_database.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/features/catalog/data/catalog_fingerprint.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
@@ -325,19 +326,11 @@ void main() {
     expect(await catalogDao.readCatalogSyncProgress(), isNull);
   });
 
-  test('un fallo de sincronización conserva el progreso guardado', () async {
-    await savePage([bulbasaur], nextOffset: 50);
-
-    await catalogDao.recordCatalogSyncFailure('Sin conexión');
-    final progress = await catalogDao.readCatalogSyncProgress();
-
-    expect(progress?.nextOffset, 50);
-    expect(progress?.lastError, 'Sin conexión');
-    expect(await countRowsIn(database.pokemonTable), 1);
-  });
-
   test('limpia el último error cuando una página se guarda bien', () async {
-    await catalogDao.recordCatalogSyncFailure('Sin conexión');
+    await database.syncMetadataDao.recordPending(
+      CatalogDao.catalogSyncKey,
+      failure: const NoConnection(),
+    );
 
     await savePage([bulbasaur], nextOffset: 50, isComplete: true);
     final progress = await catalogDao.readCatalogSyncProgress();

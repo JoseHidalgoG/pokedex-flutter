@@ -2,6 +2,9 @@ import 'package:async/async.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/core/database/app_database.dart';
+import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
+import 'package:pokedex_flutter/core/sync/domain/retry_policy.dart';
+import 'package:pokedex_flutter/core/sync/sync_scheduler.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/offline_first_catalog_repository.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
@@ -30,24 +33,28 @@ class SinglePagePokeApiCatalog implements CatalogRemoteDataSource {
 
 void main() {
   late AppDatabase database;
-  late CatalogSyncService syncService;
+  late SyncScheduler scheduler;
   late OfflineFirstCatalogRepository repository;
 
   setUp(() {
     database = AppDatabase(NativeDatabase.memory());
-    syncService = CatalogSyncService(
-      remoteDataSource: SinglePagePokeApiCatalog(),
-      catalogDao: database.catalogDao,
-      hasInternetAccess: () async => true,
+    scheduler = SyncScheduler(
+      budget: CallBudget(),
+      retryPolicy: RetryPolicy(),
+      store: database.syncMetadataDao,
     );
     repository = OfflineFirstCatalogRepository(
       catalogDao: database.catalogDao,
-      syncService: syncService,
+      syncService: CatalogSyncService(
+        remoteDataSource: SinglePagePokeApiCatalog(),
+        catalogDao: database.catalogDao,
+      ),
+      scheduler: scheduler,
     );
   });
 
   tearDown(() async {
-    await syncService.dispose();
+    await scheduler.dispose();
     await database.close();
   });
 
@@ -124,6 +131,17 @@ void main() {
 
       expect(await catalogUpdates.next, [1, 4]);
       expect(await repository.watchSyncStatus().first, isA<SyncRevalidated>());
+    },
+  );
+
+  test(
+    'syncCatalog pasa por el planificador y deja el estado en sync_metadata',
+    () async {
+      await repository.syncCatalog();
+      final metadata = await database.syncMetadataDao.readByKey('catalog');
+
+      expect(metadata?.status, 'idle');
+      expect(metadata?.isComplete, isTrue);
     },
   );
 }
