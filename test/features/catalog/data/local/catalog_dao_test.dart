@@ -356,6 +356,87 @@ void main() {
     expect([for (final favorite in favorites) favorite.pokemonId], [4]);
   });
 
+  group('revalidación de lo visible', () {
+    final limit = savedAt.add(const Duration(minutes: 30));
+
+    test(
+      'staleIdsAmong devuelve solo los ids pedidos guardados antes del límite',
+      () async {
+        await savePage([bulbasaur, charmander]);
+        await catalogDao.saveRevalidated([
+          squirtle,
+        ], savedAt: limit.add(const Duration(minutes: 1)));
+
+        final staleIds = await catalogDao.staleIdsAmong([
+          7,
+          4,
+          1,
+          150,
+        ], olderThan: limit);
+
+        expect(staleIds, [1, 4]);
+      },
+    );
+
+    test(
+      'staleIdsAmong no cuenta los ids que no están en el catálogo',
+      () async {
+        await savePage([bulbasaur]);
+
+        expect(
+          await catalogDao.staleIdsAmong([150], olderThan: limit),
+          isEmpty,
+        );
+      },
+    );
+
+    test('saveRevalidated actualiza los Pokémon sin tocar el progreso del catálogo', () async {
+      const renamedBulbasaur = CatalogEntry(
+        id: 1,
+        name: 'bulbasaur-renombrado',
+        imageUrl: 'https://example.com/1.png',
+        typeNames: ['grass'],
+        baseStats: {'hp': 50},
+      );
+      await savePage([bulbasaur, charmander], nextOffset: 50);
+
+      await catalogDao.saveRevalidated([renamedBulbasaur], savedAt: limit);
+      final row = await savedPokemonRow(1);
+      final progress = await catalogDao.readCatalogSyncProgress();
+
+      expect(row.name, 'bulbasaur-renombrado');
+      expect(row.updatedAt, limit);
+      expect(row.remoteFingerprint, catalogFingerprintOf(renamedBulbasaur));
+      expect(await savedStatsOf(1), {'hp': 50});
+      expect((await savedPokemonRow(4)).updatedAt, savedAt);
+      expect(progress?.nextOffset, 50);
+      expect(progress?.lastSyncedAt, savedAt);
+    });
+
+    test('la página vuelve a emitirse con el nombre revalidado', () async {
+      await savePage([bulbasaur, charmander]);
+      final pageNames = StreamQueue(
+        catalogDao
+            .watchCatalogPage(limit: 2, offset: 0)
+            .map((entries) => [for (final entry in entries) entry.name]),
+      );
+      addTearDown(pageNames.cancel);
+
+      expect(await pageNames.next, ['bulbasaur', 'charmander']);
+
+      await catalogDao.saveRevalidated(const [
+        CatalogEntry(
+          id: 4,
+          name: 'charmander-renombrado',
+          imageUrl: 'https://example.com/4.png',
+          typeNames: ['fire'],
+        ),
+      ], savedAt: limit);
+
+      expect(await pageNames.next, ['bulbasaur', 'charmander-renombrado']);
+    });
+  });
+
   test('el esquema crea los índices de búsqueda, filtros y ranking', () async {
     final indexes = await database
         .customSelect(
