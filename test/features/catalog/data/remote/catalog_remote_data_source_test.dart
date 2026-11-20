@@ -8,6 +8,7 @@ import 'package:pokedex_flutter/core/network/pokeapi_graphql_client.dart';
 import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_query.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
 
 import '../../../../fixtures/catalog_batch_fixture.dart';
@@ -199,6 +200,52 @@ void main() {
       dataSource.fetchCatalogPage(limit: 50, offset: 0),
       throwsA(const InvalidResponse()),
     );
+  });
+
+  group('fetchPokemonByIds', () {
+    test(
+      'envía los ids y marca la consulta con la prioridad del usuario',
+      () async {
+        final link = ScriptedPokeApiLink(replyWithSavedPage);
+
+        await dataSourceOver(link).fetchPokemonByIds([25, 1]);
+        final request = link.receivedRequests.single;
+
+        expect(request.operation.document, same(pokemonByIdsQuery));
+        expect(request.variables, {
+          'ids': [25, 1],
+        });
+        expect(
+          request.context.entry<CallPriorityEntry>()?.priority,
+          CallPriority.user,
+        );
+      },
+    );
+
+    test('convierte la respuesta en los Pokémon recibidos', () async {
+      final pokemon = await dataSourceOver(
+        ScriptedPokeApiLink(replyWithSavedPage),
+      ).fetchPokemonByIds([1, 2, 3, 4]);
+
+      expect([for (final dto in pokemon) dto.id], [1, 2, 3, 4]);
+      expect(pokemon.first.name, 'bulbasaur');
+      expect(pokemon.first.baseStats, hasLength(6));
+    });
+
+    test('lanza ServerError cuando PokeAPI responde 503', () async {
+      final dataSource = dataSourceOver(
+        ScriptedPokeApiLink(
+          () => Stream.error(
+            const ServerException(statusCode: 503, parsedResponse: null),
+          ),
+        ),
+      );
+
+      expect(
+        dataSource.fetchPokemonByIds([25]),
+        throwsA(const ServerError(503)),
+      );
+    });
   });
 
   test('acepta una página que tarda más de 5 segundos en llegar', () {

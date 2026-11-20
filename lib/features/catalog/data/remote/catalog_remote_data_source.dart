@@ -21,8 +21,8 @@ class CatalogRemoteDataSource {
     required int limit,
     required int offset,
     bool withTotal = false,
-  }) async {
-    final result = await _client.query(
+  }) {
+    return _send(
       QueryOptions(
         document: catalogPageQuery,
         variables: {'limit': limit, 'offset': offset, 'withTotal': withTotal},
@@ -30,16 +30,37 @@ class CatalogRemoteDataSource {
         errorPolicy: ErrorPolicy.all,
         context: withCallPriority(CallPriority.background),
       ),
+      parse: (data) => CatalogBatch(
+        pokemon: _pokemonIn(data),
+        totalCount: withTotal ? _totalCountIn(data) : null,
+      ),
     );
+  }
+
+  Future<List<PokemonDto>> fetchPokemonByIds(List<int> ids) {
+    return _send(
+      QueryOptions(
+        document: pokemonByIdsQuery,
+        variables: {'ids': ids},
+        queryRequestTimeout: _requestTimeout,
+        errorPolicy: ErrorPolicy.all,
+        context: withCallPriority(CallPriority.user),
+      ),
+      parse: _pokemonIn,
+    );
+  }
+
+  Future<T> _send<T>(
+    QueryOptions options, {
+    required T Function(Map<String, Object?>? data) parse,
+  }) async {
+    final result = await _client.query(options);
     final exception = result.exception;
     if (exception != null) {
       throw syncFailureFrom(exception, dataReceived: result.data != null);
     }
     try {
-      return CatalogBatch(
-        pokemon: _pokemonIn(result.data),
-        totalCount: withTotal ? _totalCountIn(result.data) : null,
-      );
+      return parse(result.data);
     } on FormatException catch (formatError) {
       throw syncFailureFrom(formatError);
     }
@@ -55,7 +76,7 @@ class CatalogRemoteDataSource {
             throw FormatException('Pokémon con formato inesperado', pokemon),
       ];
     }
-    throw FormatException('Página del catálogo sin lista de Pokémon', data);
+    throw FormatException('Respuesta sin lista de Pokémon', data);
   }
 
   int _totalCountIn(Map<String, Object?>? data) {
