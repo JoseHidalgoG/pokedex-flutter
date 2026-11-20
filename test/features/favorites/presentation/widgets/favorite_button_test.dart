@@ -6,6 +6,8 @@ import 'package:pokedex_flutter/features/favorites/presentation/widgets/favorite
 
 import '../../fakes/fake_favorites_repository.dart';
 
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
+
 void main() {
   late FakeFavoritesRepository repository;
 
@@ -25,6 +27,9 @@ void main() {
         ],
         child: const MaterialApp(
           home: Scaffold(body: FavoriteButton(pokemonId: 25)),
+          locale: Locale('es'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
         ),
       ),
     );
@@ -88,5 +93,31 @@ void main() {
     await tester.pump();
 
     expect(find.byIcon(Icons.favorite_border), findsOneWidget);
+  });
+
+  testWidgets('muestra el tooltip en inglés', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          favoritesRepositoryProvider.overrideWith((ref) => repository),
+        ],
+        child: const MaterialApp(
+          locale: Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: FavoriteButton(pokemonId: 25)),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    expect(find.byTooltip('Add to favorites'), findsOneWidget);
+
+    await repository.addFavorite(25);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byTooltip('Remove from favorites'), findsOneWidget);
   });
 }

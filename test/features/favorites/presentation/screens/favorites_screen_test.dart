@@ -6,6 +6,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_
 import 'package:pokedex_flutter/features/catalog/presentation/screens/pokemon_detail_screen.dart';
 import 'package:pokedex_flutter/features/favorites/presentation/providers/favorites_providers.dart';
 import 'package:pokedex_flutter/features/favorites/presentation/screens/favorites_screen.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 import '../../fakes/fake_favorites_repository.dart';
 
@@ -44,7 +45,12 @@ void main() {
           favoritesRepositoryProvider.overrideWith((ref) => repository),
           catalogProvider.overrideWith((ref) => Stream.value(pokemon)),
         ],
-        child: const MaterialApp(home: FavoritesScreen()),
+        child: const MaterialApp(
+          home: FavoritesScreen(),
+          locale: Locale('es'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+        ),
       ),
     );
 
@@ -141,9 +147,7 @@ void main() {
     expect(find.byType(PokemonDetailScreen), findsOneWidget);
   });
 
-  testWidgets('conserva los favoritos al regresar del detalle', (
-      tester,
-      ) async {
+  testWidgets('conserva los favoritos al regresar del detalle', (tester) async {
     await repository.addFavorite(25);
 
     await pumpFavoritesScreen(tester);
@@ -151,23 +155,16 @@ void main() {
     await tester.tap(find.text('Pikachu'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.byType(PokemonDetailScreen),
-      findsOneWidget,
-    );
+    expect(find.byType(PokemonDetailScreen), findsOneWidget);
 
-    await tester.pageBack();
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+
+    navigator.pop();
     await tester.pumpAndSettle();
 
-    expect(
-      find.byType(PokemonDetailScreen),
-      findsNothing,
-    );
+    expect(find.byType(PokemonDetailScreen), findsNothing);
 
-    expect(
-      find.byType(FavoritesScreen),
-      findsOneWidget,
-    );
+    expect(find.byType(FavoritesScreen), findsOneWidget);
 
     expect(
       find.descendant(
@@ -178,5 +175,34 @@ void main() {
     );
 
     expect(await repository.isFavorite(25), isTrue);
+  });
+
+  testWidgets('muestra el estado vacío en inglés', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          favoritesRepositoryProvider.overrideWith((ref) => repository),
+          catalogProvider.overrideWith(
+            (ref) => Stream.value([pikachu, bulbasaur]),
+          ),
+        ],
+        child: const MaterialApp(
+          locale: Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: FavoritesScreen(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Favorites'), findsOneWidget);
+    expect(find.text("You don't have any favorites yet"), findsOneWidget);
+    expect(
+      find.text('Tap the heart on a Pokémon to add it here.'),
+      findsOneWidget,
+    );
   });
 }

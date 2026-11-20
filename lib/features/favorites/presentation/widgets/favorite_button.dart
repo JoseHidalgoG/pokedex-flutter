@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pokedex_flutter/features/favorites/presentation/providers/favorites_providers.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 class FavoriteButton extends ConsumerWidget {
   const FavoriteButton({super.key, required this.pokemonId});
@@ -9,11 +10,12 @@ class FavoriteButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final favoriteState = ref.watch(isFavoriteProvider(pokemonId));
 
     return favoriteState.when(
       data: (isFavorite) => IconButton(
-        tooltip: isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos',
+        tooltip: isFavorite ? l10n.removeFromFavorites : l10n.addToFavorites,
         icon: Icon(
           isFavorite ? Icons.favorite : Icons.favorite_border,
           color: isFavorite ? Colors.red : null,
@@ -24,20 +26,18 @@ class FavoriteButton extends ConsumerWidget {
           } catch (error) {
             if (!context.mounted) return;
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('No se pudo actualizar el favorito'),
-              ),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(l10n.favoriteUpdateError)));
           }
         },
       ),
       loading: () =>
           const IconButton(onPressed: null, icon: Icon(Icons.favorite_border)),
-      error: (error, stackTrace) => const IconButton(
-        tooltip: 'Error al cargar favorito',
+      error: (error, stackTrace) => IconButton(
+        tooltip: l10n.favoriteLoadError,
         onPressed: null,
-        icon: Icon(Icons.error_outline),
+        icon: const Icon(Icons.error_outline),
       ),
     );
   }

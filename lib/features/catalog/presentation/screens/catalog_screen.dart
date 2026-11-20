@@ -11,6 +11,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/widgets/catalog_em
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_list_item.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_pagination.dart';
 import 'package:pokedex_flutter/features/favorites/presentation/screens/favorites_screen.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 const _maxVisiblePageButtons = 5;
 const _pageButtonSpacing = 6.0;
@@ -226,7 +227,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            tooltip: 'Ver favoritos',
+            tooltip: AppLocalizations.of(context)!.viewFavorites,
             icon: const Icon(Icons.favorite),
             onPressed: () {
               Navigator.of(context).push(

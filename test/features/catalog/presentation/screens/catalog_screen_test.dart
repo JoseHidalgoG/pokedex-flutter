@@ -12,6 +12,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_
 import 'package:pokedex_flutter/features/catalog/presentation/screens/catalog_screen.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/screens/pokemon_detail_screen.dart';
 import 'package:pokedex_flutter/features/favorites/presentation/providers/favorites_providers.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 import '../../../favorites/fakes/fake_favorites_repository.dart';
 
@@ -47,7 +48,12 @@ void main() {
             (ref) => FakeFavoritesRepository(),
           ),
         ],
-        child: const MaterialApp(home: CatalogScreen()),
+        child: const MaterialApp(
+          locale: Locale('es'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: CatalogScreen(),
+        ),
       ),
     );
 
@@ -242,7 +248,12 @@ void main() {
               (ref) => FakeFavoritesRepository(),
             ),
           ],
-          child: const MaterialApp(home: CatalogScreen()),
+          child: const MaterialApp(
+            locale: Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: CatalogScreen(),
+          ),
         ),
       );
 
@@ -297,7 +308,12 @@ void main() {
             (ref) => FakeFavoritesRepository(),
           ),
         ],
-        child: const MaterialApp(home: CatalogScreen()),
+        child: const MaterialApp(
+          home: CatalogScreen(),
+          locale: Locale('es'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+        ),
       ),
     );
 

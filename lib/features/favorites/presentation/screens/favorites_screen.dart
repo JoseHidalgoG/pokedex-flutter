@@ -5,17 +5,19 @@ import 'package:pokedex_flutter/features/catalog/presentation/screens/pokemon_de
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_list_item.dart';
 import 'package:pokedex_flutter/features/favorites/presentation/providers/favorites_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 class FavoritesScreen extends ConsumerWidget {
   const FavoritesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final favoriteIdsAsync = ref.watch(favoriteIdsProvider);
     final catalogAsync = ref.watch(catalogProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Favoritos'), centerTitle: true),
+      appBar: AppBar(title: Text(l10n.favoritesTitle), centerTitle: true),
       body: favoriteIdsAsync.when(
         data: (ids) {
           if (ids.isEmpty) {
@@ -31,9 +33,9 @@ class FavoritesScreen extends ConsumerWidget {
                   .toList();
 
               if (favoritePokemon.isEmpty) {
-                return const Center(
+                return Center(
                   child: Text(
-                    'No se encontraron los datos de los Pokémon favoritos.',
+                    l10n.favoritePokemonNotFound,
                     textAlign: TextAlign.center,
                   ),
                 );
@@ -42,15 +44,13 @@ class FavoritesScreen extends ConsumerWidget {
               return _FavoritesList(pokemonList: favoritePokemon);
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stackTrace) => const Center(
-              child: Text('No se pudieron cargar los Pokémon favoritos.'),
-            ),
+            error: (error, stackTrace) =>
+                Center(child: Text(l10n.favoritePokemonLoadError)),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => const Center(
-          child: Text('No se pudieron consultar los favoritos.'),
-        ),
+        error: (error, stackTrace) =>
+            Center(child: Text(l10n.favoritesLoadError)),
       ),
     );
   }
@@ -88,6 +88,8 @@ class _FavoritesEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -101,15 +103,12 @@ class _FavoritesEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Todavía no tienes favoritos',
+              l10n.noFavoritesTitle,
               style: Theme.of(context).textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Marca un Pokémon con el corazón para agregarlo aquí.',
-              textAlign: TextAlign.center,
-            ),
+            Text(l10n.noFavoritesMessage, textAlign: TextAlign.center),
           ],
         ),
       ),
