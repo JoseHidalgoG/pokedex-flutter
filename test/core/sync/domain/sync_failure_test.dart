@@ -3,14 +3,15 @@ import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 
 void main() {
   test('solo NoConnection y QueryError no se reintentan', () {
-    const failuresAndRetry = <(SyncFailure, bool)>[
-      (NoConnection(), false),
-      (RequestTimeout(), true),
-      (RateLimited(retryAfter: Duration(minutes: 1)), true),
-      (ServerError(503), true),
-      (PartialResponse(), true),
-      (QueryError("field 'pokemon' not found"), false),
-      (InvalidResponse(), true),
+    final failuresAndRetry = <(SyncFailure, bool)>[
+      (const NoConnection(), false),
+      (const RequestTimeout(), true),
+      (const RateLimited(retryAfter: Duration(minutes: 1)), true),
+      (const ServerError(503), true),
+      (const PartialResponse(), true),
+      (const QueryError("field 'pokemon' not found"), false),
+      (const InvalidResponse(), true),
+      (CallBudgetExhausted(DateTime(2026, 11, 20, 11)), true),
     ];
 
     for (final (failure, isRetryable) in failuresAndRetry) {

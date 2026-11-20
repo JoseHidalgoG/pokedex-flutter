@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:graphql/client.dart';
+import 'package:pokedex_flutter/core/network/call_budget_link.dart';
 import 'package:pokedex_flutter/core/network/pokeapi_graphql_client.dart';
+import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
@@ -80,6 +82,18 @@ void main() {
       'offset': 200,
       'withTotal': false,
     });
+  });
+
+  test('marca sus consultas con la prioridad de segundo plano', () async {
+    final link = ScriptedPokeApiLink(replyWithSavedPage);
+
+    await dataSourceOver(link).fetchCatalogPage(limit: 100, offset: 0);
+    final request = link.receivedRequests.single;
+
+    expect(
+      request.context.entry<CallPriorityEntry>()?.priority,
+      CallPriority.background,
+    );
   });
 
   test('devuelve el total de Pokémon cuando lo pide', () async {

@@ -6446,6 +6446,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'CREATE INDEX trivia_results_by_score ON trivia_results (score)',
   );
   late final CatalogDao catalogDao = CatalogDao(this as AppDatabase);
+  late final SyncMetadataDao syncMetadataDao = SyncMetadataDao(
+    this as AppDatabase,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();

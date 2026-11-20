@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:pokedex_flutter/core/database/app_database.steps.dart';
+import 'package:pokedex_flutter/core/sync/data/sync_metadata_dao.dart';
+import 'package:pokedex_flutter/core/sync/data/sync_metadata_table.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_detail_tables.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_tables.dart';
@@ -31,7 +33,7 @@ part 'app_database.g.dart';
     UserPreferencesTable,
     SyncMetadataTable,
   ],
-  daos: [CatalogDao],
+  daos: [CatalogDao, SyncMetadataDao],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);

@@ -1,8 +1,8 @@
-import 'dart:async';
-
 import 'package:pokedex_flutter/core/database/app_database.dart';
 import 'package:pokedex_flutter/core/sync/data/sync_failure_translator.dart';
+import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_job.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
@@ -10,77 +10,39 @@ import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_constants.dart';
 
-typedef InternetAccessCheck = Future<bool> Function();
-
 class CatalogSyncService {
   CatalogSyncService({
     required this._remoteDataSource,
     required this._catalogDao,
-    required this._hasInternetAccess,
     this._now = DateTime.now,
   });
 
   final CatalogRemoteDataSource _remoteDataSource;
   final CatalogDao _catalogDao;
-  final InternetAccessCheck _hasInternetAccess;
   final DateTime Function() _now;
 
-  final _statusChanges = StreamController<SyncStatus>.broadcast();
-  SyncStatus _status = const SyncIdle();
-  Future<void>? _runningSync;
-
-  SyncStatus get currentStatus => _status;
-
-  Stream<SyncStatus> watchStatus() {
-    return Stream.multi((listener) {
-      listener.add(_status);
-      final subscription = _statusChanges.stream.listen(
-        listener.add,
-        onDone: listener.close,
-      );
-      listener.onCancel = subscription.cancel;
-    });
+  SyncJob fullPassJob({bool force = false}) {
+    return SyncJob(
+      key: CatalogDao.catalogSyncKey,
+      priority: CallPriority.background,
+      runningStatus: const SyncFullPassInProgress(),
+      force: force,
+      perform: () => syncCatalog(force: force),
+    );
   }
 
-  Future<void> syncCatalog({bool force = false}) {
-    return _runningSync ??= _synchronize(force: force)
-        .whenComplete(() => _runningSync = null);
-  }
-
-  Future<void> dispose() => _statusChanges.close();
-
-  Future<void> _synchronize({required bool force}) async {
-    _emit(const SyncFullPassInProgress());
-
+  Future<SyncOutcome> syncCatalog({bool force = false}) async {
     try {
       final progress = await _catalogDao.readCatalogSyncProgress();
-
       if (!force && _isFreshAndComplete(progress)) {
-        _emit(const SyncIdle());
-        return;
+        return SyncOutcome.upToDate;
       }
-
-      final hasInternet = await _hasInternetAccess();
-
-      if (!hasInternet) {
-        _emit(const SyncFailed(NoConnection()));
-        return;
-      }
-
       await _downloadBatchesAfter(progress);
-
-      _emit(SyncRevalidated(_now()));
-    } on SyncFailure catch (failure) {
-      final reportedFailure = await _confirmConnectionBehind(failure);
-
-      _emit(SyncFailed(reportedFailure));
-
-      try {
-        await _catalogDao.recordCatalogSyncFailure(reportedFailure.toString());
-      } catch (_) {}
-    } catch (error) {
-      _emit(SyncFailed(syncFailureFrom(error)));
+      return SyncOutcome.revalidated;
+    } on SyncFailure {
       rethrow;
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(syncFailureFrom(error), stackTrace);
     }
   }
 
@@ -138,23 +100,5 @@ class CatalogSyncService {
     final cameBackShort = batch.pokemon.length < catalogRemoteBatchSize;
     final reachedTotal = totalCount != null && nextOffset >= totalCount;
     return cameBackShort || reachedTotal;
-  }
-
-  Future<SyncFailure> _confirmConnectionBehind(SyncFailure failure) async {
-    if (failure is NoConnection) {
-      return failure;
-    }
-    try {
-      return await _hasInternetAccess() ? failure : const NoConnection();
-    } catch (_) {
-      return failure;
-    }
-  }
-
-  void _emit(SyncStatus status) {
-    _status = status;
-    if (!_statusChanges.isClosed) {
-      _statusChanges.add(status);
-    }
   }
 }

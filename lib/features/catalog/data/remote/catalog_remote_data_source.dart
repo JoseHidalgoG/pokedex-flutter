@@ -1,5 +1,7 @@
 import 'package:graphql/client.dart';
+import 'package:pokedex_flutter/core/network/call_budget_link.dart';
 import 'package:pokedex_flutter/core/sync/data/sync_failure_translator.dart';
+import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_query.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
@@ -26,6 +28,7 @@ class CatalogRemoteDataSource {
         variables: {'limit': limit, 'offset': offset, 'withTotal': withTotal},
         queryRequestTimeout: _requestTimeout,
         errorPolicy: ErrorPolicy.all,
+        context: withCallPriority(CallPriority.background),
       ),
     );
     final exception = result.exception;

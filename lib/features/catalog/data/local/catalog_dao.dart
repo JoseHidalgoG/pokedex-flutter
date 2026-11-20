@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:pokedex_flutter/core/database/app_database.dart';
+import 'package:pokedex_flutter/core/sync/data/sync_metadata_table.dart';
 import 'package:pokedex_flutter/features/catalog/data/catalog_fingerprint.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_tables.dart';
@@ -81,15 +82,6 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     final catalogProgress = select(syncMetadataTable)
       ..where((metadata) => metadata.key.equals(catalogSyncKey));
     return catalogProgress.getSingleOrNull();
-  }
-
-  Future<void> recordCatalogSyncFailure(String message) {
-    return into(syncMetadataTable).insertOnConflictUpdate(
-      SyncMetadataTableCompanion(
-        key: const Value(catalogSyncKey),
-        lastError: Value(message),
-      ),
-    );
   }
 
   Future<void> _upsertEntries(

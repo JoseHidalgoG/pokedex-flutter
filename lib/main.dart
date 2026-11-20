@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:pokedex_flutter/core/sync/sync_providers.dart';
 import 'package:pokedex_flutter/features/connectivity/presentation/connectivity_banner.dart';
 
 import 'package:pokedex_flutter/features/catalog/data/catalog_data_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/screens/catalog_screen.dart';
-import 'package:pokedex_flutter/features/catalog/presentation/catalog_sync_coordinator.dart';
 
 void main() {
   runApp(
@@ -51,7 +51,20 @@ class MainApp extends StatelessWidget {
         );
       },
 
-      home: const CatalogSyncCoordinator(child: CatalogScreen()),
+      home: const SyncLifecycle(child: CatalogScreen()),
     );
+  }
+}
+
+class SyncLifecycle extends ConsumerWidget {
+  const SyncLifecycle({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(syncSchedulerProvider);
+    ref.watch(catalogFullPassTriggersProvider);
+    return child;
   }
 }

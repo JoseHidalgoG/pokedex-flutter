@@ -7,7 +7,8 @@ sealed class SyncFailure implements Exception {
     RateLimited() ||
     ServerError() ||
     PartialResponse() ||
-    InvalidResponse() => true,
+    InvalidResponse() ||
+    CallBudgetExhausted() => true,
   };
 }
 
@@ -85,4 +86,20 @@ final class InvalidResponse extends SyncFailure {
 
   @override
   String toString() => 'InvalidResponse';
+}
+
+final class CallBudgetExhausted extends SyncFailure {
+  const CallBudgetExhausted(this.until);
+
+  final DateTime until;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CallBudgetExhausted && other.until == until;
+
+  @override
+  int get hashCode => Object.hash(CallBudgetExhausted, until);
+
+  @override
+  String toString() => 'CallBudgetExhausted(until: $until)';
 }

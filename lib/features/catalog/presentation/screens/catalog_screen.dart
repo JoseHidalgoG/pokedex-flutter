@@ -255,7 +255,8 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             );
           }
 
-          if (syncStatus is SyncFullPassInProgress) {
+          if (syncStatus is SyncFullPassInProgress ||
+              syncStatus is SyncWaitingRetry) {
             return _buildLoading();
           }
 

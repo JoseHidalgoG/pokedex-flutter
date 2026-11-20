@@ -75,6 +75,24 @@ void main() {
     expect(find.text('Cargando catálogo'), findsOneWidget);
   });
 
+  testWidgets('sigue cargando mientras espera un reintento sin datos', (
+    tester,
+  ) async {
+    await pumpCatalog(
+      tester,
+      pokemon: [],
+      syncStatus: SyncWaitingRetry(
+        attempt: 1,
+        maxAttempts: 5,
+        retryAt: DateTime(2026, 11, 20, 10, 0, 2),
+        failure: const ServerError(503),
+      ),
+    );
+
+    expect(find.text('Cargando catálogo'), findsOneWidget);
+    expect(find.text('No hay Pokémon disponibles'), findsNothing);
+  });
+
   testWidgets(
     'muestra un error cuando no hay datos y falla la sincronización',
     (tester) async {
