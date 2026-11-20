@@ -10,6 +10,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/screens/pokemon_de
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/catalog_empty_state.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_list_item.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_pagination.dart';
+import 'package:pokedex_flutter/features/favorites/presentation/screens/favorites_screen.dart';
 
 const _maxVisiblePageButtons = 5;
 const _pageButtonSpacing = 6.0;
@@ -224,6 +225,17 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
         title: const Text('Pokédex'),
         centerTitle: true,
         actions: [
+          IconButton(
+            tooltip: 'Ver favoritos',
+            icon: const Icon(Icons.favorite),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const FavoritesScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: isSyncing ? 'Sincronizando...' : 'Sincronizar catálogo',
             onPressed: isSyncing ? null : _retrySync,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_type_chip.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_cached_image.dart';
+import 'package:pokedex_flutter/features/favorites/presentation/widgets/favorite_button.dart';
 
 class PokemonListItem extends StatelessWidget {
   const PokemonListItem({
@@ -54,6 +55,7 @@ class PokemonListItem extends StatelessWidget {
                   ],
                 ),
               ),
+              FavoriteButton(pokemonId: pokemon.id),
               const Icon(Icons.chevron_right),
             ],
           ),

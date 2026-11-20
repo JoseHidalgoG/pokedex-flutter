@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_type_chip.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_cached_image.dart';
+import 'package:pokedex_flutter/features/favorites/presentation/widgets/favorite_button.dart';
 
 class PokemonDetailScreen extends StatelessWidget {
   const PokemonDetailScreen({super.key, required this.pokemon});
@@ -14,7 +15,10 @@ class PokemonDetailScreen extends StatelessWidget {
         pokemon.name[0].toUpperCase() + pokemon.name.substring(1);
 
     return Scaffold(
-      appBar: AppBar(title: Text(capitalizedName)),
+      appBar: AppBar(
+        title: Text(capitalizedName),
+        actions: [FavoriteButton(pokemonId: pokemon.id)],
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
