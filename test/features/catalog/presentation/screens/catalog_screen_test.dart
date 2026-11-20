@@ -11,6 +11,10 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/screens/catalog_screen.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/screens/pokemon_detail_screen.dart';
+import 'package:pokedex_flutter/features/favorites/presentation/providers/favorites_providers.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
+
+import '../../../favorites/fakes/fake_favorites_repository.dart';
 
 void main() {
   const pikachu = Pokemon(
@@ -40,8 +44,16 @@ void main() {
           catalogSyncStatusProvider.overrideWith(
             (ref) => Stream.value(syncStatus),
           ),
+          favoritesRepositoryProvider.overrideWith(
+            (ref) => FakeFavoritesRepository(),
+          ),
         ],
-        child: const MaterialApp(home: CatalogScreen()),
+        child: const MaterialApp(
+          locale: Locale('es'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: CatalogScreen(),
+        ),
       ),
     );
 
@@ -232,8 +244,16 @@ void main() {
             catalogSyncStatusProvider.overrideWith(
               (ref) => syncStatusController.stream,
             ),
+            favoritesRepositoryProvider.overrideWith(
+              (ref) => FakeFavoritesRepository(),
+            ),
           ],
-          child: const MaterialApp(home: CatalogScreen()),
+          child: const MaterialApp(
+            locale: Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: CatalogScreen(),
+          ),
         ),
       );
 
@@ -284,8 +304,16 @@ void main() {
           catalogSyncStatusProvider.overrideWith(
             (ref) => Stream.value(const SyncIdle()),
           ),
+          favoritesRepositoryProvider.overrideWith(
+            (ref) => FakeFavoritesRepository(),
+          ),
         ],
-        child: const MaterialApp(home: CatalogScreen()),
+        child: const MaterialApp(
+          home: CatalogScreen(),
+          locale: Locale('es'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+        ),
       ),
     );
 

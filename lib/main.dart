@@ -7,6 +7,7 @@ import 'package:pokedex_flutter/features/connectivity/presentation/connectivity_
 import 'package:pokedex_flutter/features/catalog/data/catalog_data_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/screens/catalog_screen.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 void main() {
   runApp(
@@ -29,6 +30,8 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       title: 'Pokédex',
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.red),
         useMaterial3: true,

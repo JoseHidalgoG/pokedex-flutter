@@ -1,0 +1,14 @@
+{
+  "@@locale": "es",
+  "favoritesTitle": "Favoritos",
+  "addToFavorites": "Agregar a favoritos",
+  "removeFromFavorites": "Quitar de favoritos",
+  "viewFavorites": "Ver favoritos",
+  "noFavoritesTitle": "Todavía no tienes favoritos",
+  "noFavoritesMessage": "Marca un Pokémon con el corazón para agregarlo aquí.",
+  "favoritePokemonNotFound": "No se encontraron los datos de los Pokémon favoritos.",
+  "favoritePokemonLoadError": "No se pudieron cargar los Pokémon favoritos.",
+  "favoritesLoadError": "No se pudieron consultar los favoritos.",
+  "favoriteUpdateError": "No se pudo actualizar el favorito",
+  "favoriteLoadError": "Error al cargar favorito"
+}
