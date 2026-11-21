@@ -12,6 +12,8 @@ typedef SyncStatusChange = ({String key, SyncStatus status});
 
 typedef _JobAfterRunning = ({SyncJob job, Completer<void> done});
 
+typedef _PeriodicJob = ({SyncJob job, Duration period});
+
 class SyncScheduler {
   SyncScheduler({
     required this._budget,
@@ -33,6 +35,8 @@ class SyncScheduler {
   final _jobsForNextReconnect = <String, SyncJob>{};
   final _jobsOnEachReconnect = <String, SyncJob>{};
   final _jobsAfterRunning = <String, _JobAfterRunning>{};
+  final _periodicJobs = <String, _PeriodicJob>{};
+  final _periodicTimers = <String, Timer>{};
   final _statuses = <String, SyncStatus>{};
   final _lastRevalidations = <String, DateTime>{};
   final _statusChanges = StreamController<SyncStatusChange>.broadcast();
@@ -86,20 +90,48 @@ class SyncScheduler {
     _jobsOnEachReconnect[job.key] = job;
   }
 
+  void runEveryWhileOnline(SyncJob job, Duration period) {
+    _periodicJobs[job.key] = (job: job, period: period);
+    if (_isOnline) {
+      _startPeriodicTimer(job.key);
+    }
+  }
+
   void connectivityChanged({required bool isOnline}) {
     final cameOnline = isOnline && !_isOnline;
     _isOnline = isOnline;
     if (cameOnline) {
       _runJobsAfterReconnect();
+      _periodicJobs.keys.forEach(_startPeriodicTimer);
     } else if (!isOnline) {
       _holdScheduledJobsUntilReconnect();
+      _cancelPeriodicTimers();
     }
   }
 
   Future<void> dispose() async {
     _isDisposed = true;
     _cancelScheduledStarts();
+    _cancelPeriodicTimers();
     await _statusChanges.close();
+  }
+
+  void _startPeriodicTimer(String key) {
+    final periodicJob = _periodicJobs[key];
+    if (periodicJob == null || _isDisposed) {
+      return;
+    }
+    _periodicTimers.remove(key)?.cancel();
+    _periodicTimers[key] = Timer.periodic(periodicJob.period, (_) {
+      unawaited(run(periodicJob.job));
+    });
+  }
+
+  void _cancelPeriodicTimers() {
+    for (final periodicTimer in _periodicTimers.values) {
+      periodicTimer.cancel();
+    }
+    _periodicTimers.clear();
   }
 
   void _runJobsAfterReconnect() {

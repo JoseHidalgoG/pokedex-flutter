@@ -604,6 +604,117 @@ void main() {
     );
   });
 
+  group('cada cierto tiempo mientras haya servicio', () {
+    const period = Duration(seconds: 60);
+
+    SyncJob restorationJob(Future<SyncOutcome> Function() perform) {
+      return SyncJob(
+        key: 'catalog:restore',
+        priority: CallPriority.restoration,
+        runningStatus: const SyncRevalidating(),
+        perform: perform,
+      );
+    }
+
+    test('corre cada 60 s mientras está en línea y no al registrarse', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.upToDate]);
+
+        scheduler.runEveryWhileOnline(restorationJob(work.perform), period);
+        async.elapse(const Duration(seconds: 30));
+        scheduler.connectivityChanged(isOnline: true);
+        async.elapse(const Duration(seconds: 29));
+        expect(work.calls, 0);
+
+        async.elapse(const Duration(seconds: 1));
+        expect(work.calls, 1);
+
+        async.elapse(const Duration(seconds: 120));
+        expect(work.calls, 3);
+      });
+    });
+
+    test('sin conexión se detiene y al reconectar vuelve a contar 60 s', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.upToDate]);
+
+        scheduler.runEveryWhileOnline(restorationJob(work.perform), period);
+        async.elapse(const Duration(seconds: 90));
+        expect(work.calls, 1);
+
+        scheduler.connectivityChanged(isOnline: false);
+        async.elapse(const Duration(minutes: 5));
+        expect(work.calls, 1);
+
+        scheduler.connectivityChanged(isOnline: true);
+        async.elapse(const Duration(seconds: 59));
+        expect(work.calls, 1);
+        async.elapse(const Duration(seconds: 1));
+        expect(work.calls, 2);
+      });
+    });
+
+    test('registrada sin conexión empieza a contar en el primer online', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final work = ScriptedWork([SyncOutcome.upToDate]);
+
+        scheduler.runEveryWhileOnline(restorationJob(work.perform), period);
+        async.elapse(const Duration(minutes: 3));
+        expect(work.calls, 0);
+
+        scheduler.connectivityChanged(isOnline: true);
+        async.elapse(period);
+        expect(work.calls, 1);
+      });
+    });
+
+    test('un tic con la verificación anterior en curso no la repite', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final verification = Completer<SyncOutcome>();
+        var performs = 0;
+
+        scheduler.runEveryWhileOnline(
+          restorationJob(() {
+            performs++;
+            return verification.future;
+          }),
+          period,
+        );
+        async.elapse(const Duration(seconds: 150));
+
+        expect(performs, 1);
+        verification.complete(SyncOutcome.upToDate);
+        async.flushMicrotasks();
+      });
+    });
+
+    test('dispose cancela el temporizador', () {
+      fakeAsync((async) {
+        final clock = async.getClock(start);
+        final scheduler = SyncScheduler(
+          budget: CallBudget(now: clock.now),
+          retryPolicy: RetryPolicy(random: NoJitterRandom()),
+          store: store,
+          now: clock.now,
+        )..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.upToDate]);
+
+        scheduler.runEveryWhileOnline(restorationJob(work.perform), period);
+        unawaited(scheduler.dispose());
+        async.elapse(const Duration(minutes: 3));
+
+        expect(work.calls, 0);
+      });
+    });
+  });
+
   group('presupuesto', () {
     test('un 429 sin Retry-After bloquea el presupuesto 10 min y el reintento lo espera', () {
       fakeAsync((async) {
