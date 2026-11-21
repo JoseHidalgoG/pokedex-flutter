@@ -37,14 +37,17 @@ class CatalogRemoteDataSource {
     );
   }
 
-  Future<List<PokemonDto>> fetchPokemonByIds(List<int> ids) {
+  Future<List<PokemonDto>> fetchPokemonByIds(
+    List<int> ids, {
+    CallPriority priority = CallPriority.user,
+  }) {
     return _send(
       QueryOptions(
         document: pokemonByIdsQuery,
         variables: {'ids': ids},
         queryRequestTimeout: _requestTimeout,
         errorPolicy: ErrorPolicy.all,
-        context: withCallPriority(CallPriority.user),
+        context: withCallPriority(priority),
       ),
       parse: _pokemonIn,
     );
