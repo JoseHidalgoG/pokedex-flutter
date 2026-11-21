@@ -10,6 +10,7 @@ La aplicación sigue una arquitectura **offline-first**, por lo que los Pokémon
 - **Riverpod:** gestión del estado e inyección de dependencias.
 - **Drift y SQLite:** almacenamiento persistente del catálogo.
 - **GraphQL:** comunicación con la API de PokéAPI.
+- **gql:** lectura del nombre de cada operación GraphQL, para registrarla en consola con sus variables y su duración.
 - **connectivity_plus:** detección de cambios de conectividad.
 - **internet_connection_checker_plus:** comprobación de acceso a Internet.
 - **cached_network_image:** almacenamiento temporal de imágenes descargadas.

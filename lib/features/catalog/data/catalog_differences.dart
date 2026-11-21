@@ -22,6 +22,14 @@ List<String> catalogDifferencesBetween(
   ];
 }
 
+String describedDifferencesBetween(CatalogEntry local, CatalogEntry remote) {
+  final differences = catalogDifferencesBetween(local, remote);
+  if (differences.isEmpty) {
+    return 'solo la huella guardada estaba alterada';
+  }
+  return differences.join('; ');
+}
+
 String? _differenceIn(String field, Object? local, Object? remote) {
   if (local == remote) {
     return null;

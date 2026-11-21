@@ -80,20 +80,15 @@ class CatalogRestorationService {
           'se deja como está',
         );
       } else {
-        _log('restauración #${local.id} ${_changesBetween(local, remote)}');
+        _log(
+          'restauración #${local.id} '
+          '${describedDifferencesBetween(local, remote)}',
+        );
       }
     }
     await _catalogDao.saveRevalidated([
       ...remoteEntries.values,
     ], savedAt: _now());
-  }
-
-  static String _changesBetween(CatalogEntry local, CatalogEntry remote) {
-    final differences = catalogDifferencesBetween(local, remote);
-    if (differences.isEmpty) {
-      return 'solo la huella guardada estaba alterada';
-    }
-    return differences.join('; ');
   }
 
   static void _log(String message) {

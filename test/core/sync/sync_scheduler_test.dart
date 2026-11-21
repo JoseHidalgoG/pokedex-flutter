@@ -92,6 +92,15 @@ class VisibleRequests {
   }
 }
 
+SyncJob detailJob(int pokemonId, ScriptedWork work) {
+  return SyncJob(
+    key: 'detail:$pokemonId',
+    priority: CallPriority.user,
+    runningStatus: const SyncRevalidating(),
+    perform: work.perform,
+  );
+}
+
 SyncJob catalogJob(ScriptedWork work, {bool force = false}) {
   return SyncJob(
     key: 'catalog',
@@ -361,6 +370,39 @@ void main() {
         );
       });
     });
+
+    test('lastRevalidationOf guarda la última descarga real aunque haya otra en curso', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final download = Completer<SyncOutcome>();
+        final outcomes = [
+          Future.value(SyncOutcome.revalidated),
+          download.future,
+        ];
+        var performs = 0;
+        SyncJob job() => SyncJob(
+          key: 'detail:25',
+          priority: CallPriority.user,
+          runningStatus: const SyncRevalidating(),
+          perform: () => outcomes[performs++],
+        );
+        expect(scheduler.lastRevalidationOf('detail:25'), isNull);
+
+        scheduler.run(job());
+        async.flushMicrotasks();
+        async.elapse(const Duration(minutes: 6));
+        scheduler.run(job());
+        async.flushMicrotasks();
+
+        expect(scheduler.statusOf('detail:25'), isA<SyncRevalidating>());
+        expect(scheduler.lastRevalidationOf('detail:25'), start);
+
+        download.complete(SyncOutcome.upToDate);
+        async.flushMicrotasks();
+        expect(scheduler.lastRevalidationOf('detail:25'), start);
+        expect(scheduler.lastRevalidationOf('catalog'), isNull);
+      });
+    });
   });
 
   group('reintentos', () {
@@ -599,6 +641,45 @@ void main() {
 
           expect(work.calls, 2);
           expect(scheduler.statusOf('catalog'), isA<SyncRevalidated>());
+        });
+      },
+    );
+
+    test('stopRunningOnReconnect quita solo esa clave de las reconexiones', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final detailWork = ScriptedWork([SyncOutcome.upToDate]);
+        final catalogWork = ScriptedWork([SyncOutcome.upToDate]);
+        scheduler
+          ..runOnEachReconnect(detailJob(25, detailWork))
+          ..runOnEachReconnect(catalogJob(catalogWork))
+          ..stopRunningOnReconnect('detail:25')
+          ..connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+
+        expect(detailWork.calls, 0);
+        expect(catalogWork.calls, 1);
+      });
+    });
+
+    test(
+      'stopRunningOnReconnect descarta lo que esperaba a la próxima reconexión',
+      () {
+        fakeAsync((async) {
+          final scheduler = schedulerIn(async);
+          final work = ScriptedWork([
+            const NoConnection(),
+            SyncOutcome.revalidated,
+          ]);
+
+          scheduler.run(detailJob(25, work));
+          async.flushMicrotasks();
+          scheduler
+            ..stopRunningOnReconnect('detail:25')
+            ..connectivityChanged(isOnline: true);
+          async.flushMicrotasks();
+
+          expect(work.calls, 1);
         });
       },
     );

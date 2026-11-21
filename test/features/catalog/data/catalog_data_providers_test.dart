@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gql/ast.dart';
 import 'package:graphql/client.dart';
 import 'package:pokedex_flutter/core/database/app_database.dart';
 import 'package:pokedex_flutter/core/database/app_database_provider.dart';
@@ -17,32 +18,46 @@ import 'package:pokedex_flutter/features/catalog/data/catalog_data_providers.dar
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_query.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/type_efficacy_query.dart';
 import 'package:pokedex_flutter/features/connectivity/connectivity_providers.dart';
 import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status.dart';
 
 import '../../../fixtures/catalog_batch_fixture.dart';
+import '../../../fixtures/pokemon_detail_fixture.dart';
 
 class SavedBatchPokeApiLink extends Link {
-  SavedBatchPokeApiLink({this.unreachableRequests = 0});
+  SavedBatchPokeApiLink({this.unreachableCatalogRequests = 0});
 
-  int unreachableRequests;
+  int unreachableCatalogRequests;
   final receivedRequests = <Request>[];
 
   int get requests => receivedRequests.length;
 
+  int get catalogRequests =>
+      receivedRequests.length - requestsFor(typeEfficacyQuery).length;
+
+  List<Request> requestsFor(DocumentNode document) => [
+    for (final request in receivedRequests)
+      if (identical(request.operation.document, document)) request,
+  ];
+
   @override
   Stream<Response> request(Request request, [NextLink? forward]) {
     receivedRequests.add(request);
-    if (unreachableRequests > 0) {
-      unreachableRequests--;
+    if (identical(request.operation.document, typeEfficacyQuery)) {
+      return Stream.value(_responseFrom(savedTypeEfficacyResponse()));
+    }
+    if (unreachableCatalogRequests > 0) {
+      unreachableCatalogRequests--;
       return Stream.error(const SocketException('Failed host lookup'));
     }
-    final savedResponse = savedCatalogBatchResponse();
-    return Stream.value(
-      Response(
-        data: savedResponse['data'] as Map<String, Object?>?,
-        response: savedResponse,
-      ),
+    return Stream.value(_responseFrom(savedCatalogBatchResponse()));
+  }
+
+  static Response _responseFrom(Map<String, Object?> savedResponse) {
+    return Response(
+      data: savedResponse['data'] as Map<String, Object?>?,
+      response: savedResponse,
     );
   }
 }
@@ -92,13 +107,32 @@ void main() {
       catalogStatusIn(container),
       emitsThrough(isA<SyncRevalidated>()),
     );
-    expect(pokeApi.requests, 1);
+    expect(pokeApi.catalogRequests, 1);
   });
+
+  test(
+    'al arrancar descarga la tabla de tipos una vez con prioridad de fondo',
+    () async {
+      final pokeApi = SavedBatchPokeApiLink();
+
+      startAppOver(pokeApi);
+
+      await expectLater(
+        database.pokemonDetailDao.watchTypeEfficacy(),
+        emitsThrough(hasLength(324)),
+      );
+      final request = pokeApi.requestsFor(typeEfficacyQuery).single;
+      expect(
+        request.context.entry<CallPriorityEntry>()?.priority,
+        CallPriority.background,
+      );
+    },
+  );
 
   test(
     'si al arrancar no hay conexión, repite la pasada al pasar a en línea',
     () async {
-      final pokeApi = SavedBatchPokeApiLink(unreachableRequests: 1);
+      final pokeApi = SavedBatchPokeApiLink(unreachableCatalogRequests: 1);
 
       final container = startAppOver(pokeApi);
       await expectLater(
@@ -118,7 +152,7 @@ void main() {
         database.catalogDao.watchCatalogCount(),
         emitsThrough(4),
       );
-      expect(pokeApi.requests, 2);
+      expect(pokeApi.catalogRequests, 2);
     },
   );
 
@@ -145,8 +179,7 @@ void main() {
       database.catalogDao.watchCatalog().map((catalog) => catalog.first.name),
       emitsThrough('bulbasaur'),
     );
-    final request = pokeApi.receivedRequests.single;
-    expect(request.operation.document, same(pokemonByIdsQuery));
+    final request = pokeApi.requestsFor(pokemonByIdsQuery).single;
     expect(request.variables, {
       'ids': [1],
     });
@@ -156,20 +189,26 @@ void main() {
     );
   });
 
-  test('una reconexión con el catálogo fresco no llama a PokeAPI', () async {
+  test('una reconexión con el catálogo y la tabla de tipos frescos no llama a PokeAPI', () async {
     final pokeApi = SavedBatchPokeApiLink();
     final container = startAppOver(pokeApi);
     await expectLater(
       catalogStatusIn(container),
       emitsThrough(isA<SyncRevalidated>()),
     );
+    await expectLater(
+      database.pokemonDetailDao.watchTypeEfficacy(),
+      emitsThrough(hasLength(324)),
+    );
+    final requestsBeforeReconnect = pokeApi.requests;
 
     connectivity
       ..add(ConnectivityStatus.serviceUnavailable)
       ..add(ConnectivityStatus.online);
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    expect(pokeApi.requests, 1);
+    expect(requestsBeforeReconnect, 2);
+    expect(pokeApi.requests, requestsBeforeReconnect);
     expect(await catalogStatusIn(container).first, isA<SyncRevalidated>());
   });
 }
