@@ -17,5 +17,7 @@ abstract interface class CatalogRepository {
 
   Future<void> syncCatalog({bool force = false});
 
+  Future<void> revalidatePokemon(List<int> ids, {bool force = false});
+
   Future<DateTime?> getLastSyncedAt();
 }

@@ -43,7 +43,7 @@ flowchart LR
   end
 
   subgraph domain
-    UseCases["WatchCatalogPage · WatchCatalogCount<br/>WatchCatalogSyncStatus · SyncCatalog"]
+    UseCases["WatchCatalogPage · WatchCatalogCount<br/>WatchPokemonByIds · WatchCatalogSyncStatus<br/>SyncCatalog · RevalidatePokemon"]
     Contract[["CatalogRepository"]]
   end
 
@@ -110,13 +110,54 @@ sequenceDiagram
 
 Si la descarga se corta, `sync_metadata.next_offset` guarda dónde se quedó y la siguiente sincronización continúa desde ahí.
 
+## Revalidación de lo visible
+
+La pasada completa solo corre si la última tiene más de 1 h, así que la página que se está viendo se revalida aparte. `catalogPageProvider` llama a `RevalidatePokemon` con los ids de la página la primera vez que la página trae Pokémon y cada vez que vuelve a mostrarse. No espera la respuesta: si llegan datos nuevos, entran por la base y `watchCatalogPage` vuelve a emitir.
+
+- **Sin conexión** no se hace nada. El repositorio deja la petición registrada con `runOnEachReconnect` y `SyncScheduler` la repite en la siguiente reconexión.
+- **Con servicio** solo se llama si algún id tiene `pokemon.updated_at` de hace más de 15 min (`visibleFreshnessWindow`). Si todos están frescos, no hay llamada ni cambio de estado.
+- **Una sola consulta** `PokemonByIds` trae los ids vencidos con prioridad de usuario, bajo la clave `catalog:visible`. `saveRevalidated` los guarda en una transacción con `_upsertEntries`, sin tocar el progreso de la pasada completa.
+- **`force`** (deslizar para actualizar, en la fase 2) pide todos los ids aunque estén frescos.
+- **`runLatest`**: si llega una petición mientras otra de lo visible está en curso, espera a que termine, y una más nueva la reemplaza. Así, al pasar páginas rápido solo se descarga la última.
+
+```mermaid
+sequenceDiagram
+  participant Page as catalogPageProvider
+  participant Repo as OfflineFirstCatalogRepository
+  participant Scheduler as SyncScheduler
+  participant Sync as CatalogSyncService
+  participant Dao as CatalogDao
+  participant Remote as CatalogRemoteDataSource
+
+  Page->>Repo: revalidatePokemon(ids de la página), sin esperar
+  Repo->>Scheduler: runOnEachReconnect(catalog:visible)
+  alt sin conexión
+    Repo-->>Page: nada; la reconexión lo retoma
+  else con servicio
+    Repo->>Sync: hasStalePokemonAmong(ids)
+    Sync->>Dao: staleIdsAmong(ids, hace 15 min)
+    alt todos frescos
+      Repo-->>Page: nada, sin llamadas
+    else alguno vencido
+      Repo->>Scheduler: runLatest(catalog:visible)
+      Scheduler->>Sync: perform(), con SyncRevalidating
+      Sync->>Remote: fetchPokemonByIds(ids vencidos), prioridad user
+      Remote-->>Sync: Pokémon de PokeAPI
+      Sync->>Dao: saveRevalidated() en una transacción
+      Dao-->>Page: watchCatalogPage emite los datos nuevos
+      Sync-->>Scheduler: revalidated
+      Scheduler-->>Repo: SyncRevalidated(ahora)
+    end
+  end
+```
+
 ## Estados de la sincronización
 
-`SyncScheduler` publica un `SyncStatus` por recurso, un tipo sellado en Dart puro de `core/sync/domain`. La pantalla y el banner leen el del catálogo para mostrar «Cargando catálogo», «Sincronizando...», el estado de error o el `SnackBar` de fallo. El mismo estado queda en `sync_metadata.status` (`in_progress`, `waiting_retry`, `paused`, `pending`, `failed` o `idle`), con el intento, la hora del próximo reintento y el tipo del último fallo.
+`SyncScheduler` publica un `SyncStatus` por recurso, un tipo sellado en Dart puro de `core/sync/domain`. La pantalla y el banner leen el del catálogo para mostrar «Cargando catálogo», «Sincronizando...», el estado de error o el `SnackBar` de fallo. Ese estado junta las claves `catalog` y `catalog:visible` con `mostRelevantSyncStatus`, que elige, en este orden: pasada completa en curso, revalidando, esperando reintento, en pausa, fallo, revalidado (la hora más reciente) y reposo. El mismo estado queda en `sync_metadata.status` (`in_progress`, `waiting_retry`, `paused`, `pending`, `failed` o `idle`), con el intento, la hora del próximo reintento y el tipo del último fallo.
 
 `SyncRevalidated` solo aparece cuando los datos acaban de llegar de PokeAPI en esta sesión. Si el catálogo está fresco y no hace falta llamar, el estado vuelve a `SyncIdle`, o a la última revalidación si ya hubo una.
 
-Un fallo reintentable espera 2, 4, 8, 16 y 32 s (`RetryPolicy`) y después queda en `SyncFailed` hasta la siguiente reconexión o «Reintentar». Un 429 bloquea el presupuesto durante su `Retry-After`, o 10 min si no lo trae. Si se pierde la conexión durante una espera, el temporizador se cancela y la reconexión retoma el trabajo. Cada clave tiene un solo intento en curso: dos peticiones de la pasada completa comparten la misma descarga.
+Un fallo reintentable espera 2, 4, 8, 16 y 32 s (`RetryPolicy`) y después queda en `SyncFailed` hasta la siguiente reconexión o «Reintentar». Un 429 bloquea el presupuesto durante su `Retry-After`, o 10 min si no lo trae. Si se pierde la conexión durante una espera, el temporizador se cancela y la reconexión retoma el trabajo. Cada clave tiene un solo intento en curso: dos peticiones de la pasada completa comparten la misma descarga, y lo visible usa `runLatest` para que la petición más nueva espere a la que está en curso.
 
 ```mermaid
 stateDiagram-v2
@@ -132,7 +173,12 @@ stateDiagram-v2
   SyncWaitingRetry --> SyncFailed: se pierde la conexión
   SyncRevalidated --> SyncFullPassInProgress: reconexión o Reintentar
   SyncFailed --> SyncFullPassInProgress: reconexión o Reintentar
+  SyncIdle --> SyncRevalidating: página con datos de más de 15 min
+  SyncRevalidated --> SyncRevalidating: página con datos de más de 15 min
+  SyncRevalidating --> SyncRevalidated: PokemonByIds guardado
 ```
+
+La revalidación de lo visible pasa por los mismos reintentos, pausas y fallos que la pasada completa, con su propia clave.
 
 `SyncFailed` lleva el `SyncFailure` que explica el fallo. `data` lo traduce desde las excepciones de GraphQL, así que ni `presentation` ni `domain` conocen `OperationException`.
 
@@ -151,7 +197,7 @@ stateDiagram-v2
 
 ## Conectividad
 
-`ConnectivityService` no se fía solo del sistema operativo: tener Wi-Fi no garantiza que la API responda. Por eso distingue tres estados. `connectivityStatusProvider` ignora los cambios que duran menos de 800 ms, y `SyncScheduler` relanza la pasada completa y los trabajos pendientes cuando el estado pasa a `online`.
+`ConnectivityService` no se fía solo del sistema operativo: tener Wi-Fi no garantiza que la API responda. Por eso distingue tres estados. `connectivityStatusProvider` ignora los cambios que duran menos de 800 ms, y `SyncScheduler` relanza la pasada completa, los trabajos pendientes y la última revalidación de lo visible cuando el estado pasa a `online`.
 
 Mientras el estado es `serviceUnavailable`, el servicio repite la consulta de prueba, porque la API puede volver sin que cambie la red. La espera crece con cada fallo seguido: 15, 30, 60 y 120 s, y luego cada 5 min. Así, una hora sin servicio gasta 16 de las 100 llamadas por hora que permite PokeAPI, en vez de 240. Un cambio de red vuelve a empezar en 15 s. En cuanto la API responde, el estado pasa a `online` y el catálogo se sincroniza sin reiniciar la aplicación. En `online` y `offline` no repite la consulta.
 

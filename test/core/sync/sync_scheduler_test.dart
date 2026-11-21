@@ -73,6 +73,25 @@ class ScriptedWork {
   }
 }
 
+class VisibleRequests {
+  final performedIds = <List<int>>[];
+  final downloads = <Completer<SyncOutcome>>[];
+
+  SyncJob jobFor(List<int> ids) {
+    return SyncJob(
+      key: 'catalog:visible',
+      priority: CallPriority.user,
+      runningStatus: const SyncRevalidating(),
+      perform: () {
+        performedIds.add(ids);
+        final download = Completer<SyncOutcome>();
+        downloads.add(download);
+        return download.future;
+      },
+    );
+  }
+}
+
 SyncJob catalogJob(ScriptedWork work, {bool force = false}) {
   return SyncJob(
     key: 'catalog',
@@ -153,6 +172,113 @@ void main() {
     });
   });
 
+  group('el pedido más reciente', () {
+    test('sin nada en curso corre en el acto', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final visible = VisibleRequests();
+
+        scheduler.runLatest(visible.jobFor([1, 2]));
+        async.flushMicrotasks();
+
+        expect(visible.performedIds, [
+          [1, 2],
+        ]);
+      });
+    });
+
+    test(
+      'con la misma clave en curso espera a que termine y corre después',
+      () {
+        fakeAsync((async) {
+          final scheduler = schedulerIn(async)
+            ..connectivityChanged(isOnline: true);
+          final visible = VisibleRequests();
+
+          scheduler.runLatest(visible.jobFor([1]));
+          async.flushMicrotasks();
+          scheduler.runLatest(visible.jobFor([51]));
+          async.flushMicrotasks();
+          expect(visible.performedIds, [
+            [1],
+          ]);
+
+          visible.downloads.first.complete(SyncOutcome.revalidated);
+          async.flushMicrotasks();
+
+          expect(visible.performedIds, [
+            [1],
+            [51],
+          ]);
+        });
+      },
+    );
+
+    test(
+      'un pedido más nuevo reemplaza al que esperaba y los dos terminan con él',
+      () {
+        fakeAsync((async) {
+          final scheduler = schedulerIn(async)
+            ..connectivityChanged(isOnline: true);
+          final visible = VisibleRequests();
+          var finishedRequests = 0;
+
+          scheduler.runLatest(visible.jobFor([1]));
+          async.flushMicrotasks();
+          for (final ids in [
+            [51],
+            [101],
+          ]) {
+            scheduler.runLatest(visible.jobFor(ids)).then((_) {
+              finishedRequests++;
+            });
+          }
+          visible.downloads.first.complete(SyncOutcome.revalidated);
+          async.flushMicrotasks();
+
+          expect(visible.performedIds, [
+            [1],
+            [101],
+          ]);
+          expect(finishedRequests, 0);
+
+          visible.downloads.last.complete(SyncOutcome.revalidated);
+          async.flushMicrotasks();
+
+          expect(finishedRequests, 2);
+        });
+      },
+    );
+
+    test('si la red se pierde mientras espera, corre al reconectar', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final visible = VisibleRequests();
+
+        scheduler.runLatest(visible.jobFor([1]));
+        async.flushMicrotasks();
+        scheduler
+          ..runLatest(visible.jobFor([51]))
+          ..connectivityChanged(isOnline: false);
+        visible.downloads.first.complete(SyncOutcome.revalidated);
+        async.flushMicrotasks();
+        expect(visible.performedIds, [
+          [1],
+        ]);
+
+        scheduler.connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+
+        expect(visible.performedIds, [
+          [1],
+          [51],
+        ]);
+      });
+    });
+  });
+
   group('estados publicados', () {
     test('publica el trabajo en curso y después la hora de revalidación', () {
       fakeAsync((async) {
@@ -171,6 +297,44 @@ void main() {
         expect(store.history, ['in_progress', 'idle']);
       });
     });
+
+    test(
+      'watchStatuses publica en orden cada cambio de las claves pedidas',
+      () {
+        fakeAsync((async) {
+          final scheduler = schedulerIn(async);
+          final statuses = <List<SyncStatus>>[];
+          scheduler
+              .watchStatuses(['catalog', 'catalog:visible'])
+              .listen(statuses.add);
+
+          scheduler.run(catalogJob(ScriptedWork([SyncOutcome.revalidated])));
+          async.flushMicrotasks();
+          scheduler.run(
+            SyncJob(
+              key: 'detail:25',
+              priority: CallPriority.user,
+              runningStatus: const SyncRevalidating(),
+              perform: ScriptedWork([SyncOutcome.revalidated]).perform,
+            ),
+          );
+          async.flushMicrotasks();
+          final visible = VisibleRequests();
+          scheduler.run(visible.jobFor([1]));
+          async.flushMicrotasks();
+          visible.downloads.single.complete(SyncOutcome.revalidated);
+          async.flushMicrotasks();
+
+          expect(statuses, [
+            [isA<SyncIdle>(), isA<SyncIdle>()],
+            [isA<SyncFullPassInProgress>(), isA<SyncIdle>()],
+            [isA<SyncRevalidated>(), isA<SyncIdle>()],
+            [isA<SyncRevalidated>(), isA<SyncRevalidating>()],
+            [isA<SyncRevalidated>(), isA<SyncRevalidated>()],
+          ]);
+        });
+      },
+    );
 
     test('si no hizo falta pedir nada vuelve a reposo o conserva la última revalidación', () {
       fakeAsync((async) {
@@ -297,6 +461,19 @@ void main() {
   });
 
   group('conexión', () {
+    test('isOnline sigue al último estado de conexión recibido', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        expect(scheduler.isOnline, isFalse);
+
+        scheduler.connectivityChanged(isOnline: true);
+        expect(scheduler.isOnline, isTrue);
+
+        scheduler.connectivityChanged(isOnline: false);
+        expect(scheduler.isOnline, isFalse);
+      });
+    });
+
     test('NoConnection sin red no se reintenta y retoma al reconectar', () {
       fakeAsync((async) {
         final scheduler = schedulerIn(async)

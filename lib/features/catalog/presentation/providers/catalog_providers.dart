@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
+import 'package:pokedex_flutter/features/catalog/domain/usecases/revalidate_pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/usecases/sync_catalog.dart';
 import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog.dart';
 import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog_sync_status.dart';
@@ -50,14 +53,35 @@ final watchCatalogCountProvider = Provider<WatchCatalogCount>(
   (ref) => WatchCatalogCount(ref.watch(catalogRepositoryProvider)),
 );
 
+final revalidatePokemonProvider = Provider<RevalidatePokemon>(
+  (ref) => RevalidatePokemon(ref.watch(catalogRepositoryProvider)),
+);
+
 final catalogPageProvider = StreamProvider.family<List<Pokemon>, int>((
   ref,
   page,
 ) {
-  return ref.watch(watchCatalogPageProvider)(
-    page: page,
-    pageSize: catalogPageSize,
-  );
+  final revalidatePokemon = ref.watch(revalidatePokemonProvider);
+  var shownIds = const <int>[];
+
+  void revalidateShownPokemon() {
+    if (shownIds.isNotEmpty) {
+      unawaited(revalidatePokemon(shownIds));
+    }
+  }
+
+  ref.onResume(revalidateShownPokemon);
+
+  return ref
+      .watch(watchCatalogPageProvider)(page: page, pageSize: catalogPageSize)
+      .map((pagePokemon) {
+        final isFirstShown = shownIds.isEmpty && pagePokemon.isNotEmpty;
+        shownIds = [for (final pokemon in pagePokemon) pokemon.id];
+        if (isFirstShown) {
+          revalidateShownPokemon();
+        }
+        return pagePokemon;
+      });
 });
 
 final catalogCountProvider = StreamProvider<int>(

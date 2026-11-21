@@ -42,6 +42,30 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     });
   }
 
+  Future<void> saveRevalidated(
+    List<CatalogEntry> entries, {
+    required DateTime savedAt,
+  }) async {
+    if (entries.isEmpty) {
+      return;
+    }
+    await transaction(() => _upsertEntries(entries, savedAt: savedAt));
+  }
+
+  Future<List<int>> staleIdsAmong(
+    List<int> ids, {
+    required DateTime olderThan,
+  }) {
+    final staleIds = selectOnly(pokemonTable)
+      ..addColumns([pokemonTable.id])
+      ..where(
+        pokemonTable.id.isIn(ids) &
+            pokemonTable.updatedAt.isSmallerThanValue(olderThan),
+      )
+      ..orderBy([OrderingTerm.asc(pokemonTable.id)]);
+    return staleIds.map((row) => row.read(pokemonTable.id)!).get();
+  }
+
   Stream<List<CatalogEntry>> watchCatalog() {
     return _pokemonWithTypes().watch().map(_groupTypesByPokemon);
   }

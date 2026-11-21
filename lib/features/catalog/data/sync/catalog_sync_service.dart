@@ -31,14 +31,58 @@ class CatalogSyncService {
     );
   }
 
-  Future<SyncOutcome> syncCatalog({bool force = false}) async {
-    try {
+  SyncJob visiblePokemonJob(List<int> ids, {bool force = false}) {
+    return SyncJob(
+      key: visiblePokemonSyncKey,
+      priority: CallPriority.user,
+      runningStatus: const SyncRevalidating(),
+      force: force,
+      perform: () => revalidatePokemon(ids, force: force),
+    );
+  }
+
+  Future<SyncOutcome> syncCatalog({bool force = false}) {
+    return _asSyncFailures(() async {
       final progress = await _catalogDao.readCatalogSyncProgress();
       if (!force && _isFreshAndComplete(progress)) {
         return SyncOutcome.upToDate;
       }
       await _downloadBatchesAfter(progress);
       return SyncOutcome.revalidated;
+    });
+  }
+
+  Future<bool> hasStalePokemonAmong(List<int> ids) async {
+    final staleIds = await _staleIdsAmong(ids);
+    return staleIds.isNotEmpty;
+  }
+
+  Future<SyncOutcome> revalidatePokemon(List<int> ids, {bool force = false}) {
+    return _asSyncFailures(() async {
+      final idsToDownload = force ? ids : await _staleIdsAmong(ids);
+      if (idsToDownload.isEmpty) {
+        return SyncOutcome.upToDate;
+      }
+      final pokemon = await _remoteDataSource.fetchPokemonByIds(idsToDownload);
+      await _catalogDao.saveRevalidated([
+        for (final dto in pokemon) dto.toCatalogEntry(),
+      ], savedAt: _now());
+      return SyncOutcome.revalidated;
+    });
+  }
+
+  Future<List<int>> _staleIdsAmong(List<int> ids) {
+    return _catalogDao.staleIdsAmong(
+      ids,
+      olderThan: _now().subtract(visibleFreshnessWindow),
+    );
+  }
+
+  Future<SyncOutcome> _asSyncFailures(
+    Future<SyncOutcome> Function() work,
+  ) async {
+    try {
+      return await work();
     } on SyncFailure {
       rethrow;
     } catch (error, stackTrace) {
