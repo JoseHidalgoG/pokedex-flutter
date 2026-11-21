@@ -9,8 +9,10 @@ import 'package:pokedex_flutter/features/catalog/data/catalog_fingerprint.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_detail_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/type_efficacy_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
 
 typedef CatalogPageRequest = ({int offset, bool withTotal});
@@ -81,6 +83,18 @@ class FakePokeApiCatalog implements CatalogRemoteDataSource {
           baseStats: pokemon.baseStats,
         ),
     ];
+  }
+
+  @override
+  Future<PokemonDetailDto?> fetchPokemonDetail(int id) {
+    throw UnimplementedError('la pasada del catálogo no pide detalles');
+  }
+
+  @override
+  Future<List<TypeEfficacyDto>> fetchTypeEfficacy({
+    CallPriority priority = CallPriority.background,
+  }) {
+    throw UnimplementedError('la pasada del catálogo no pide tipos');
   }
 }
 

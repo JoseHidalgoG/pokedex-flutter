@@ -11,8 +11,10 @@ import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_detail_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/type_efficacy_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_restoration_service.dart';
 
 typedef PokemonByIdsRequest = ({List<int> ids, CallPriority priority});
@@ -44,6 +46,18 @@ class PokeApiTruth implements CatalogRemoteDataSource {
       throw const ServerError(503);
     }
     return [for (final id in ids) ?_pokemonById[id]];
+  }
+
+  @override
+  Future<PokemonDetailDto?> fetchPokemonDetail(int id) {
+    throw UnimplementedError('la restauración no pide detalles');
+  }
+
+  @override
+  Future<List<TypeEfficacyDto>> fetchTypeEfficacy({
+    CallPriority priority = CallPriority.background,
+  }) {
+    throw UnimplementedError('la restauración no pide la tabla de tipos');
   }
 }
 
