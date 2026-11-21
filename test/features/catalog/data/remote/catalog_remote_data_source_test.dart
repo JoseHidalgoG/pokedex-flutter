@@ -222,6 +222,20 @@ void main() {
       },
     );
 
+    test('la restauración marca la consulta con su propia prioridad', () async {
+      final link = ScriptedPokeApiLink(replyWithSavedPage);
+
+      await dataSourceOver(link)
+          .fetchPokemonByIds([25], priority: CallPriority.restoration);
+
+      expect(
+        link.receivedRequests.single.context
+            .entry<CallPriorityEntry>()
+            ?.priority,
+        CallPriority.restoration,
+      );
+    });
+
     test('convierte la respuesta en los Pokémon recibidos', () async {
       final pokemon = await dataSourceOver(
         ScriptedPokeApiLink(replyWithSavedPage),

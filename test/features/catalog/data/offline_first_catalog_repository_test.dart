@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:async/async.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/core/database/app_database.dart';
 import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
 import 'package:pokedex_flutter/core/sync/domain/retry_policy.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_job.dart';
 import 'package:pokedex_flutter/core/sync/sync_scheduler.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/offline_first_catalog_repository.dart';
@@ -33,7 +36,10 @@ class SinglePagePokeApiCatalog implements CatalogRemoteDataSource {
   final requestedIdLists = <List<int>>[];
 
   @override
-  Future<List<PokemonDto>> fetchPokemonByIds(List<int> ids) async {
+  Future<List<PokemonDto>> fetchPokemonByIds(
+    List<int> ids, {
+    CallPriority priority = CallPriority.user,
+  }) async {
     requestedIdLists.add(ids);
     return [
       for (final id in ids)
@@ -166,6 +172,33 @@ void main() {
 
       expect(await catalogUpdates.next, [1, 4]);
       expect(await repository.watchSyncStatus().first, isA<SyncRevalidated>());
+    },
+  );
+
+  test(
+    'una restauración en curso no cambia el estado que ve el banner',
+    () async {
+      final restoration = Completer<SyncOutcome>();
+      final statuses = <SyncStatus>[];
+      final subscription = repository.watchSyncStatus().listen(statuses.add);
+      addTearDown(subscription.cancel);
+
+      unawaited(
+        scheduler.run(
+          SyncJob(
+            key: 'catalog:restore',
+            priority: CallPriority.restoration,
+            runningStatus: const SyncRevalidating(),
+            perform: () => restoration.future,
+          ),
+        ),
+      );
+      await pumpEventQueue();
+      restoration.complete(SyncOutcome.revalidated);
+      await pumpEventQueue();
+
+      expect(scheduler.statusOf('catalog:restore'), isA<SyncRevalidated>());
+      expect(statuses, [isA<SyncIdle>()]);
     },
   );
 

@@ -4,8 +4,11 @@ import 'package:pokedex_flutter/core/sync/data/sync_metadata_table.dart';
 import 'package:pokedex_flutter/features/catalog/data/catalog_fingerprint.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_tables.dart';
+import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_constants.dart';
 
 part 'catalog_dao.g.dart';
+
+typedef StoredCatalogEntry = ({CatalogEntry entry, String? storedFingerprint});
 
 @DriftAccessor(
   tables: [
@@ -106,6 +109,71 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     final catalogProgress = select(syncMetadataTable)
       ..where((metadata) => metadata.key.equals(catalogSyncKey));
     return catalogProgress.getSingleOrNull();
+  }
+
+  Future<List<StoredCatalogEntry>> readEntriesWithFingerprint() {
+    return transaction(() async {
+      final pokemonRows = await (select(
+        pokemonTable,
+      )..orderBy([(pokemon) => OrderingTerm.asc(pokemon.id)])).get();
+      final typeRows =
+          await (select(pokemonTypesTable)..orderBy([
+                (type) => OrderingTerm.asc(type.pokemonId),
+                (type) => OrderingTerm.asc(type.slot),
+              ]))
+              .get();
+      final statRows = await select(pokemonStatsTable).get();
+
+      final typeNamesById = <int, List<String>>{};
+      for (final type in typeRows) {
+        typeNamesById.putIfAbsent(type.pokemonId, () => []).add(type.typeName);
+      }
+      final statsById = <int, Map<String, int>>{};
+      for (final stat in statRows) {
+        statsById.putIfAbsent(stat.pokemonId, () => {})[stat.statName] =
+            stat.baseStat;
+      }
+
+      return [
+        for (final pokemon in pokemonRows)
+          (
+            entry: CatalogEntry(
+              id: pokemon.id,
+              name: pokemon.name,
+              imageUrl: pokemon.imageUrl,
+              typeNames: typeNamesById[pokemon.id] ?? const [],
+              speciesId: pokemon.speciesId,
+              generationId: pokemon.generationId,
+              isDefault: pokemon.isDefault,
+              heightDm: pokemon.heightDm,
+              weightHg: pokemon.weightHg,
+              baseStats: statsById[pokemon.id] ?? const {},
+            ),
+            storedFingerprint: pokemon.remoteFingerprint,
+          ),
+      ];
+    });
+  }
+
+  Future<Map<int, String?>> storedFingerprintsOf(List<int> ids) async {
+    final rows =
+        await (selectOnly(pokemonTable)
+              ..addColumns([pokemonTable.id, pokemonTable.remoteFingerprint])
+              ..where(pokemonTable.id.isIn(ids)))
+            .get();
+    return {
+      for (final row in rows)
+        row.read(pokemonTable.id)!: row.read(pokemonTable.remoteFingerprint),
+    };
+  }
+
+  Future<void> recordFingerprintsVerified({required DateTime at}) {
+    return into(syncMetadataTable).insertOnConflictUpdate(
+      SyncMetadataTableCompanion(
+        key: const Value(restorationSyncKey),
+        lastVerifiedAt: Value(at),
+      ),
+    );
   }
 
   Future<void> _upsertEntries(
