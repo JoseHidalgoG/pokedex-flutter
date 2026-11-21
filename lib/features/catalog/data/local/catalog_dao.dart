@@ -139,6 +139,15 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     return transaction(() => _readStoredEntriesWhere(const Constant(true)));
   }
 
+  Future<StoredCatalogEntry?> readStoredEntry(int pokemonId) {
+    return transaction(() async {
+      final stored = await _readStoredEntriesWhere(
+        pokemonTable.id.equals(pokemonId),
+      );
+      return stored.firstOrNull;
+    });
+  }
+
   Future<CatalogEntry?> readEntry(int pokemonId) async {
     final stored = await _readStoredEntriesWhere(
       pokemonTable.id.equals(pokemonId),

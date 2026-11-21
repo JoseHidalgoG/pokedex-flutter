@@ -154,7 +154,7 @@ class PokemonDetailDao extends DatabaseAccessor<AppDatabase>
             ? const []
             : await _movesOf(pokemonId, versionGroup: moveVersionGroup),
         gameVersions: await _gameVersionsOf(pokemonId),
-        detailSyncedAt: await _detailSyncedAt(pokemonId),
+        detailSyncedAt: await readDetailSyncedAt(pokemonId),
       );
     });
   }
@@ -340,11 +340,18 @@ class PokemonDetailDao extends DatabaseAccessor<AppDatabase>
     return games.map((row) => row.versionName).get();
   }
 
-  Future<DateTime?> _detailSyncedAt(int pokemonId) async {
-    final metadata =
-        await (select(syncMetadataTable)
-              ..where((row) => row.key.equals(detailSyncKey(pokemonId))))
-            .getSingleOrNull();
+  Future<DateTime?> readDetailSyncedAt(int pokemonId) {
+    return _lastSyncedAtOf(detailSyncKey(pokemonId));
+  }
+
+  Future<DateTime?> readTypeEfficacySyncedAt() {
+    return _lastSyncedAtOf(typeEfficacySyncKey);
+  }
+
+  Future<DateTime?> _lastSyncedAtOf(String key) async {
+    final metadata = await (select(
+      syncMetadataTable,
+    )..where((row) => row.key.equals(key))).getSingleOrNull();
     return metadata?.lastSyncedAt;
   }
 
