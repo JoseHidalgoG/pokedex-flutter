@@ -47,6 +47,8 @@ class SyncScheduler {
 
   SyncStatus statusOf(String key) => _statuses[key] ?? const SyncIdle();
 
+  DateTime? lastRevalidationOf(String key) => _lastRevalidations[key];
+
   Stream<SyncStatus> watchStatus(String key) {
     return watchStatuses([key]).map((statuses) => statuses.single);
   }
@@ -88,6 +90,11 @@ class SyncScheduler {
 
   void runOnEachReconnect(SyncJob job) {
     _jobsOnEachReconnect[job.key] = job;
+  }
+
+  void stopRunningOnReconnect(String key) {
+    _jobsOnEachReconnect.remove(key);
+    _jobsForNextReconnect.remove(key);
   }
 
   void runEveryWhileOnline(SyncJob job, Duration period) {
