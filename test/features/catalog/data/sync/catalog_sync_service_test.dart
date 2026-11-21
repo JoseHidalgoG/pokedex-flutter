@@ -5,6 +5,7 @@ import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_job.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
+import 'package:pokedex_flutter/features/catalog/data/catalog_fingerprint.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
@@ -63,7 +64,10 @@ class FakePokeApiCatalog implements CatalogRemoteDataSource {
   }
 
   @override
-  Future<List<PokemonDto>> fetchPokemonByIds(List<int> ids) async {
+  Future<List<PokemonDto>> fetchPokemonByIds(
+    List<int> ids, {
+    CallPriority priority = CallPriority.user,
+  }) async {
     requestedIdLists.add(ids);
     if (failsRequestsByIds) {
       throw const ServerError(503);
@@ -170,6 +174,32 @@ void main() {
       expect(progress?.nextOffset, 120);
       expect(progress?.isComplete, isTrue);
     });
+
+    test(
+      'sobrescribe con el dato de PokeAPI un Pokémon alterado en la base',
+      () async {
+        final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
+        await saveAlreadyDownloaded(
+          remoteCatalog,
+          count: 120,
+          isComplete: true,
+          savedAt: now.subtract(const Duration(minutes: 10)),
+        );
+        await database.customStatement(
+          "UPDATE pokemon SET name = 'alterado' WHERE id = 25",
+        );
+
+        await syncServiceOver(remoteCatalog).syncCatalog(force: true);
+        final stored = await catalogDao.readEntriesWithFingerprint();
+        final pokemon25 = stored.singleWhere((item) => item.entry.id == 25);
+
+        expect(pokemon25.entry.name, 'pokemon-25');
+        expect(
+          catalogFingerprintOf(pokemon25.entry),
+          pokemon25.storedFingerprint,
+        );
+      },
+    );
 
     test('sincronizar dos veces no repite ningún id', () async {
       final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
