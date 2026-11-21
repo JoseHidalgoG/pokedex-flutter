@@ -5,6 +5,7 @@ import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry_mapper.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_constants.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progress.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
 
@@ -37,6 +38,16 @@ class OfflineFirstCatalogRepository implements CatalogRepository {
   @override
   Stream<int> watchCatalogCount() {
     return _catalogDao.watchCatalogCount();
+  }
+
+  @override
+  Stream<CatalogProgress> watchCatalogProgress() {
+    return _catalogDao.watchCatalogProgress().map(
+      (progress) => CatalogProgress(
+        savedCount: progress.savedCount,
+        totalCount: progress.totalCount,
+      ),
+    );
   }
 
   @override

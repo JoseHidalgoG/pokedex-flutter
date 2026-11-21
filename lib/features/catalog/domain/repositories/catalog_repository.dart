@@ -1,4 +1,5 @@
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progress.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 
 abstract interface class CatalogRepository {
@@ -10,6 +11,8 @@ abstract interface class CatalogRepository {
   });
 
   Stream<int> watchCatalogCount();
+
+  Stream<CatalogProgress> watchCatalogProgress();
 
   Stream<List<Pokemon>> watchPokemonByIds(List<int> ids);
 

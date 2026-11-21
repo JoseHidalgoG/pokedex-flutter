@@ -17,6 +17,7 @@ import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/type_efficacy_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progress.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 
 class SinglePagePokeApiCatalog implements CatalogRemoteDataSource {
@@ -138,6 +139,21 @@ void main() {
     expect(pikachu.name, 'pikachu');
     expect(pikachu.imageUrl, 'https://example.com/25.png');
     expect(pikachu.typeNames, ['electric']);
+  });
+
+  test('watchCatalogProgress entrega el progreso de dominio', () async {
+    await database.catalogDao.saveCatalogPage(
+      entries: const [bulbasaurEntry, charmanderEntry],
+      nextOffset: 2,
+      isComplete: false,
+      savedAt: DateTime(2026, 11, 23),
+      totalCount: 1025,
+    );
+
+    final progress = await repository.watchCatalogProgress().first;
+
+    expect(progress, const CatalogProgress(savedCount: 2, totalCount: 1025));
+    expect(progress.isComplete, isFalse);
   });
 
   test(

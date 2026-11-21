@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progress.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
@@ -42,6 +43,13 @@ class InMemoryCatalogRepository implements CatalogRepository {
   @override
   Stream<int> watchCatalogCount() {
     return Stream.value(_pokemon.length);
+  }
+
+  @override
+  Stream<CatalogProgress> watchCatalogProgress() {
+    return Stream.value(
+      CatalogProgress(savedCount: _pokemon.length, totalCount: _pokemon.length),
+    );
   }
 
   @override
