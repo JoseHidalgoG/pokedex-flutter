@@ -437,6 +437,91 @@ void main() {
     });
   });
 
+  group('lectura para verificar huellas', () {
+    test('readEntriesWithFingerprint arma cada Pokémon completo con su huella guardada', () async {
+      await savePage([squirtle, bulbasaur]);
+
+      final stored = await catalogDao.readEntriesWithFingerprint();
+      final (:entry, :storedFingerprint) = stored.first;
+
+      expect([for (final item in stored) item.entry.id], [1, 7]);
+      expect(entry.name, 'bulbasaur');
+      expect(entry.imageUrl, 'https://example.com/1.png');
+      expect(entry.typeNames, ['grass', 'poison']);
+      expect(entry.speciesId, 1);
+      expect(entry.generationId, 1);
+      expect(entry.isDefault, isTrue);
+      expect(entry.heightDm, 7);
+      expect(entry.weightHg, 69);
+      expect(entry.baseStats, bulbasaur.baseStats);
+      expect(storedFingerprint, catalogFingerprintOf(bulbasaur));
+      expect(catalogFingerprintOf(entry), storedFingerprint);
+    });
+
+    test(
+      'readEntriesWithFingerprint ve un UPDATE hecho por fuera de la app',
+      () async {
+        await savePage([bulbasaur]);
+        await database.customStatement(
+          "UPDATE pokemon_types SET type_name = 'fire' WHERE pokemon_id = 1 "
+          'AND slot = 1',
+        );
+
+        final stored = await catalogDao.readEntriesWithFingerprint();
+
+        expect(stored.single.entry.typeNames, ['fire', 'poison']);
+        expect(
+          catalogFingerprintOf(stored.single.entry),
+          isNot(stored.single.storedFingerprint),
+        );
+      },
+    );
+
+    test(
+      'un Pokémon sin tipos ni estadísticas sale con listas vacías',
+      () async {
+        await savePage([bulbasaur]);
+        await database.customStatement(
+          'DELETE FROM pokemon_types WHERE pokemon_id = 1',
+        );
+        await database.customStatement(
+          'DELETE FROM pokemon_stats WHERE pokemon_id = 1',
+        );
+
+        final stored = await catalogDao.readEntriesWithFingerprint();
+
+        expect(stored.single.entry.typeNames, isEmpty);
+        expect(stored.single.entry.baseStats, isEmpty);
+      },
+    );
+
+    test('storedFingerprintsOf devuelve solo las huellas pedidas', () async {
+      await savePage([bulbasaur, charmander, squirtle]);
+      await database.customStatement(
+        'UPDATE pokemon SET remote_fingerprint = NULL WHERE id = 4',
+      );
+
+      final fingerprints = await catalogDao.storedFingerprintsOf([1, 4, 150]);
+
+      expect(fingerprints, {1: catalogFingerprintOf(bulbasaur), 4: null});
+    });
+
+    test('recordFingerprintsVerified anota la hora sin tocar el progreso del catálogo', () async {
+      await savePage([bulbasaur], nextOffset: 50);
+      final verifiedAt = savedAt.add(const Duration(minutes: 1));
+
+      await catalogDao.recordFingerprintsVerified(at: verifiedAt);
+      final restoration = await database.syncMetadataDao.readByKey(
+        'catalog:restore',
+      );
+      final catalog = await catalogDao.readCatalogSyncProgress();
+
+      expect(restoration?.lastVerifiedAt, verifiedAt);
+      expect(catalog?.lastVerifiedAt, isNull);
+      expect(catalog?.nextOffset, 50);
+    });
+  });
+
   test('el esquema crea los índices de búsqueda, filtros y ranking', () async {
     final indexes = await database
         .customSelect(

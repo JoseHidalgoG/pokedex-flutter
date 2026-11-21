@@ -73,4 +73,60 @@ void main() {
       catalogFingerprintOf(bulbasaurWith()),
     );
   });
+
+  group('comparar con la huella guardada', () {
+    test('una huella nula no cuenta como diferencia', () {
+      expect(
+        differsFromStoredFingerprint(bulbasaurWith(), stored: null),
+        isFalse,
+      );
+    });
+
+    test('la huella del mismo dato no es una diferencia', () {
+      final stored = catalogFingerprintOf(bulbasaurWith());
+
+      expect(
+        differsFromStoredFingerprint(bulbasaurWith(), stored: stored),
+        isFalse,
+      );
+    });
+
+    test('un tipo cambiado sí es una diferencia', () {
+      final stored = catalogFingerprintOf(bulbasaurWith());
+
+      expect(
+        differsFromStoredFingerprint(
+          bulbasaurWith(typeNames: ['fire']),
+          stored: stored,
+        ),
+        isTrue,
+      );
+    });
+
+    test('idsWithDifferentStoredFingerprint devuelve solo los ids con una huella guardada distinta', () {
+      const ivysaur = CatalogEntry(
+        id: 2,
+        name: 'ivysaur',
+        imageUrl: 'https://example.com/2.png',
+        typeNames: ['grass', 'poison'],
+      );
+      const venusaur = CatalogEntry(
+        id: 3,
+        name: 'venusaur',
+        imageUrl: 'https://example.com/3.png',
+        typeNames: ['grass', 'poison'],
+      );
+
+      final ids = idsWithDifferentStoredFingerprint(
+        [bulbasaurWith(), ivysaur, venusaur],
+        storedFingerprints: {
+          1: catalogFingerprintOf(bulbasaurWith()),
+          2: 'huella-alterada',
+          3: null,
+        },
+      );
+
+      expect(ids, [2]);
+    });
+  });
 }
