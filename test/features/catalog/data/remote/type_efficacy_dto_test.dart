@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/type_efficacy_dto.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/type_efficacy_dto_mapper.dart';
 
 import '../../../../fixtures/pokemon_detail_fixture.dart';
 
@@ -47,6 +48,20 @@ void main() {
 
   test('lo normal no afecta a lo fantasma', () {
     expect(damageFactorOf('normal', 'ghost'), 0);
+  });
+
+  test('convierte cada fila en una entrada local con los mismos datos', () {
+    const fireAgainstGrass = TypeEfficacyDto(
+      attackingType: 'fire',
+      defendingType: 'grass',
+      damageFactor: 200,
+    );
+
+    final entry = fireAgainstGrass.toTypeEfficacyEntry();
+
+    expect(entry.attackingType, 'fire');
+    expect(entry.defendingType, 'grass');
+    expect(entry.damageFactor, 200);
   });
 
   test('rechaza una fila sin el factor de daño', () {

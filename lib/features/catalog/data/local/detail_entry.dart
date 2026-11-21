@@ -3,7 +3,7 @@ import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 class DetailEntry {
   const DetailEntry({
     required this.pokemon,
-    required this.species,
+    this.species,
     this.forms = const [],
     this.eggGroups = const [],
     this.evolutionChain = const [],
@@ -12,10 +12,11 @@ class DetailEntry {
     this.moveVersionGroup,
     this.moves = const [],
     this.gameVersions = const [],
+    this.detailSyncedAt,
   });
 
   final CatalogEntry pokemon;
-  final SpeciesEntry species;
+  final SpeciesEntry? species;
   final List<CatalogEntry> forms;
   final List<String> eggGroups;
   final List<SpeciesEntry> evolutionChain;
@@ -24,6 +25,7 @@ class DetailEntry {
   final String? moveVersionGroup;
   final List<MoveEntry> moves;
   final List<String> gameVersions;
+  final DateTime? detailSyncedAt;
 }
 
 class SpeciesEntry {

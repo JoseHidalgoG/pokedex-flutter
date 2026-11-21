@@ -327,7 +327,7 @@ void main() {
       () {
         final detail = pikachuDetailWith().toDetailEntry();
 
-        expect(detail.species.evolutionChainId, isNull);
+        expect(detail.species!.evolutionChainId, isNull);
         expect(detail.evolutionChain, isEmpty);
         expect(detail.evolutions, isEmpty);
       },
@@ -347,11 +347,12 @@ void main() {
 
     test('guarda la especie y las de su cadena con el número de la cadena', () {
       final pikachu = savedDetailEntry('pikachu');
+      final species = pikachu.species!;
 
-      expect(pikachu.species.id, 25);
-      expect(pikachu.species.name, 'pikachu');
-      expect(pikachu.species.generationId, 1);
-      expect(pikachu.species.evolutionChainId, 10);
+      expect(species.id, 25);
+      expect(species.name, 'pikachu');
+      expect(species.generationId, 1);
+      expect(species.evolutionChainId, 10);
       expect(
         [for (final species in pikachu.evolutionChain) species.name],
         ['pichu', 'pikachu', 'raichu'],
