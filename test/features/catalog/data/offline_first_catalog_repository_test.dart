@@ -12,7 +12,9 @@ import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/offline_first_catalog_repository.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_detail_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/type_efficacy_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
@@ -45,6 +47,18 @@ class SinglePagePokeApiCatalog implements CatalogRemoteDataSource {
       for (final id in ids)
         PokemonDto(id: id, name: 'revalidado-$id', typeNames: const ['normal']),
     ];
+  }
+
+  @override
+  Future<PokemonDetailDto?> fetchPokemonDetail(int id) {
+    throw UnimplementedError('el repositorio del catálogo no pide detalles');
+  }
+
+  @override
+  Future<List<TypeEfficacyDto>> fetchTypeEfficacy({
+    CallPriority priority = CallPriority.background,
+  }) {
+    throw UnimplementedError('el repositorio del catálogo no pide tipos');
   }
 }
 
