@@ -5,6 +5,8 @@ La app sigue una arquitectura por capas dentro de cada funcionalidad: `presentat
 - [ADR-0001: Base de datos local como única fuente de verdad](adr/0001-base-local-fuente-de-verdad.md)
 - [ADR-0002: Drift sobre SQLite como base de datos local](adr/0002-drift-como-base-local.md)
 - [ADR-0003: Riverpod para el estado y la inyección de dependencias](adr/0003-riverpod-para-estado-e-inyeccion.md)
+- [ADR-0004: Reintentos con backoff, presupuesto de llamadas y una sola sincronización por recurso](adr/0004-reintentos-presupuesto-y-una-sincronizacion-por-recurso.md)
+- [ADR-0006: Preferencia online dentro del presupuesto](adr/0006-preferencia-online-dentro-del-presupuesto.md)
 
 ## Estructura de carpetas
 
@@ -27,7 +29,14 @@ lib/
       domain/      ConnectivityStatus y contrato
       presentation/ ConnectivityBanner
     favorites/
-      data/        tabla favorites (la interfaz llega en la entrega final)
+      data/        tabla favorites, FavoritesDao y DriftFavoritesRepository
+      domain/      contrato FavoritesRepository y casos de uso
+      presentation/ FavoritesScreen, FavoriteButton y providers
+    settings/
+      data/        tabla user_preferences
+    trivia/
+      data/        tablas trivia_results, trivia_answers y achievements
+  l10n/            textos en ARB (español e inglés) y AppLocalizations generado
 ```
 
 ## Capas y componentes
@@ -219,34 +228,192 @@ flowchart TD
   Transition -- sí --> Scheduler[SyncScheduler]
 ```
 
+### Máquina de estados de la disponibilidad
+
+El estado de la disponibilidad solo cambia tras una consulta de prueba. Mientras dura la consulta no se publica nada nuevo y el banner sigue con el estado anterior. Las esperas de `serviceUnavailable` crecen con cada fallo seguido y vuelven a 15 s cuando cambia la red.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Comprobando: arranque
+  Comprobando --> offline: sin ninguna red
+  Comprobando --> online: la API responde
+  Comprobando --> serviceUnavailable: error o más de 5 s
+  online --> Comprobando: cambio de red
+  offline --> Comprobando: cambio de red
+  state serviceUnavailable {
+    [*] --> Espera15s
+    Espera15s --> Espera30s: sigue sin responder
+    Espera30s --> Espera60s: sigue sin responder
+    Espera60s --> Espera120s: sigue sin responder
+    Espera120s --> Espera5min: sigue sin responder
+    Espera5min --> Espera5min: sigue sin responder
+  }
+  serviceUnavailable --> online: la API responde
+  serviceUnavailable --> Comprobando: cambio de red, la espera vuelve a 15 s
+```
+
 ## Modelo de datos
 
-`pokemon_types` se borra en cascada con su Pokémon. `favorites` no tiene clave foránea hacia `pokemon` a propósito, para que ninguna operación sobre el catálogo borre lo que marcó el usuario. `sync_metadata` tiene una fila por proceso de sincronización.
+El esquema 2 tiene 18 tablas. La migración desde la versión 1 (`stepByStep`) añade las columnas y tablas nuevas y deja en nulo el `last_synced_at` del catálogo, para que la siguiente pasada complete los campos nuevos. Las filas antiguas quedan con `remote_fingerprint` nulo.
+
+Las reglas que hay que saber defender:
+
+- **Cascada solo desde `pokemon`, `species` y `trivia_results`.** Las filas que dependen de un Pokémon se borran con él. Ninguna clave foránea apunta a `abilities` ni a `moves`, así que el orden de inserción no importa.
+- **Upsert con `ON CONFLICT DO UPDATE`, nunca `INSERT OR REPLACE`.** REPLACE borra la fila antes de insertarla, y la cascada se llevaría sus tipos y estadísticas.
+- **Lo del usuario no depende del catálogo.** `favorites` y `trivia_answers` guardan el número del Pokémon sin clave foránea, para que ninguna operación sobre el catálogo borre lo que hizo el usuario.
+- **Una fila de `sync_metadata` por clave.** `catalog` y `catalog:visible` tienen cada una su estado, su intento y su último fallo.
+- **Las formas son filas de `pokemon`.** Una forma regional tiene `is_default = false` y el mismo `species_id`; el catálogo solo muestra las filas por defecto.
+
+Catálogo y detalle. Las líneas punteadas son relaciones sin clave foránea.
 
 ```mermaid
 erDiagram
   pokemon ||--|{ pokemon_types : "tiene 1 o 2"
+  pokemon ||--o{ pokemon_stats : "tiene"
+  pokemon ||--o{ pokemon_abilities : "tiene"
+  pokemon ||--o{ pokemon_moves : "aprende"
+  pokemon ||--o{ pokemon_games : "aparece en"
+  pokemon }o..o| species : "species_id"
+  species ||--o{ species_egg_groups : "pertenece a"
+  species ||..o{ evolutions : "evoluciona"
+  pokemon_abilities }o..|| abilities : "ability_id"
+  pokemon_moves }o..|| moves : "move_id"
   pokemon {
     int id PK "número de la Pokédex"
     string name
     string image_url
-    datetime updated_at
+    datetime updated_at "vigencia de lo visible"
+    int species_id
+    int generation_id
+    bool is_default
+    int height_dm
+    int weight_hg
+    int base_stat_total
+    string remote_fingerprint "SHA-256"
   }
   pokemon_types {
     int pokemon_id PK, FK
     int slot PK
     string type_name
   }
+  pokemon_stats {
+    int pokemon_id PK, FK
+    string stat_name PK
+    int base_stat
+  }
+  pokemon_abilities {
+    int pokemon_id PK, FK
+    int slot PK
+    int ability_id
+    bool is_hidden
+  }
+  pokemon_moves {
+    int pokemon_id PK, FK
+    int move_id PK
+    string version_group PK
+    string learn_method PK
+    int level
+  }
+  pokemon_games {
+    int pokemon_id PK, FK
+    string version_name PK
+  }
+  species {
+    int id PK
+    string name
+    int generation_id
+    int evolution_chain_id
+  }
+  species_egg_groups {
+    int species_id PK, FK
+    string egg_group PK
+  }
+  evolutions {
+    int id PK
+    int chain_id
+    int from_species_id
+    int to_species_id
+    string trigger
+    int min_level
+    string item
+  }
+  abilities {
+    int id PK
+    string name
+    string name_es
+    string short_effect_es
+    string short_effect_en
+  }
+  moves {
+    int id PK
+    string name
+    string name_es
+    string type_name
+  }
+  type_efficacy {
+    string attacking_type PK
+    string defending_type PK
+    int damage_factor "porcentaje"
+  }
+```
+
+Usuario y sincronización.
+
+```mermaid
+erDiagram
+  trivia_results ||--o{ trivia_answers : "tiene"
   favorites {
     int pokemon_id PK "sin FK"
     datetime created_at
   }
-  sync_metadata {
+  trivia_results {
+    int id PK
+    int score
+    int correct_answers
+    int total_questions
+    int duration_ms
+    datetime played_at
+  }
+  trivia_answers {
+    int id PK
+    int result_id FK
+    int pokemon_id "sin FK"
+    bool correct
+    int response_ms
+  }
+  achievements {
     string key PK
+    datetime unlocked_at
+  }
+  user_preferences {
+    string key PK
+    string value
+  }
+  sync_metadata {
+    string key PK "catalog, catalog:visible"
     int next_offset
     int total_count
     bool is_complete
     datetime last_synced_at
+    string status
+    int attempt
+    datetime next_retry_at
+    datetime last_verified_at
+    string last_error_kind
     string last_error
   }
 ```
+
+`evolutions` guarda también la hora del día, el lugar, la felicidad mínima y el tipo de movimiento que piden algunas evoluciones; el diagrama muestra solo las columnas principales.
+
+Índices (RNF-REN-02):
+
+| Índice | Columnas | Consulta que acelera |
+| --- | --- | --- |
+| `pokemon_name_nocase` | `pokemon(name COLLATE NOCASE)` | Búsqueda por prefijo del nombre y orden alfabético |
+| `pokemon_generation_id` | `pokemon(generation_id)` | Filtro por generación |
+| `pokemon_base_stat_total` | `pokemon(base_stat_total)` | Orden por total base |
+| `pokemon_species_id` | `pokemon(species_id)` | Formas de una especie en el detalle |
+| `pokemon_types_by_type` | `pokemon_types(type_name, pokemon_id)` | Filtro por tipo |
+| `pokemon_moves_by_version_and_method` | `pokemon_moves(pokemon_id, version_group, learn_method)` | Movimientos del detalle por juego y método |
+| `trivia_results_by_score` | `trivia_results(score)` | Ranking local |
