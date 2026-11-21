@@ -67,7 +67,7 @@ class SyncLifecycle extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(syncSchedulerProvider);
-    ref.watch(catalogFullPassTriggersProvider);
+    ref.watch(catalogSyncTriggersProvider);
     return child;
   }
 }
