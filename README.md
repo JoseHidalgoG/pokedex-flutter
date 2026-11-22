@@ -10,10 +10,13 @@ La aplicación sigue una arquitectura **offline-first**, por lo que los Pokémon
 - **Riverpod:** gestión del estado e inyección de dependencias.
 - **Drift y SQLite:** almacenamiento persistente del catálogo.
 - **GraphQL:** comunicación con la API de PokéAPI.
+- **gql:** lectura del nombre de cada operación GraphQL, para registrarla en consola con sus variables y su duración.
 - **connectivity_plus:** detección de cambios de conectividad.
 - **internet_connection_checker_plus:** comprobación de acceso a Internet.
 - **cached_network_image:** almacenamiento temporal de imágenes descargadas.
+- **crypto:** huella SHA-256 de cada Pokémon, para detectar datos alterados en la base local.
 - **flutter_test y mocktail:** pruebas automatizadas.
+- **http (solo en pruebas):** `MockClient` detrás de un `HttpLink` real, para comprobar cómo se traducen las respuestas HTTP de PokeAPI a fallos de sincronización.
 
 ## Funcionalidades principales
 
@@ -47,6 +50,8 @@ Para evitar cambios visuales demasiado frecuentes, el estado de conectividad uti
 La aplicación solicita una sincronización al iniciarse y cuando detecta que se ha recuperado la conexión.
 
 El servicio de sincronización descarga el catálogo en lotes de 100 Pokémon y omite la descarga cuando la última pasada completa tiene menos de 1 hora. Con cada Pokémon guarda la huella SHA-256 de sus datos tal como llegaron de PokeAPI.
+
+Con servicio, la página que se está viendo se revalida aparte: si alguno de sus Pokémon se guardó hace más de 15 minutos, la app los pide de nuevo a PokeAPI en una sola consulta y la lista se actualiza sola. Sin conexión no se hace ninguna llamada, y la revalidación se repite al recuperar la conexión.
 
 ### Caché de imágenes
 
@@ -173,6 +178,8 @@ La conectividad se supervisa de forma independiente y permite solicitar una nuev
 - La caché de imágenes no garantiza almacenamiento permanente.
 - Los datos locales se conservan ante fallos de sincronización.
 - El tiempo de sincronización depende de la conexión y de la disponibilidad de PokéAPI.
+- PokeAPI permite 100 llamadas por hora. La app se detiene en 80 y lleva la cuenta en memoria, así que la cuenta vuelve a cero si se cierra la app, aunque PokeAPI siga contando las llamadas anteriores.
+- Los estados de sincronización guardados en `sync_metadata` no se restauran al reiniciar: la app vuelve a decidir desde cero qué sincronizar.
 
 ## Proyecto académico
 

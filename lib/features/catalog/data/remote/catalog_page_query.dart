@@ -1,33 +1,5 @@
 import 'package:graphql/client.dart';
-
-const _catalogPokemonFields = r'''
-  fragment CatalogPokemonFields on pokemon {
-    id
-    name
-    height
-    weight
-    is_default
-    pokemonspecy {
-      id
-      generation_id
-    }
-    pokemontypes(order_by: { slot: asc }) {
-      slot
-      type {
-        name
-      }
-    }
-    pokemonstats {
-      base_stat
-      stat {
-        name
-      }
-    }
-    pokemonsprites {
-      sprites(path: "other.official-artwork.front_default")
-    }
-  }
-''';
+import 'package:pokedex_flutter/features/catalog/data/remote/catalog_pokemon_fields.dart';
 
 const _catalogPageOperation = r'''
   query CatalogPage($limit: Int!, $offset: Int!, $withTotal: Boolean!) {
@@ -56,6 +28,10 @@ const _pokemonByIdsOperation = r'''
   }
 ''';
 
-final catalogPageQuery = gql('$_catalogPageOperation$_catalogPokemonFields');
+final catalogPageQuery = gql(
+  '$_catalogPageOperation$catalogPokemonFieldsFragment',
+);
 
-final pokemonByIdsQuery = gql('$_pokemonByIdsOperation$_catalogPokemonFields');
+final pokemonByIdsQuery = gql(
+  '$_pokemonByIdsOperation$catalogPokemonFieldsFragment',
+);

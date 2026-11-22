@@ -5,36 +5,49 @@ import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_job.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
+import 'package:pokedex_flutter/features/catalog/data/catalog_fingerprint.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_batch.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data_source.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_detail_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
+import 'package:pokedex_flutter/features/catalog/data/remote/type_efficacy_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
 
 typedef CatalogPageRequest = ({int offset, bool withTotal});
 
 class FakePokeApiCatalog implements CatalogRemoteDataSource {
-  FakePokeApiCatalog({required int pokemonCount, this.failingOffset})
-    : _catalog = [
-        for (var id = 1; id <= pokemonCount; id++)
-          PokemonDto(
-            id: id,
-            name: 'pokemon-$id',
-            typeNames: const ['normal'],
-            baseStats: const {'hp': 50, 'speed': 50},
-          ),
-      ];
+  FakePokeApiCatalog({
+    required int pokemonCount,
+    this.failingOffset,
+    this.failsRequestsByIds = false,
+  }) : _catalog = [
+         for (var id = 1; id <= pokemonCount; id++)
+           PokemonDto(
+             id: id,
+             name: 'pokemon-$id',
+             typeNames: const ['normal'],
+             baseStats: const {'hp': 50, 'speed': 50},
+           ),
+       ];
 
   final List<PokemonDto> _catalog;
   final int? failingOffset;
+  final bool failsRequestsByIds;
   final requests = <CatalogPageRequest>[];
+  final requestedIdLists = <List<int>>[];
 
   List<int> get requestedOffsets => [
     for (final request in requests) request.offset,
   ];
 
   List<PokemonDto> pokemonUpTo(int count) => _catalog.take(count).toList();
+
+  List<PokemonDto> pokemonWithIds(List<int> ids) => [
+    for (final pokemon in _catalog)
+      if (ids.contains(pokemon.id)) pokemon,
+  ];
 
   @override
   Future<CatalogBatch> fetchCatalogPage({
@@ -50,6 +63,38 @@ class FakePokeApiCatalog implements CatalogRemoteDataSource {
       pokemon: _catalog.skip(offset).take(limit).toList(),
       totalCount: withTotal ? _catalog.length : null,
     );
+  }
+
+  @override
+  Future<List<PokemonDto>> fetchPokemonByIds(
+    List<int> ids, {
+    CallPriority priority = CallPriority.user,
+  }) async {
+    requestedIdLists.add(ids);
+    if (failsRequestsByIds) {
+      throw const ServerError(503);
+    }
+    return [
+      for (final pokemon in pokemonWithIds(ids))
+        PokemonDto(
+          id: pokemon.id,
+          name: '${pokemon.name}-revalidado',
+          typeNames: pokemon.typeNames,
+          baseStats: pokemon.baseStats,
+        ),
+    ];
+  }
+
+  @override
+  Future<PokemonDetailDto?> fetchPokemonDetail(int id) {
+    throw UnimplementedError('la pasada del catálogo no pide detalles');
+  }
+
+  @override
+  Future<List<TypeEfficacyDto>> fetchTypeEfficacy({
+    CallPriority priority = CallPriority.background,
+  }) {
+    throw UnimplementedError('la pasada del catálogo no pide tipos');
   }
 }
 
@@ -143,6 +188,32 @@ void main() {
       expect(progress?.nextOffset, 120);
       expect(progress?.isComplete, isTrue);
     });
+
+    test(
+      'sobrescribe con el dato de PokeAPI un Pokémon alterado en la base',
+      () async {
+        final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
+        await saveAlreadyDownloaded(
+          remoteCatalog,
+          count: 120,
+          isComplete: true,
+          savedAt: now.subtract(const Duration(minutes: 10)),
+        );
+        await database.customStatement(
+          "UPDATE pokemon SET name = 'alterado' WHERE id = 25",
+        );
+
+        await syncServiceOver(remoteCatalog).syncCatalog(force: true);
+        final stored = await catalogDao.readEntriesWithFingerprint();
+        final pokemon25 = stored.singleWhere((item) => item.entry.id == 25);
+
+        expect(pokemon25.entry.name, 'pokemon-25');
+        expect(
+          catalogFingerprintOf(pokemon25.entry),
+          pokemon25.storedFingerprint,
+        );
+      },
+    );
 
     test('sincronizar dos veces no repite ningún id', () async {
       final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
@@ -331,6 +402,127 @@ void main() {
         ),
       );
     });
+  });
+
+  group('revalidación de lo visible', () {
+    Future<PokemonRow> savedPokemonRow(int id) {
+      return (database.select(
+        database.pokemonTable,
+      )..where((pokemon) => pokemon.id.equals(id))).getSingle();
+    }
+
+    Future<void> saveRevalidatedAgo(
+      FakePokeApiCatalog remoteCatalog,
+      Duration age, {
+      required List<int> ids,
+    }) {
+      return catalogDao.saveRevalidated([
+        for (final pokemon in remoteCatalog.pokemonWithIds(ids))
+          pokemon.toCatalogEntry(),
+      ], savedAt: now.subtract(age));
+    }
+
+    test(
+      'con todos los ids guardados hace menos de 15 min no llama a PokeAPI',
+      () async {
+        final remoteCatalog = FakePokeApiCatalog(pokemonCount: 3);
+        await saveRevalidatedAgo(
+          remoteCatalog,
+          const Duration(minutes: 14),
+          ids: [1, 2, 3],
+        );
+        final syncService = syncServiceOver(remoteCatalog);
+
+        final outcome = await syncService.revalidatePokemon([1, 2, 3]);
+
+        expect(outcome, SyncOutcome.upToDate);
+        expect(await syncService.hasStalePokemonAmong([1, 2, 3]), isFalse);
+        expect(remoteCatalog.requestedIdLists, isEmpty);
+      },
+    );
+
+    test('pide solo los ids vencidos en una llamada y los guarda con la hora actual', () async {
+      final remoteCatalog = FakePokeApiCatalog(pokemonCount: 3);
+      await saveRevalidatedAgo(
+        remoteCatalog,
+        const Duration(minutes: 16),
+        ids: [1, 3],
+      );
+      await saveRevalidatedAgo(
+        remoteCatalog,
+        const Duration(minutes: 5),
+        ids: [2],
+      );
+      final syncService = syncServiceOver(remoteCatalog);
+
+      expect(await syncService.hasStalePokemonAmong([1, 2, 3]), isTrue);
+      final outcome = await syncService.revalidatePokemon([1, 2, 3]);
+
+      expect(outcome, SyncOutcome.revalidated);
+      expect(remoteCatalog.requestedIdLists, [
+        [1, 3],
+      ]);
+      expect((await savedPokemonRow(1)).name, 'pokemon-1-revalidado');
+      expect((await savedPokemonRow(1)).updatedAt, now);
+      expect((await savedPokemonRow(2)).name, 'pokemon-2');
+    });
+
+    test('force pide todos los ids aunque estén frescos', () async {
+      final remoteCatalog = FakePokeApiCatalog(pokemonCount: 2);
+      await saveRevalidatedAgo(
+        remoteCatalog,
+        const Duration(minutes: 1),
+        ids: [1, 2],
+      );
+
+      final outcome = await syncServiceOver(remoteCatalog)
+          .revalidatePokemon([1, 2], force: true);
+
+      expect(outcome, SyncOutcome.revalidated);
+      expect(remoteCatalog.requestedIdLists, [
+        [1, 2],
+      ]);
+    });
+
+    test('ante un fallo de PokeAPI lo lanza y conserva los datos', () async {
+      final remoteCatalog = FakePokeApiCatalog(
+        pokemonCount: 1,
+        failsRequestsByIds: true,
+      );
+      await saveRevalidatedAgo(
+        remoteCatalog,
+        const Duration(hours: 2),
+        ids: [1],
+      );
+
+      await expectLater(
+        syncServiceOver(remoteCatalog).revalidatePokemon([1]),
+        throwsA(const ServerError(503)),
+      );
+      expect((await savedPokemonRow(1)).name, 'pokemon-1');
+    });
+
+    test(
+      'la tarea usa la clave catalog:visible y la prioridad del usuario',
+      () async {
+        final remoteCatalog = FakePokeApiCatalog(pokemonCount: 1);
+        await saveRevalidatedAgo(
+          remoteCatalog,
+          const Duration(hours: 2),
+          ids: [1],
+        );
+
+        final job = syncServiceOver(remoteCatalog)
+            .visiblePokemonJob([1], force: true);
+        final outcome = await job.perform();
+
+        expect(job.key, 'catalog:visible');
+        expect(job.priority, CallPriority.user);
+        expect(job.runningStatus, isA<SyncRevalidating>());
+        expect(job.force, isTrue);
+        expect(outcome, SyncOutcome.revalidated);
+      },
+    );
   });
 
   test('la tarea de la pasada completa usa la clave catalog y la prioridad de fondo', () async {

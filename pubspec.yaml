@@ -17,6 +17,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_riverpod: ^3.4.3
+  gql: ^1.0.1
   graphql: ^5.2.4
   intl: any
 

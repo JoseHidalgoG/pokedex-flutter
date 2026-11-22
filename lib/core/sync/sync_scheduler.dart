@@ -10,6 +10,10 @@ import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 
 typedef SyncStatusChange = ({String key, SyncStatus status});
 
+typedef _JobAfterRunning = ({SyncJob job, Completer<void> done});
+
+typedef _PeriodicJob = ({SyncJob job, Duration period});
+
 class SyncScheduler {
   SyncScheduler({
     required this._budget,
@@ -30,23 +34,35 @@ class SyncScheduler {
   final _scheduledStarts = <String, Timer>{};
   final _jobsForNextReconnect = <String, SyncJob>{};
   final _jobsOnEachReconnect = <String, SyncJob>{};
+  final _jobsAfterRunning = <String, _JobAfterRunning>{};
+  final _periodicJobs = <String, _PeriodicJob>{};
+  final _periodicTimers = <String, Timer>{};
   final _statuses = <String, SyncStatus>{};
   final _lastRevalidations = <String, DateTime>{};
   final _statusChanges = StreamController<SyncStatusChange>.broadcast();
   var _isOnline = false;
   var _isDisposed = false;
 
+  bool get isOnline => _isOnline;
+
   SyncStatus statusOf(String key) => _statuses[key] ?? const SyncIdle();
 
+  DateTime? lastRevalidationOf(String key) => _lastRevalidations[key];
+
   Stream<SyncStatus> watchStatus(String key) {
+    return watchStatuses([key]).map((statuses) => statuses.single);
+  }
+
+  Stream<List<SyncStatus>> watchStatuses(List<String> keys) {
     return Stream.multi((listener) {
-      listener.add(statusOf(key));
+      final latest = {for (final key in keys) key: statusOf(key)};
+      listener.add([...latest.values]);
       final subscription = _statusChanges.stream
-          .where((change) => change.key == key)
-          .listen(
-            (change) => listener.add(change.status),
-            onDone: listener.close,
-          );
+          .where((change) => latest.containsKey(change.key))
+          .listen((change) {
+            latest[change.key] = change.status;
+            listener.add([...latest.values]);
+          }, onDone: listener.close);
       listener.onCancel = subscription.cancel;
     });
   }
@@ -63,8 +79,29 @@ class SyncScheduler {
     return _start(job, retriesSoFar: 0);
   }
 
+  Future<void> runLatest(SyncJob job) {
+    if (!_runningAttempts.containsKey(job.key)) {
+      return run(job);
+    }
+    final done = _jobsAfterRunning[job.key]?.done ?? Completer<void>();
+    _jobsAfterRunning[job.key] = (job: job, done: done);
+    return done.future;
+  }
+
   void runOnEachReconnect(SyncJob job) {
     _jobsOnEachReconnect[job.key] = job;
+  }
+
+  void stopRunningOnReconnect(String key) {
+    _jobsOnEachReconnect.remove(key);
+    _jobsForNextReconnect.remove(key);
+  }
+
+  void runEveryWhileOnline(SyncJob job, Duration period) {
+    _periodicJobs[job.key] = (job: job, period: period);
+    if (_isOnline) {
+      _startPeriodicTimer(job.key);
+    }
   }
 
   void connectivityChanged({required bool isOnline}) {
@@ -72,15 +109,36 @@ class SyncScheduler {
     _isOnline = isOnline;
     if (cameOnline) {
       _runJobsAfterReconnect();
+      _periodicJobs.keys.forEach(_startPeriodicTimer);
     } else if (!isOnline) {
       _holdScheduledJobsUntilReconnect();
+      _cancelPeriodicTimers();
     }
   }
 
   Future<void> dispose() async {
     _isDisposed = true;
     _cancelScheduledStarts();
+    _cancelPeriodicTimers();
     await _statusChanges.close();
+  }
+
+  void _startPeriodicTimer(String key) {
+    final periodicJob = _periodicJobs[key];
+    if (periodicJob == null || _isDisposed) {
+      return;
+    }
+    _periodicTimers.remove(key)?.cancel();
+    _periodicTimers[key] = Timer.periodic(periodicJob.period, (_) {
+      unawaited(run(periodicJob.job));
+    });
+  }
+
+  void _cancelPeriodicTimers() {
+    for (final periodicTimer in _periodicTimers.values) {
+      periodicTimer.cancel();
+    }
+    _periodicTimers.clear();
   }
 
   void _runJobsAfterReconnect() {
@@ -111,10 +169,26 @@ class SyncScheduler {
     attempt = _attempt(job, retriesSoFar: retriesSoFar).whenComplete(() {
       if (identical(_runningAttempts[job.key], attempt)) {
         _runningAttempts.remove(job.key);
+        _startJobWaitingFor(job.key);
       }
     });
     _runningAttempts[job.key] = attempt;
     return attempt;
+  }
+
+  void _startJobWaitingFor(String key) {
+    final waiting = _jobsAfterRunning.remove(key);
+    if (waiting == null) {
+      return;
+    }
+    if (_isDisposed) {
+      waiting.done.complete();
+    } else if (!_isOnline) {
+      _jobsForNextReconnect[key] = waiting.job;
+      waiting.done.complete();
+    } else {
+      waiting.done.complete(run(waiting.job));
+    }
   }
 
   Future<void> _attempt(SyncJob job, {required int retriesSoFar}) async {

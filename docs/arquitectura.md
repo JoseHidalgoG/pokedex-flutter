@@ -5,6 +5,8 @@ La app sigue una arquitectura por capas dentro de cada funcionalidad: `presentat
 - [ADR-0001: Base de datos local como única fuente de verdad](adr/0001-base-local-fuente-de-verdad.md)
 - [ADR-0002: Drift sobre SQLite como base de datos local](adr/0002-drift-como-base-local.md)
 - [ADR-0003: Riverpod para el estado y la inyección de dependencias](adr/0003-riverpod-para-estado-e-inyeccion.md)
+- [ADR-0004: Reintentos con backoff, presupuesto de llamadas y una sola sincronización por recurso](adr/0004-reintentos-presupuesto-y-una-sincronizacion-por-recurso.md)
+- [ADR-0006: Preferencia online dentro del presupuesto](adr/0006-preferencia-online-dentro-del-presupuesto.md)
 
 ## Estructura de carpetas
 
@@ -27,7 +29,14 @@ lib/
       domain/      ConnectivityStatus y contrato
       presentation/ ConnectivityBanner
     favorites/
-      data/        tabla favorites (la interfaz llega en la entrega final)
+      data/        tabla favorites, FavoritesDao y DriftFavoritesRepository
+      domain/      contrato FavoritesRepository y casos de uso
+      presentation/ FavoritesScreen, FavoriteButton y providers
+    settings/
+      data/        tabla user_preferences
+    trivia/
+      data/        tablas trivia_results, trivia_answers y achievements
+  l10n/            textos en ARB (español e inglés) y AppLocalizations generado
 ```
 
 ## Capas y componentes
@@ -43,7 +52,7 @@ flowchart LR
   end
 
   subgraph domain
-    UseCases["WatchCatalogPage · WatchCatalogCount<br/>WatchCatalogSyncStatus · SyncCatalog"]
+    UseCases["WatchCatalogPage · WatchCatalogCount<br/>WatchPokemonByIds · WatchCatalogSyncStatus<br/>SyncCatalog · RevalidatePokemon"]
     Contract[["CatalogRepository"]]
   end
 
@@ -110,13 +119,54 @@ sequenceDiagram
 
 Si la descarga se corta, `sync_metadata.next_offset` guarda dónde se quedó y la siguiente sincronización continúa desde ahí.
 
+## Revalidación de lo visible
+
+La pasada completa solo corre si la última tiene más de 1 h, así que la página que se está viendo se revalida aparte. `catalogPageProvider` llama a `RevalidatePokemon` con los ids de la página la primera vez que la página trae Pokémon y cada vez que vuelve a mostrarse. No espera la respuesta: si llegan datos nuevos, entran por la base y `watchCatalogPage` vuelve a emitir.
+
+- **Sin conexión** no se hace nada. El repositorio deja la petición registrada con `runOnEachReconnect` y `SyncScheduler` la repite en la siguiente reconexión.
+- **Con servicio** solo se llama si algún id tiene `pokemon.updated_at` de hace más de 15 min (`visibleFreshnessWindow`). Si todos están frescos, no hay llamada ni cambio de estado.
+- **Una sola consulta** `PokemonByIds` trae los ids vencidos con prioridad de usuario, bajo la clave `catalog:visible`. `saveRevalidated` los guarda en una transacción con `_upsertEntries`, sin tocar el progreso de la pasada completa.
+- **`force`** (deslizar para actualizar, en la fase 2) pide todos los ids aunque estén frescos.
+- **`runLatest`**: si llega una petición mientras otra de lo visible está en curso, espera a que termine, y una más nueva la reemplaza. Así, al pasar páginas rápido solo se descarga la última.
+
+```mermaid
+sequenceDiagram
+  participant Page as catalogPageProvider
+  participant Repo as OfflineFirstCatalogRepository
+  participant Scheduler as SyncScheduler
+  participant Sync as CatalogSyncService
+  participant Dao as CatalogDao
+  participant Remote as CatalogRemoteDataSource
+
+  Page->>Repo: revalidatePokemon(ids de la página), sin esperar
+  Repo->>Scheduler: runOnEachReconnect(catalog:visible)
+  alt sin conexión
+    Repo-->>Page: nada; la reconexión lo retoma
+  else con servicio
+    Repo->>Sync: hasStalePokemonAmong(ids)
+    Sync->>Dao: staleIdsAmong(ids, hace 15 min)
+    alt todos frescos
+      Repo-->>Page: nada, sin llamadas
+    else alguno vencido
+      Repo->>Scheduler: runLatest(catalog:visible)
+      Scheduler->>Sync: perform(), con SyncRevalidating
+      Sync->>Remote: fetchPokemonByIds(ids vencidos), prioridad user
+      Remote-->>Sync: Pokémon de PokeAPI
+      Sync->>Dao: saveRevalidated() en una transacción
+      Dao-->>Page: watchCatalogPage emite los datos nuevos
+      Sync-->>Scheduler: revalidated
+      Scheduler-->>Repo: SyncRevalidated(ahora)
+    end
+  end
+```
+
 ## Estados de la sincronización
 
-`SyncScheduler` publica un `SyncStatus` por recurso, un tipo sellado en Dart puro de `core/sync/domain`. La pantalla y el banner leen el del catálogo para mostrar «Cargando catálogo», «Sincronizando...», el estado de error o el `SnackBar` de fallo. El mismo estado queda en `sync_metadata.status` (`in_progress`, `waiting_retry`, `paused`, `pending`, `failed` o `idle`), con el intento, la hora del próximo reintento y el tipo del último fallo.
+`SyncScheduler` publica un `SyncStatus` por recurso, un tipo sellado en Dart puro de `core/sync/domain`. La pantalla y el banner leen el del catálogo para mostrar «Cargando catálogo», «Sincronizando...», el estado de error o el `SnackBar` de fallo. Ese estado junta las claves `catalog` y `catalog:visible` con `mostRelevantSyncStatus`, que elige, en este orden: pasada completa en curso, revalidando, esperando reintento, en pausa, fallo, revalidado (la hora más reciente) y reposo. El mismo estado queda en `sync_metadata.status` (`in_progress`, `waiting_retry`, `paused`, `pending`, `failed` o `idle`), con el intento, la hora del próximo reintento y el tipo del último fallo.
 
 `SyncRevalidated` solo aparece cuando los datos acaban de llegar de PokeAPI en esta sesión. Si el catálogo está fresco y no hace falta llamar, el estado vuelve a `SyncIdle`, o a la última revalidación si ya hubo una.
 
-Un fallo reintentable espera 2, 4, 8, 16 y 32 s (`RetryPolicy`) y después queda en `SyncFailed` hasta la siguiente reconexión o «Reintentar». Un 429 bloquea el presupuesto durante su `Retry-After`, o 10 min si no lo trae. Si se pierde la conexión durante una espera, el temporizador se cancela y la reconexión retoma el trabajo. Cada clave tiene un solo intento en curso: dos peticiones de la pasada completa comparten la misma descarga.
+Un fallo reintentable espera 2, 4, 8, 16 y 32 s (`RetryPolicy`) y después queda en `SyncFailed` hasta la siguiente reconexión o «Reintentar». Un 429 bloquea el presupuesto durante su `Retry-After`, o 10 min si no lo trae. Si se pierde la conexión durante una espera, el temporizador se cancela y la reconexión retoma el trabajo. Cada clave tiene un solo intento en curso: dos peticiones de la pasada completa comparten la misma descarga, y lo visible usa `runLatest` para que la petición más nueva espere a la que está en curso.
 
 ```mermaid
 stateDiagram-v2
@@ -132,7 +182,12 @@ stateDiagram-v2
   SyncWaitingRetry --> SyncFailed: se pierde la conexión
   SyncRevalidated --> SyncFullPassInProgress: reconexión o Reintentar
   SyncFailed --> SyncFullPassInProgress: reconexión o Reintentar
+  SyncIdle --> SyncRevalidating: página con datos de más de 15 min
+  SyncRevalidated --> SyncRevalidating: página con datos de más de 15 min
+  SyncRevalidating --> SyncRevalidated: PokemonByIds guardado
 ```
+
+La revalidación de lo visible pasa por los mismos reintentos, pausas y fallos que la pasada completa, con su propia clave.
 
 `SyncFailed` lleva el `SyncFailure` que explica el fallo. `data` lo traduce desde las excepciones de GraphQL, así que ni `presentation` ni `domain` conocen `OperationException`.
 
@@ -151,7 +206,7 @@ stateDiagram-v2
 
 ## Conectividad
 
-`ConnectivityService` no se fía solo del sistema operativo: tener Wi-Fi no garantiza que la API responda. Por eso distingue tres estados. `connectivityStatusProvider` ignora los cambios que duran menos de 800 ms, y `SyncScheduler` relanza la pasada completa y los trabajos pendientes cuando el estado pasa a `online`.
+`ConnectivityService` no se fía solo del sistema operativo: tener Wi-Fi no garantiza que la API responda. Por eso distingue tres estados. `connectivityStatusProvider` ignora los cambios que duran menos de 800 ms, y `SyncScheduler` relanza la pasada completa, los trabajos pendientes y la última revalidación de lo visible cuando el estado pasa a `online`.
 
 Mientras el estado es `serviceUnavailable`, el servicio repite la consulta de prueba, porque la API puede volver sin que cambie la red. La espera crece con cada fallo seguido: 15, 30, 60 y 120 s, y luego cada 5 min. Así, una hora sin servicio gasta 16 de las 100 llamadas por hora que permite PokeAPI, en vez de 240. Un cambio de red vuelve a empezar en 15 s. En cuanto la API responde, el estado pasa a `online` y el catálogo se sincroniza sin reiniciar la aplicación. En `online` y `offline` no repite la consulta.
 
@@ -173,34 +228,192 @@ flowchart TD
   Transition -- sí --> Scheduler[SyncScheduler]
 ```
 
+### Máquina de estados de la disponibilidad
+
+El estado de la disponibilidad solo cambia tras una consulta de prueba. Mientras dura la consulta no se publica nada nuevo y el banner sigue con el estado anterior. Las esperas de `serviceUnavailable` crecen con cada fallo seguido y vuelven a 15 s cuando cambia la red.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Comprobando: arranque
+  Comprobando --> offline: sin ninguna red
+  Comprobando --> online: la API responde
+  Comprobando --> serviceUnavailable: error o más de 5 s
+  online --> Comprobando: cambio de red
+  offline --> Comprobando: cambio de red
+  state serviceUnavailable {
+    [*] --> Espera15s
+    Espera15s --> Espera30s: sigue sin responder
+    Espera30s --> Espera60s: sigue sin responder
+    Espera60s --> Espera120s: sigue sin responder
+    Espera120s --> Espera5min: sigue sin responder
+    Espera5min --> Espera5min: sigue sin responder
+  }
+  serviceUnavailable --> online: la API responde
+  serviceUnavailable --> Comprobando: cambio de red, la espera vuelve a 15 s
+```
+
 ## Modelo de datos
 
-`pokemon_types` se borra en cascada con su Pokémon. `favorites` no tiene clave foránea hacia `pokemon` a propósito, para que ninguna operación sobre el catálogo borre lo que marcó el usuario. `sync_metadata` tiene una fila por proceso de sincronización.
+El esquema 2 tiene 18 tablas. La migración desde la versión 1 (`stepByStep`) añade las columnas y tablas nuevas y deja en nulo el `last_synced_at` del catálogo, para que la siguiente pasada complete los campos nuevos. Las filas antiguas quedan con `remote_fingerprint` nulo.
+
+Las reglas que hay que saber defender:
+
+- **Cascada solo desde `pokemon`, `species` y `trivia_results`.** Las filas que dependen de un Pokémon se borran con él. Ninguna clave foránea apunta a `abilities` ni a `moves`, así que el orden de inserción no importa.
+- **Upsert con `ON CONFLICT DO UPDATE`, nunca `INSERT OR REPLACE`.** REPLACE borra la fila antes de insertarla, y la cascada se llevaría sus tipos y estadísticas.
+- **Lo del usuario no depende del catálogo.** `favorites` y `trivia_answers` guardan el número del Pokémon sin clave foránea, para que ninguna operación sobre el catálogo borre lo que hizo el usuario.
+- **Una fila de `sync_metadata` por clave.** `catalog` y `catalog:visible` tienen cada una su estado, su intento y su último fallo.
+- **Las formas son filas de `pokemon`.** Una forma regional tiene `is_default = false` y el mismo `species_id`; el catálogo solo muestra las filas por defecto.
+
+Catálogo y detalle. Las líneas punteadas son relaciones sin clave foránea.
 
 ```mermaid
 erDiagram
   pokemon ||--|{ pokemon_types : "tiene 1 o 2"
+  pokemon ||--o{ pokemon_stats : "tiene"
+  pokemon ||--o{ pokemon_abilities : "tiene"
+  pokemon ||--o{ pokemon_moves : "aprende"
+  pokemon ||--o{ pokemon_games : "aparece en"
+  pokemon }o..o| species : "species_id"
+  species ||--o{ species_egg_groups : "pertenece a"
+  species ||..o{ evolutions : "evoluciona"
+  pokemon_abilities }o..|| abilities : "ability_id"
+  pokemon_moves }o..|| moves : "move_id"
   pokemon {
     int id PK "número de la Pokédex"
     string name
     string image_url
-    datetime updated_at
+    datetime updated_at "vigencia de lo visible"
+    int species_id
+    int generation_id
+    bool is_default
+    int height_dm
+    int weight_hg
+    int base_stat_total
+    string remote_fingerprint "SHA-256"
   }
   pokemon_types {
     int pokemon_id PK, FK
     int slot PK
     string type_name
   }
+  pokemon_stats {
+    int pokemon_id PK, FK
+    string stat_name PK
+    int base_stat
+  }
+  pokemon_abilities {
+    int pokemon_id PK, FK
+    int slot PK
+    int ability_id
+    bool is_hidden
+  }
+  pokemon_moves {
+    int pokemon_id PK, FK
+    int move_id PK
+    string version_group PK
+    string learn_method PK
+    int level
+  }
+  pokemon_games {
+    int pokemon_id PK, FK
+    string version_name PK
+  }
+  species {
+    int id PK
+    string name
+    int generation_id
+    int evolution_chain_id
+  }
+  species_egg_groups {
+    int species_id PK, FK
+    string egg_group PK
+  }
+  evolutions {
+    int id PK
+    int chain_id
+    int from_species_id
+    int to_species_id
+    string trigger
+    int min_level
+    string item
+  }
+  abilities {
+    int id PK
+    string name
+    string name_es
+    string short_effect_es
+    string short_effect_en
+  }
+  moves {
+    int id PK
+    string name
+    string name_es
+    string type_name
+  }
+  type_efficacy {
+    string attacking_type PK
+    string defending_type PK
+    int damage_factor "porcentaje"
+  }
+```
+
+Usuario y sincronización.
+
+```mermaid
+erDiagram
+  trivia_results ||--o{ trivia_answers : "tiene"
   favorites {
     int pokemon_id PK "sin FK"
     datetime created_at
   }
-  sync_metadata {
+  trivia_results {
+    int id PK
+    int score
+    int correct_answers
+    int total_questions
+    int duration_ms
+    datetime played_at
+  }
+  trivia_answers {
+    int id PK
+    int result_id FK
+    int pokemon_id "sin FK"
+    bool correct
+    int response_ms
+  }
+  achievements {
     string key PK
+    datetime unlocked_at
+  }
+  user_preferences {
+    string key PK
+    string value
+  }
+  sync_metadata {
+    string key PK "catalog, catalog:visible"
     int next_offset
     int total_count
     bool is_complete
     datetime last_synced_at
+    string status
+    int attempt
+    datetime next_retry_at
+    datetime last_verified_at
+    string last_error_kind
     string last_error
   }
 ```
+
+`evolutions` guarda también la hora del día, el lugar, la felicidad mínima y el tipo de movimiento que piden algunas evoluciones; el diagrama muestra solo las columnas principales.
+
+Índices (RNF-REN-02):
+
+| Índice | Columnas | Consulta que acelera |
+| --- | --- | --- |
+| `pokemon_name_nocase` | `pokemon(name COLLATE NOCASE)` | Búsqueda por prefijo del nombre y orden alfabético |
+| `pokemon_generation_id` | `pokemon(generation_id)` | Filtro por generación |
+| `pokemon_base_stat_total` | `pokemon(base_stat_total)` | Orden por total base |
+| `pokemon_species_id` | `pokemon(species_id)` | Formas de una especie en el detalle |
+| `pokemon_types_by_type` | `pokemon_types(type_name, pokemon_id)` | Filtro por tipo |
+| `pokemon_moves_by_version_and_method` | `pokemon_moves(pokemon_id, version_group, learn_method)` | Movimientos del detalle por juego y método |
+| `trivia_results_by_score` | `trivia_results(score)` | Ranking local |

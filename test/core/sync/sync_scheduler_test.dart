@@ -73,6 +73,34 @@ class ScriptedWork {
   }
 }
 
+class VisibleRequests {
+  final performedIds = <List<int>>[];
+  final downloads = <Completer<SyncOutcome>>[];
+
+  SyncJob jobFor(List<int> ids) {
+    return SyncJob(
+      key: 'catalog:visible',
+      priority: CallPriority.user,
+      runningStatus: const SyncRevalidating(),
+      perform: () {
+        performedIds.add(ids);
+        final download = Completer<SyncOutcome>();
+        downloads.add(download);
+        return download.future;
+      },
+    );
+  }
+}
+
+SyncJob detailJob(int pokemonId, ScriptedWork work) {
+  return SyncJob(
+    key: 'detail:$pokemonId',
+    priority: CallPriority.user,
+    runningStatus: const SyncRevalidating(),
+    perform: work.perform,
+  );
+}
+
 SyncJob catalogJob(ScriptedWork work, {bool force = false}) {
   return SyncJob(
     key: 'catalog',
@@ -153,6 +181,113 @@ void main() {
     });
   });
 
+  group('el pedido más reciente', () {
+    test('sin nada en curso corre en el acto', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final visible = VisibleRequests();
+
+        scheduler.runLatest(visible.jobFor([1, 2]));
+        async.flushMicrotasks();
+
+        expect(visible.performedIds, [
+          [1, 2],
+        ]);
+      });
+    });
+
+    test(
+      'con la misma clave en curso espera a que termine y corre después',
+      () {
+        fakeAsync((async) {
+          final scheduler = schedulerIn(async)
+            ..connectivityChanged(isOnline: true);
+          final visible = VisibleRequests();
+
+          scheduler.runLatest(visible.jobFor([1]));
+          async.flushMicrotasks();
+          scheduler.runLatest(visible.jobFor([51]));
+          async.flushMicrotasks();
+          expect(visible.performedIds, [
+            [1],
+          ]);
+
+          visible.downloads.first.complete(SyncOutcome.revalidated);
+          async.flushMicrotasks();
+
+          expect(visible.performedIds, [
+            [1],
+            [51],
+          ]);
+        });
+      },
+    );
+
+    test(
+      'un pedido más nuevo reemplaza al que esperaba y los dos terminan con él',
+      () {
+        fakeAsync((async) {
+          final scheduler = schedulerIn(async)
+            ..connectivityChanged(isOnline: true);
+          final visible = VisibleRequests();
+          var finishedRequests = 0;
+
+          scheduler.runLatest(visible.jobFor([1]));
+          async.flushMicrotasks();
+          for (final ids in [
+            [51],
+            [101],
+          ]) {
+            scheduler.runLatest(visible.jobFor(ids)).then((_) {
+              finishedRequests++;
+            });
+          }
+          visible.downloads.first.complete(SyncOutcome.revalidated);
+          async.flushMicrotasks();
+
+          expect(visible.performedIds, [
+            [1],
+            [101],
+          ]);
+          expect(finishedRequests, 0);
+
+          visible.downloads.last.complete(SyncOutcome.revalidated);
+          async.flushMicrotasks();
+
+          expect(finishedRequests, 2);
+        });
+      },
+    );
+
+    test('si la red se pierde mientras espera, corre al reconectar', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final visible = VisibleRequests();
+
+        scheduler.runLatest(visible.jobFor([1]));
+        async.flushMicrotasks();
+        scheduler
+          ..runLatest(visible.jobFor([51]))
+          ..connectivityChanged(isOnline: false);
+        visible.downloads.first.complete(SyncOutcome.revalidated);
+        async.flushMicrotasks();
+        expect(visible.performedIds, [
+          [1],
+        ]);
+
+        scheduler.connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+
+        expect(visible.performedIds, [
+          [1],
+          [51],
+        ]);
+      });
+    });
+  });
+
   group('estados publicados', () {
     test('publica el trabajo en curso y después la hora de revalidación', () {
       fakeAsync((async) {
@@ -171,6 +306,44 @@ void main() {
         expect(store.history, ['in_progress', 'idle']);
       });
     });
+
+    test(
+      'watchStatuses publica en orden cada cambio de las claves pedidas',
+      () {
+        fakeAsync((async) {
+          final scheduler = schedulerIn(async);
+          final statuses = <List<SyncStatus>>[];
+          scheduler
+              .watchStatuses(['catalog', 'catalog:visible'])
+              .listen(statuses.add);
+
+          scheduler.run(catalogJob(ScriptedWork([SyncOutcome.revalidated])));
+          async.flushMicrotasks();
+          scheduler.run(
+            SyncJob(
+              key: 'detail:25',
+              priority: CallPriority.user,
+              runningStatus: const SyncRevalidating(),
+              perform: ScriptedWork([SyncOutcome.revalidated]).perform,
+            ),
+          );
+          async.flushMicrotasks();
+          final visible = VisibleRequests();
+          scheduler.run(visible.jobFor([1]));
+          async.flushMicrotasks();
+          visible.downloads.single.complete(SyncOutcome.revalidated);
+          async.flushMicrotasks();
+
+          expect(statuses, [
+            [isA<SyncIdle>(), isA<SyncIdle>()],
+            [isA<SyncFullPassInProgress>(), isA<SyncIdle>()],
+            [isA<SyncRevalidated>(), isA<SyncIdle>()],
+            [isA<SyncRevalidated>(), isA<SyncRevalidating>()],
+            [isA<SyncRevalidated>(), isA<SyncRevalidated>()],
+          ]);
+        });
+      },
+    );
 
     test('si no hizo falta pedir nada vuelve a reposo o conserva la última revalidación', () {
       fakeAsync((async) {
@@ -195,6 +368,39 @@ void main() {
           scheduler.statusOf('catalog'),
           isA<SyncRevalidated>().having((status) => status.at, 'at', start),
         );
+      });
+    });
+
+    test('lastRevalidationOf guarda la última descarga real aunque haya otra en curso', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final download = Completer<SyncOutcome>();
+        final outcomes = [
+          Future.value(SyncOutcome.revalidated),
+          download.future,
+        ];
+        var performs = 0;
+        SyncJob job() => SyncJob(
+          key: 'detail:25',
+          priority: CallPriority.user,
+          runningStatus: const SyncRevalidating(),
+          perform: () => outcomes[performs++],
+        );
+        expect(scheduler.lastRevalidationOf('detail:25'), isNull);
+
+        scheduler.run(job());
+        async.flushMicrotasks();
+        async.elapse(const Duration(minutes: 6));
+        scheduler.run(job());
+        async.flushMicrotasks();
+
+        expect(scheduler.statusOf('detail:25'), isA<SyncRevalidating>());
+        expect(scheduler.lastRevalidationOf('detail:25'), start);
+
+        download.complete(SyncOutcome.upToDate);
+        async.flushMicrotasks();
+        expect(scheduler.lastRevalidationOf('detail:25'), start);
+        expect(scheduler.lastRevalidationOf('catalog'), isNull);
       });
     });
   });
@@ -297,6 +503,19 @@ void main() {
   });
 
   group('conexión', () {
+    test('isOnline sigue al último estado de conexión recibido', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        expect(scheduler.isOnline, isFalse);
+
+        scheduler.connectivityChanged(isOnline: true);
+        expect(scheduler.isOnline, isTrue);
+
+        scheduler.connectivityChanged(isOnline: false);
+        expect(scheduler.isOnline, isFalse);
+      });
+    });
+
     test('NoConnection sin red no se reintenta y retoma al reconectar', () {
       fakeAsync((async) {
         final scheduler = schedulerIn(async)
@@ -425,6 +644,156 @@ void main() {
         });
       },
     );
+
+    test('stopRunningOnReconnect quita solo esa clave de las reconexiones', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final detailWork = ScriptedWork([SyncOutcome.upToDate]);
+        final catalogWork = ScriptedWork([SyncOutcome.upToDate]);
+        scheduler
+          ..runOnEachReconnect(detailJob(25, detailWork))
+          ..runOnEachReconnect(catalogJob(catalogWork))
+          ..stopRunningOnReconnect('detail:25')
+          ..connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+
+        expect(detailWork.calls, 0);
+        expect(catalogWork.calls, 1);
+      });
+    });
+
+    test(
+      'stopRunningOnReconnect descarta lo que esperaba a la próxima reconexión',
+      () {
+        fakeAsync((async) {
+          final scheduler = schedulerIn(async);
+          final work = ScriptedWork([
+            const NoConnection(),
+            SyncOutcome.revalidated,
+          ]);
+
+          scheduler.run(detailJob(25, work));
+          async.flushMicrotasks();
+          scheduler
+            ..stopRunningOnReconnect('detail:25')
+            ..connectivityChanged(isOnline: true);
+          async.flushMicrotasks();
+
+          expect(work.calls, 1);
+        });
+      },
+    );
+  });
+
+  group('cada cierto tiempo mientras haya servicio', () {
+    const period = Duration(seconds: 60);
+
+    SyncJob restorationJob(Future<SyncOutcome> Function() perform) {
+      return SyncJob(
+        key: 'catalog:restore',
+        priority: CallPriority.restoration,
+        runningStatus: const SyncRevalidating(),
+        perform: perform,
+      );
+    }
+
+    test('corre cada 60 s mientras está en línea y no al registrarse', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.upToDate]);
+
+        scheduler.runEveryWhileOnline(restorationJob(work.perform), period);
+        async.elapse(const Duration(seconds: 30));
+        scheduler.connectivityChanged(isOnline: true);
+        async.elapse(const Duration(seconds: 29));
+        expect(work.calls, 0);
+
+        async.elapse(const Duration(seconds: 1));
+        expect(work.calls, 1);
+
+        async.elapse(const Duration(seconds: 120));
+        expect(work.calls, 3);
+      });
+    });
+
+    test('sin conexión se detiene y al reconectar vuelve a contar 60 s', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.upToDate]);
+
+        scheduler.runEveryWhileOnline(restorationJob(work.perform), period);
+        async.elapse(const Duration(seconds: 90));
+        expect(work.calls, 1);
+
+        scheduler.connectivityChanged(isOnline: false);
+        async.elapse(const Duration(minutes: 5));
+        expect(work.calls, 1);
+
+        scheduler.connectivityChanged(isOnline: true);
+        async.elapse(const Duration(seconds: 59));
+        expect(work.calls, 1);
+        async.elapse(const Duration(seconds: 1));
+        expect(work.calls, 2);
+      });
+    });
+
+    test('registrada sin conexión empieza a contar en el primer online', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final work = ScriptedWork([SyncOutcome.upToDate]);
+
+        scheduler.runEveryWhileOnline(restorationJob(work.perform), period);
+        async.elapse(const Duration(minutes: 3));
+        expect(work.calls, 0);
+
+        scheduler.connectivityChanged(isOnline: true);
+        async.elapse(period);
+        expect(work.calls, 1);
+      });
+    });
+
+    test('un tic con la verificación anterior en curso no la repite', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final verification = Completer<SyncOutcome>();
+        var performs = 0;
+
+        scheduler.runEveryWhileOnline(
+          restorationJob(() {
+            performs++;
+            return verification.future;
+          }),
+          period,
+        );
+        async.elapse(const Duration(seconds: 150));
+
+        expect(performs, 1);
+        verification.complete(SyncOutcome.upToDate);
+        async.flushMicrotasks();
+      });
+    });
+
+    test('dispose cancela el temporizador', () {
+      fakeAsync((async) {
+        final clock = async.getClock(start);
+        final scheduler = SyncScheduler(
+          budget: CallBudget(now: clock.now),
+          retryPolicy: RetryPolicy(random: NoJitterRandom()),
+          store: store,
+          now: clock.now,
+        )..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.upToDate]);
+
+        scheduler.runEveryWhileOnline(restorationJob(work.perform), period);
+        unawaited(scheduler.dispose());
+        async.elapse(const Duration(minutes: 3));
+
+        expect(work.calls, 0);
+      });
+    });
   });
 
   group('presupuesto', () {

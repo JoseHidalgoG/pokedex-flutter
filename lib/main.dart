@@ -6,6 +6,7 @@ import 'package:pokedex_flutter/features/connectivity/presentation/connectivity_
 
 import 'package:pokedex_flutter/features/catalog/data/catalog_data_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/providers/pokemon_detail_providers.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 import 'package:pokedex_flutter/features/settings/presentation/providers/settings_providers.dart';
 import 'package:pokedex_flutter/features/navigation/presentation/screens/main_navigation_screen.dart';
@@ -16,6 +17,9 @@ void main() {
       overrides: [
         catalogRepositoryProvider.overrideWith(
           (ref) => ref.watch(offlineFirstCatalogRepositoryProvider),
+        ),
+        pokemonDetailRepositoryProvider.overrideWith(
+          (ref) => ref.watch(offlineFirstPokemonDetailRepositoryProvider),
         ),
       ],
       child: const MainApp(),
@@ -92,7 +96,7 @@ class SyncLifecycle extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(syncSchedulerProvider);
-    ref.watch(catalogFullPassTriggersProvider);
+    ref.watch(catalogSyncTriggersProvider);
     return child;
   }
 }

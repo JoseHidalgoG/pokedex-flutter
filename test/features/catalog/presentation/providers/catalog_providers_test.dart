@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progress.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
@@ -8,6 +11,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_
 class InMemoryCatalogRepository implements CatalogRepository {
   int syncRequests = 0;
   bool? lastForceValue;
+  final revalidationRequests = <({List<int> ids, bool force})>[];
 
   final List<Pokemon> _pokemon = List.generate(
     51,
@@ -42,6 +46,13 @@ class InMemoryCatalogRepository implements CatalogRepository {
   }
 
   @override
+  Stream<CatalogProgress> watchCatalogProgress() {
+    return Stream.value(
+      CatalogProgress(savedCount: _pokemon.length, totalCount: _pokemon.length),
+    );
+  }
+
+  @override
   Stream<List<Pokemon>> watchPokemonByIds(List<int> ids) {
     return Stream.value([
       for (final id in ids) ..._pokemon.where((pokemon) => pokemon.id == id),
@@ -60,7 +71,24 @@ class InMemoryCatalogRepository implements CatalogRepository {
   }
 
   @override
+  Future<void> revalidatePokemon(List<int> ids, {bool force = false}) async {
+    revalidationRequests.add((ids: ids, force: force));
+  }
+
+  @override
   Future<DateTime?> getLastSyncedAt() async => null;
+}
+
+class ControlledPageCatalogRepository extends InMemoryCatalogRepository {
+  final pageUpdates = StreamController<List<Pokemon>>();
+
+  @override
+  Stream<List<Pokemon>> watchCatalogPage({
+    required int page,
+    required int pageSize,
+  }) {
+    return pageUpdates.stream;
+  }
 }
 
 void main() {
@@ -160,5 +188,89 @@ void main() {
 
     expect(repository.syncRequests, 1);
     expect(repository.lastForceValue, true);
+  });
+
+  group('revalidación de la página visible', () {
+    List<List<int>> requestedIds() => [
+      for (final request in repository.revalidationRequests) request.ids,
+    ];
+
+    test(
+      'pide revalidar los ids de la página la primera vez que se muestra',
+      () async {
+        container.listen(catalogPageProvider(1), (_, _) {});
+
+        await container.read(catalogPageProvider(1).future);
+        await pumpEventQueue();
+
+        expect(requestedIds(), [
+          [51],
+        ]);
+        expect(repository.revalidationRequests.single.force, isFalse);
+      },
+    );
+
+    test('no vuelve a pedirla cuando la página se emite otra vez', () async {
+      final controlledRepository = ControlledPageCatalogRepository();
+      addTearDown(controlledRepository.pageUpdates.close);
+      final controlledContainer = ProviderContainer.test(
+        overrides: [
+          catalogRepositoryProvider.overrideWithValue(controlledRepository),
+        ],
+      );
+      const pikachu = Pokemon(
+        id: 25,
+        name: 'pikachu',
+        imageUrl: 'https://example.com/25.png',
+        typeNames: ['electric'],
+      );
+      controlledContainer.listen(catalogPageProvider(0), (_, _) {});
+
+      controlledRepository.pageUpdates
+        ..add(const [])
+        ..add(const [pikachu])
+        ..add(const [pikachu]);
+      await pumpEventQueue();
+
+      expect(controlledRepository.revalidationRequests, hasLength(1));
+      expect(controlledRepository.revalidationRequests.single.ids, [25]);
+    });
+
+    test('vuelve a pedirla cuando la página se muestra de nuevo', () async {
+      final firstShow = container.listen(catalogPageProvider(1), (_, _) {});
+      await container.read(catalogPageProvider(1).future);
+      firstShow.close();
+      await pumpEventQueue();
+
+      container.listen(catalogPageProvider(1), (_, _) {});
+      await pumpEventQueue();
+
+      expect(requestedIds(), [
+        [51],
+        [51],
+      ]);
+    });
+
+    test('no pide nada mientras la página está vacía', () async {
+      container.listen(catalogPageProvider(5), (_, _) {});
+
+      final emptyPage = await container.read(catalogPageProvider(5).future);
+      await pumpEventQueue();
+
+      expect(emptyPage, isEmpty);
+      expect(repository.revalidationRequests, isEmpty);
+    });
+
+    test(
+      'revalidatePokemonProvider pasa los ids y force al repositorio',
+      () async {
+        await container.read(revalidatePokemonProvider)([25], force: true);
+
+        expect(requestedIds(), [
+          [25],
+        ]);
+        expect(repository.revalidationRequests.single.force, isTrue);
+      },
+    );
   });
 }

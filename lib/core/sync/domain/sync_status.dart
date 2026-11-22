@@ -47,3 +47,24 @@ final class SyncFailed extends SyncStatus {
 
   final SyncFailure failure;
 }
+
+SyncStatus mostRelevantSyncStatus(List<SyncStatus> statuses) {
+  return statuses.reduce((chosen, candidate) {
+    if (chosen is SyncRevalidated && candidate is SyncRevalidated) {
+      return candidate.at.isAfter(chosen.at) ? candidate : chosen;
+    }
+    return _relevanceOf(candidate) > _relevanceOf(chosen) ? candidate : chosen;
+  });
+}
+
+int _relevanceOf(SyncStatus status) {
+  return switch (status) {
+    SyncIdle() => 0,
+    SyncRevalidated() => 1,
+    SyncFailed() => 2,
+    SyncPaused() => 3,
+    SyncWaitingRetry() => 4,
+    SyncRevalidating() => 5,
+    SyncFullPassInProgress() => 6,
+  };
+}

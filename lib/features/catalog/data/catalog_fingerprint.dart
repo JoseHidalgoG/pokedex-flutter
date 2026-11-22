@@ -7,6 +7,27 @@ String catalogFingerprintOf(CatalogEntry entry) {
   return sha256.convert(utf8.encode(_canonicalTextOf(entry))).toString();
 }
 
+bool differsFromStoredFingerprint(
+  CatalogEntry entry, {
+  required String? stored,
+}) {
+  return stored != null && stored != catalogFingerprintOf(entry);
+}
+
+List<int> idsWithDifferentStoredFingerprint(
+  List<CatalogEntry> freshEntries, {
+  required Map<int, String?> storedFingerprints,
+}) {
+  return [
+    for (final entry in freshEntries)
+      if (differsFromStoredFingerprint(
+        entry,
+        stored: storedFingerprints[entry.id],
+      ))
+        entry.id,
+  ];
+}
+
 String _canonicalTextOf(CatalogEntry entry) {
   final statNames = entry.baseStats.keys.toList()..sort();
   final stats = [

@@ -4,6 +4,16 @@ import 'dart:io';
 import 'package:graphql/client.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 
+Future<T> asSyncFailures<T>(Future<T> Function() work) async {
+  try {
+    return await work();
+  } on SyncFailure {
+    rethrow;
+  } catch (error, stackTrace) {
+    Error.throwWithStackTrace(syncFailureFrom(error), stackTrace);
+  }
+}
+
 SyncFailure syncFailureFrom(Object error, {bool dataReceived = false}) {
   return switch (error) {
     SyncFailure() => error,

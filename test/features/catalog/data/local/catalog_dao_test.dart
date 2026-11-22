@@ -356,6 +356,281 @@ void main() {
     expect([for (final favorite in favorites) favorite.pokemonId], [4]);
   });
 
+  group('revalidación de lo visible', () {
+    final limit = savedAt.add(const Duration(minutes: 30));
+
+    test(
+      'staleIdsAmong devuelve solo los ids pedidos guardados antes del límite',
+      () async {
+        await savePage([bulbasaur, charmander]);
+        await catalogDao.saveRevalidated([
+          squirtle,
+        ], savedAt: limit.add(const Duration(minutes: 1)));
+
+        final staleIds = await catalogDao.staleIdsAmong([
+          7,
+          4,
+          1,
+          150,
+        ], olderThan: limit);
+
+        expect(staleIds, [1, 4]);
+      },
+    );
+
+    test(
+      'staleIdsAmong no cuenta los ids que no están en el catálogo',
+      () async {
+        await savePage([bulbasaur]);
+
+        expect(
+          await catalogDao.staleIdsAmong([150], olderThan: limit),
+          isEmpty,
+        );
+      },
+    );
+
+    test('saveRevalidated actualiza los Pokémon sin tocar el progreso del catálogo', () async {
+      const renamedBulbasaur = CatalogEntry(
+        id: 1,
+        name: 'bulbasaur-renombrado',
+        imageUrl: 'https://example.com/1.png',
+        typeNames: ['grass'],
+        baseStats: {'hp': 50},
+      );
+      await savePage([bulbasaur, charmander], nextOffset: 50);
+
+      await catalogDao.saveRevalidated([renamedBulbasaur], savedAt: limit);
+      final row = await savedPokemonRow(1);
+      final progress = await catalogDao.readCatalogSyncProgress();
+
+      expect(row.name, 'bulbasaur-renombrado');
+      expect(row.updatedAt, limit);
+      expect(row.remoteFingerprint, catalogFingerprintOf(renamedBulbasaur));
+      expect(await savedStatsOf(1), {'hp': 50});
+      expect((await savedPokemonRow(4)).updatedAt, savedAt);
+      expect(progress?.nextOffset, 50);
+      expect(progress?.lastSyncedAt, savedAt);
+    });
+
+    test('la página vuelve a emitirse con el nombre revalidado', () async {
+      await savePage([bulbasaur, charmander]);
+      final pageNames = StreamQueue(
+        catalogDao
+            .watchCatalogPage(limit: 2, offset: 0)
+            .map((entries) => [for (final entry in entries) entry.name]),
+      );
+      addTearDown(pageNames.cancel);
+
+      expect(await pageNames.next, ['bulbasaur', 'charmander']);
+
+      await catalogDao.saveRevalidated(const [
+        CatalogEntry(
+          id: 4,
+          name: 'charmander-renombrado',
+          imageUrl: 'https://example.com/4.png',
+          typeNames: ['fire'],
+        ),
+      ], savedAt: limit);
+
+      expect(await pageNames.next, ['bulbasaur', 'charmander-renombrado']);
+    });
+  });
+
+  group('lectura para verificar huellas', () {
+    test('readEntriesWithFingerprint arma cada Pokémon completo con su huella guardada', () async {
+      await savePage([squirtle, bulbasaur]);
+
+      final stored = await catalogDao.readEntriesWithFingerprint();
+      final (:entry, :storedFingerprint) = stored.first;
+
+      expect([for (final item in stored) item.entry.id], [1, 7]);
+      expect(entry.name, 'bulbasaur');
+      expect(entry.imageUrl, 'https://example.com/1.png');
+      expect(entry.typeNames, ['grass', 'poison']);
+      expect(entry.speciesId, 1);
+      expect(entry.generationId, 1);
+      expect(entry.isDefault, isTrue);
+      expect(entry.heightDm, 7);
+      expect(entry.weightHg, 69);
+      expect(entry.baseStats, bulbasaur.baseStats);
+      expect(storedFingerprint, catalogFingerprintOf(bulbasaur));
+      expect(catalogFingerprintOf(entry), storedFingerprint);
+    });
+
+    test(
+      'readEntriesWithFingerprint ve un UPDATE hecho por fuera de la app',
+      () async {
+        await savePage([bulbasaur]);
+        await database.customStatement(
+          "UPDATE pokemon_types SET type_name = 'fire' WHERE pokemon_id = 1 "
+          'AND slot = 1',
+        );
+
+        final stored = await catalogDao.readEntriesWithFingerprint();
+
+        expect(stored.single.entry.typeNames, ['fire', 'poison']);
+        expect(
+          catalogFingerprintOf(stored.single.entry),
+          isNot(stored.single.storedFingerprint),
+        );
+      },
+    );
+
+    test(
+      'un Pokémon sin tipos ni estadísticas sale con listas vacías',
+      () async {
+        await savePage([bulbasaur]);
+        await database.customStatement(
+          'DELETE FROM pokemon_types WHERE pokemon_id = 1',
+        );
+        await database.customStatement(
+          'DELETE FROM pokemon_stats WHERE pokemon_id = 1',
+        );
+
+        final stored = await catalogDao.readEntriesWithFingerprint();
+
+        expect(stored.single.entry.typeNames, isEmpty);
+        expect(stored.single.entry.baseStats, isEmpty);
+      },
+    );
+
+    test('storedFingerprintsOf devuelve solo las huellas pedidas', () async {
+      await savePage([bulbasaur, charmander, squirtle]);
+      await database.customStatement(
+        'UPDATE pokemon SET remote_fingerprint = NULL WHERE id = 4',
+      );
+
+      final fingerprints = await catalogDao.storedFingerprintsOf([1, 4, 150]);
+
+      expect(fingerprints, {1: catalogFingerprintOf(bulbasaur), 4: null});
+    });
+
+    test('recordFingerprintsVerified anota la hora sin tocar el progreso del catálogo', () async {
+      await savePage([bulbasaur], nextOffset: 50);
+      final verifiedAt = savedAt.add(const Duration(minutes: 1));
+
+      await catalogDao.recordFingerprintsVerified(at: verifiedAt);
+      final restoration = await database.syncMetadataDao.readByKey(
+        'catalog:restore',
+      );
+      final catalog = await catalogDao.readCatalogSyncProgress();
+
+      expect(restoration?.lastVerifiedAt, verifiedAt);
+      expect(catalog?.lastVerifiedAt, isNull);
+      expect(catalog?.nextOffset, 50);
+    });
+  });
+
+  group('formas que no son Pokémon por defecto', () {
+    const alolanRaichu = CatalogEntry(
+      id: 10100,
+      name: 'raichu-alola',
+      imageUrl: 'https://example.com/10100.png',
+      typeNames: ['electric', 'psychic'],
+      speciesId: 26,
+      isDefault: false,
+    );
+    const raichu = CatalogEntry(
+      id: 26,
+      name: 'raichu',
+      imageUrl: 'https://example.com/26.png',
+      typeNames: ['electric'],
+      speciesId: 26,
+    );
+
+    test(
+      'el catálogo, sus páginas y su conteo dejan fuera las formas',
+      () async {
+        await savePage([bulbasaur, raichu]);
+        await catalogDao.saveRevalidated([alolanRaichu], savedAt: savedAt);
+
+        final catalog = await catalogDao.watchCatalog().first;
+        final page = await catalogDao
+            .watchCatalogPage(limit: 50, offset: 0)
+            .first;
+
+        expect(idsOf(catalog), [1, 26]);
+        expect(idsOf(page), [1, 26]);
+        expect(await catalogDao.watchCatalogCount().first, 2);
+      },
+    );
+
+    test('una forma guardada se puede pedir por su id', () async {
+      await catalogDao.saveRevalidated([alolanRaichu], savedAt: savedAt);
+
+      final byIds = await catalogDao.watchPokemonByIds([10100]).first;
+
+      expect(idsOf(byIds), [10100]);
+    });
+
+    test(
+      'readEntriesOfSpecies trae el Pokémon y sus formas completos',
+      () async {
+        await savePage([bulbasaur, raichu]);
+        await catalogDao.saveRevalidated([alolanRaichu], savedAt: savedAt);
+
+        final forms = await catalogDao.readEntriesOfSpecies(26);
+
+        expect(idsOf(forms), [26, 10100]);
+        expect(forms.last.typeNames, ['electric', 'psychic']);
+        expect(forms.last.isDefault, isFalse);
+      },
+    );
+
+    test('readEntry trae un Pokémon con sus estadísticas', () async {
+      await savePage([bulbasaur, charmander]);
+
+      final entry = await catalogDao.readEntry(1);
+
+      expect(entry?.name, 'bulbasaur');
+      expect(entry?.typeNames, ['grass', 'poison']);
+      expect(entry?.baseStats, bulbasaur.baseStats);
+      expect(await catalogDao.readEntry(999), isNull);
+    });
+  });
+
+  group('progreso del catálogo', () {
+    test('empieza sin Pokémon guardados ni total conocido', () async {
+      final progress = await catalogDao.watchCatalogProgress().first;
+
+      expect(progress, (savedCount: 0, totalCount: null));
+    });
+
+    test(
+      'cuenta los Pokémon por defecto guardados y el total de PokeAPI',
+      () async {
+        await savePage([bulbasaur, charmander], totalCount: 3);
+        await catalogDao.saveRevalidated([
+          const CatalogEntry(
+            id: 10001,
+            name: 'deoxys-attack',
+            imageUrl: 'https://example.com/10001.png',
+            typeNames: ['psychic'],
+            isDefault: false,
+          ),
+        ], savedAt: savedAt);
+
+        final progress = await catalogDao.watchCatalogProgress().first;
+
+        expect(progress, (savedCount: 2, totalCount: 3));
+      },
+    );
+
+    test('solo vuelve a emitir cuando el progreso cambia', () async {
+      await savePage([bulbasaur, charmander], totalCount: 3);
+      final progressUpdates = StreamQueue(catalogDao.watchCatalogProgress());
+      addTearDown(progressUpdates.cancel);
+
+      expect(await progressUpdates.next, (savedCount: 2, totalCount: 3));
+
+      await catalogDao.recordFingerprintsVerified(at: savedAt);
+      await savePage([squirtle], nextOffset: 3, isComplete: true);
+
+      expect(await progressUpdates.next, (savedCount: 3, totalCount: 3));
+    });
+  });
+
   test('el esquema crea los índices de búsqueda, filtros y ranking', () async {
     final indexes = await database
         .customSelect(

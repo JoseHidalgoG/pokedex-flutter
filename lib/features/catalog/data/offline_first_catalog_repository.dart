@@ -3,7 +3,9 @@ import 'package:pokedex_flutter/core/sync/sync_scheduler.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry_mapper.dart';
+import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_constants.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progress.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
 
@@ -39,17 +41,47 @@ class OfflineFirstCatalogRepository implements CatalogRepository {
   }
 
   @override
+  Stream<CatalogProgress> watchCatalogProgress() {
+    return _catalogDao.watchCatalogProgress().map(
+      (progress) => CatalogProgress(
+        savedCount: progress.savedCount,
+        totalCount: progress.totalCount,
+      ),
+    );
+  }
+
+  @override
   Stream<List<Pokemon>> watchPokemonByIds(List<int> ids) {
     return _catalogDao.watchPokemonByIds(ids).map(_pokemonOf);
   }
 
   @override
-  Stream<SyncStatus> watchSyncStatus() =>
-      _scheduler.watchStatus(CatalogDao.catalogSyncKey);
+  Stream<SyncStatus> watchSyncStatus() {
+    return _scheduler
+        .watchStatuses([CatalogDao.catalogSyncKey, visiblePokemonSyncKey])
+        .map(mostRelevantSyncStatus);
+  }
 
   @override
   Future<void> syncCatalog({bool force = false}) =>
       _scheduler.run(_syncService.fullPassJob(force: force));
+
+  @override
+  Future<void> revalidatePokemon(List<int> ids, {bool force = false}) async {
+    if (ids.isEmpty) {
+      return;
+    }
+    _scheduler.runOnEachReconnect(_syncService.visiblePokemonJob(ids));
+    if (!_scheduler.isOnline) {
+      return;
+    }
+    if (!force && !await _syncService.hasStalePokemonAmong(ids)) {
+      return;
+    }
+    await _scheduler.runLatest(
+      _syncService.visiblePokemonJob(ids, force: force),
+    );
+  }
 
   @override
   Future<DateTime?> getLastSyncedAt() async {

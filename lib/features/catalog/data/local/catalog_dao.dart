@@ -4,8 +4,11 @@ import 'package:pokedex_flutter/core/sync/data/sync_metadata_table.dart';
 import 'package:pokedex_flutter/features/catalog/data/catalog_fingerprint.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_tables.dart';
+import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_constants.dart';
 
 part 'catalog_dao.g.dart';
+
+typedef StoredCatalogEntry = ({CatalogEntry entry, String? storedFingerprint});
 
 @DriftAccessor(
   tables: [
@@ -28,7 +31,7 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     int? totalCount,
   }) {
     return transaction(() async {
-      await _upsertEntries(entries, savedAt: savedAt);
+      await upsertEntries(entries, savedAt: savedAt);
       await into(syncMetadataTable).insertOnConflictUpdate(
         SyncMetadataTableCompanion(
           key: const Value(catalogSyncKey),
@@ -42,8 +45,33 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     });
   }
 
+  Future<void> saveRevalidated(
+    List<CatalogEntry> entries, {
+    required DateTime savedAt,
+  }) async {
+    if (entries.isEmpty) {
+      return;
+    }
+    await transaction(() => upsertEntries(entries, savedAt: savedAt));
+  }
+
+  Future<List<int>> staleIdsAmong(
+    List<int> ids, {
+    required DateTime olderThan,
+  }) {
+    final staleIds = selectOnly(pokemonTable)
+      ..addColumns([pokemonTable.id])
+      ..where(
+        pokemonTable.id.isIn(ids) &
+            pokemonTable.updatedAt.isSmallerThanValue(olderThan),
+      )
+      ..orderBy([OrderingTerm.asc(pokemonTable.id)]);
+    return staleIds.map((row) => row.read(pokemonTable.id)!).get();
+  }
+
   Stream<List<CatalogEntry>> watchCatalog() {
-    return _pokemonWithTypes().watch().map(_groupTypesByPokemon);
+    final query = _pokemonWithTypes()..where(_isDefaultPokemon);
+    return query.watch().map(_groupTypesByPokemon);
   }
 
   Stream<List<CatalogEntry>> watchCatalogPage({
@@ -52,6 +80,7 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   }) {
     final pageIds = selectOnly(pokemonTable)
       ..addColumns([pokemonTable.id])
+      ..where(_isDefaultPokemon)
       ..orderBy([OrderingTerm.asc(pokemonTable.id)])
       ..limit(limit, offset: offset);
 
@@ -73,9 +102,31 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   Stream<int> watchCatalogCount() {
     final countExpression = pokemonTable.id.count();
 
-    return (selectOnly(pokemonTable)..addColumns([countExpression]))
+    final defaultPokemonCount = selectOnly(pokemonTable)
+      ..addColumns([countExpression])
+      ..where(_isDefaultPokemon);
+    return defaultPokemonCount.watchSingle().map(
+      (row) => row.read(countExpression) ?? 0,
+    );
+  }
+
+  Stream<({int savedCount, int? totalCount})> watchCatalogProgress() {
+    final progress = customSelect(
+      'SELECT '
+      '(SELECT COUNT(*) FROM pokemon WHERE is_default = 1) AS saved_count, '
+      '(SELECT total_count FROM sync_metadata WHERE key = ?) AS total_count',
+      variables: [Variable.withString(catalogSyncKey)],
+      readsFrom: {pokemonTable, syncMetadataTable},
+    );
+    return progress
         .watchSingle()
-        .map((row) => row.read(countExpression) ?? 0);
+        .map(
+          (row) => (
+            savedCount: row.read<int>('saved_count'),
+            totalCount: row.read<int?>('total_count'),
+          ),
+        )
+        .distinct();
   }
 
   Future<SyncMetadataRow?> readCatalogSyncProgress() {
@@ -84,7 +135,108 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     return catalogProgress.getSingleOrNull();
   }
 
-  Future<void> _upsertEntries(
+  Future<List<StoredCatalogEntry>> readEntriesWithFingerprint() {
+    return transaction(() => _readStoredEntriesWhere(const Constant(true)));
+  }
+
+  Future<StoredCatalogEntry?> readStoredEntry(int pokemonId) {
+    return transaction(() async {
+      final stored = await _readStoredEntriesWhere(
+        pokemonTable.id.equals(pokemonId),
+      );
+      return stored.firstOrNull;
+    });
+  }
+
+  Future<CatalogEntry?> readEntry(int pokemonId) async {
+    final stored = await _readStoredEntriesWhere(
+      pokemonTable.id.equals(pokemonId),
+    );
+    return stored.firstOrNull?.entry;
+  }
+
+  Future<List<CatalogEntry>> readEntriesOfSpecies(int speciesId) async {
+    final stored = await _readStoredEntriesWhere(
+      pokemonTable.speciesId.equals(speciesId),
+    );
+    return [for (final (:entry, storedFingerprint: _) in stored) entry];
+  }
+
+  Future<Map<int, String?>> storedFingerprintsOf(List<int> ids) async {
+    final rows =
+        await (selectOnly(pokemonTable)
+              ..addColumns([pokemonTable.id, pokemonTable.remoteFingerprint])
+              ..where(pokemonTable.id.isIn(ids)))
+            .get();
+    return {
+      for (final row in rows)
+        row.read(pokemonTable.id)!: row.read(pokemonTable.remoteFingerprint),
+    };
+  }
+
+  Future<void> recordFingerprintsVerified({required DateTime at}) {
+    return into(syncMetadataTable).insertOnConflictUpdate(
+      SyncMetadataTableCompanion(
+        key: const Value(restorationSyncKey),
+        lastVerifiedAt: Value(at),
+      ),
+    );
+  }
+
+  Future<List<StoredCatalogEntry>> _readStoredEntriesWhere(
+    Expression<bool> condition,
+  ) async {
+    final selectedIds = selectOnly(pokemonTable)
+      ..addColumns([pokemonTable.id])
+      ..where(condition);
+    final pokemonRows =
+        await (select(pokemonTable)
+              ..where((_) => condition)
+              ..orderBy([(pokemon) => OrderingTerm.asc(pokemon.id)]))
+            .get();
+    final typeRows =
+        await (select(pokemonTypesTable)
+              ..where((type) => type.pokemonId.isInQuery(selectedIds))
+              ..orderBy([
+                (type) => OrderingTerm.asc(type.pokemonId),
+                (type) => OrderingTerm.asc(type.slot),
+              ]))
+            .get();
+    final statRows = await (select(
+      pokemonStatsTable,
+    )..where((stat) => stat.pokemonId.isInQuery(selectedIds))).get();
+
+    final typeNamesById = <int, List<String>>{};
+    for (final type in typeRows) {
+      typeNamesById.putIfAbsent(type.pokemonId, () => []).add(type.typeName);
+    }
+    final statsById = <int, Map<String, int>>{};
+    for (final stat in statRows) {
+      statsById.putIfAbsent(stat.pokemonId, () => {})[stat.statName] =
+          stat.baseStat;
+    }
+
+    return [
+      for (final pokemon in pokemonRows)
+        (
+          entry: CatalogEntry(
+            id: pokemon.id,
+            name: pokemon.name,
+            imageUrl: pokemon.imageUrl,
+            typeNames: typeNamesById[pokemon.id] ?? const [],
+            speciesId: pokemon.speciesId,
+            generationId: pokemon.generationId,
+            isDefault: pokemon.isDefault,
+            heightDm: pokemon.heightDm,
+            weightHg: pokemon.weightHg,
+            baseStats: statsById[pokemon.id] ?? const {},
+          ),
+          storedFingerprint: pokemon.remoteFingerprint,
+        ),
+    ];
+  }
+
+  Future<void> upsertEntries(
     List<CatalogEntry> entries, {
     required DateTime savedAt,
   }) async {
@@ -145,6 +297,8 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
       );
     }
   }
+
+  Expression<bool> get _isDefaultPokemon => pokemonTable.isDefault.equals(true);
 
   JoinedSelectStatement<HasResultSet, dynamic> _pokemonWithTypes() {
     return select(pokemonTable).join([
