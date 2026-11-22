@@ -9,7 +9,7 @@ import 'package:pokedex_flutter/features/navigation/presentation/screens/main_na
 import 'package:pokedex_flutter/features/favorites/presentation/providers/favorites_providers.dart';
 import 'package:pokedex_flutter/features/settings/presentation/providers/settings_providers.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
-
+import 'package:flutter_riverpod/misc.dart' show Override;
 import '../../../favorites/fakes/fake_favorites_repository.dart';
 
 void main() {
@@ -20,26 +20,41 @@ void main() {
     typeNames: ['electric'],
   );
 
+  List<Override> navigationOverrides(
+      List<Pokemon> pokemon, {
+        required Locale locale,
+      }) {
+    return [
+      filteredCatalogPageProvider.overrideWith((ref, request) {
+        final offset = request.page * request.pageSize;
+
+        return Stream.value(
+          pokemon.skip(offset).take(request.pageSize).toList(),
+        );
+      }),
+      filteredCatalogCountProvider.overrideWith(
+            (ref, query) => Stream.value(pokemon.length),
+      ),
+      catalogSyncStatusProvider.overrideWith(
+            (ref) => Stream.value(const SyncIdle()),
+      ),
+      favoritesRepositoryProvider.overrideWith(
+            (ref) => FakeFavoritesRepository(),
+      ),
+      languageProvider.overrideWith(
+            (ref) => Stream.value(locale.languageCode),
+      ),
+      themeProvider.overrideWith((ref) => Stream.value('system')),
+    ];
+  }
+
   Future<void> pumpNavigation(
-    WidgetTester tester, {
-    Locale locale = const Locale('es'),
-  }) async {
+      WidgetTester tester, {
+        Locale locale = const Locale('es'),
+      }) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          catalogPageProvider(0).overrideWith((ref) => Stream.value([pikachu])),
-          catalogCountProvider.overrideWith((ref) => Stream.value(1)),
-          catalogSyncStatusProvider.overrideWith(
-            (ref) => Stream.value(const SyncIdle()),
-          ),
-          favoritesRepositoryProvider.overrideWith(
-            (ref) => FakeFavoritesRepository(),
-          ),
-          languageProvider.overrideWith(
-            (ref) => Stream.value(locale.languageCode),
-          ),
-          themeProvider.overrideWith((ref) => Stream.value('system')),
-        ],
+        overrides: navigationOverrides([pikachu], locale: locale),
         child: MaterialApp(
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -118,11 +133,11 @@ void main() {
   });
 
   testWidgets('conserva la página del catálogo al cambiar de pestaña', (
-    tester,
-  ) async {
+      tester,
+      ) async {
     final pokemon = List.generate(
       51,
-      (index) => Pokemon(
+          (index) => Pokemon(
         id: index + 1,
         name: 'pokemon${index + 1}',
         imageUrl: '',
@@ -132,22 +147,10 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          catalogPageProvider(0)
-              .overrideWith((ref) => Stream.value(pokemon.take(50).toList())),
-          catalogPageProvider(1)
-              .overrideWith((ref) => Stream.value(pokemon.skip(50).toList())),
-          catalogCountProvider.overrideWith((ref) => Stream.value(51)),
-          catalogSyncStatusProvider.overrideWith(
-            (ref) => Stream.value(const SyncIdle()),
-          ),
-          favoritesRepositoryProvider.overrideWith(
-            (ref) => FakeFavoritesRepository(),
-          ),
-          languageProvider.overrideWith((ref) => Stream.value('es')),
-          themeProvider.overrideWith((ref) => Stream.value('system')),
-        ],
-
+        overrides: navigationOverrides(
+          pokemon,
+          locale: const Locale('es'),
+        ),
         child: const MaterialApp(
           locale: Locale('es'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,

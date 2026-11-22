@@ -103,6 +103,19 @@
   "navigationFavorites": "Favoritos",
   "navigationTrivia": "Trivia",
   "navigationSettings": "Ajustes",
-  "triviaComingSoon": "Próximamente"
+  "triviaComingSoon": "Próximamente",
 
+  "catalogSearchHint": "Buscar por nombre o número",
+  "catalogTypeFilter": "Tipo",
+  "catalogAllTypes": "Todos los tipos",
+  "catalogSortBy": "Ordenar por",
+  "catalogSortNumberAsc": "Número (ascendente)",
+  "catalogSortNumberDesc": "Número (descendente)",
+  "catalogSortNameAsc": "Nombre (A-Z)",
+  "catalogSortNameDesc": "Nombre (Z-A)",
+  "catalogSortStatsAsc": "Estadísticas base (menor a mayor)",
+  "catalogSortStatsDesc": "Estadísticas base (mayor a menor)",
+  "catalogNoResults": "No se encontraron Pokémon",
+  "catalogNoResultsMessage": "Prueba con otra búsqueda o cambia los filtros.",
+  "catalogClearFilters": "Limpiar filtros"
 }

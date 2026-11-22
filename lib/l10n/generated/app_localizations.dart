@@ -523,6 +523,84 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Próximamente'**
   String get triviaComingSoon;
+
+  /// No description provided for @catalogSearchHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Buscar por nombre o número'**
+  String get catalogSearchHint;
+
+  /// No description provided for @catalogTypeFilter.
+  ///
+  /// In es, this message translates to:
+  /// **'Tipo'**
+  String get catalogTypeFilter;
+
+  /// No description provided for @catalogAllTypes.
+  ///
+  /// In es, this message translates to:
+  /// **'Todos los tipos'**
+  String get catalogAllTypes;
+
+  /// No description provided for @catalogSortBy.
+  ///
+  /// In es, this message translates to:
+  /// **'Ordenar por'**
+  String get catalogSortBy;
+
+  /// No description provided for @catalogSortNumberAsc.
+  ///
+  /// In es, this message translates to:
+  /// **'Número (ascendente)'**
+  String get catalogSortNumberAsc;
+
+  /// No description provided for @catalogSortNumberDesc.
+  ///
+  /// In es, this message translates to:
+  /// **'Número (descendente)'**
+  String get catalogSortNumberDesc;
+
+  /// No description provided for @catalogSortNameAsc.
+  ///
+  /// In es, this message translates to:
+  /// **'Nombre (A-Z)'**
+  String get catalogSortNameAsc;
+
+  /// No description provided for @catalogSortNameDesc.
+  ///
+  /// In es, this message translates to:
+  /// **'Nombre (Z-A)'**
+  String get catalogSortNameDesc;
+
+  /// No description provided for @catalogSortStatsAsc.
+  ///
+  /// In es, this message translates to:
+  /// **'Estadísticas base (menor a mayor)'**
+  String get catalogSortStatsAsc;
+
+  /// No description provided for @catalogSortStatsDesc.
+  ///
+  /// In es, this message translates to:
+  /// **'Estadísticas base (mayor a menor)'**
+  String get catalogSortStatsDesc;
+
+  /// No description provided for @catalogNoResults.
+  ///
+  /// In es, this message translates to:
+  /// **'No se encontraron Pokémon'**
+  String get catalogNoResults;
+
+  /// No description provided for @catalogNoResultsMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Prueba con otra búsqueda o cambia los filtros.'**
+  String get catalogNoResultsMessage;
+
+  /// No description provided for @catalogClearFilters.
+  ///
+  /// In es, this message translates to:
+  /// **'Limpiar filtros'**
+  String get catalogClearFilters;
 }
 
 class _AppLocalizationsDelegate

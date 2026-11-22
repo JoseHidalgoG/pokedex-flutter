@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
-
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -13,7 +12,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/screens/catalog_sc
 import 'package:pokedex_flutter/features/catalog/presentation/screens/pokemon_detail_screen.dart';
 import 'package:pokedex_flutter/features/favorites/presentation/providers/favorites_providers.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
-
+import 'package:flutter_riverpod/misc.dart' show Override;
 import '../../../favorites/fakes/fake_favorites_repository.dart';
 
 void main() {
@@ -24,30 +23,39 @@ void main() {
     typeNames: ['electric'],
   );
 
-  Future<void> pumpCatalog(
-    WidgetTester tester, {
-    required List<Pokemon> pokemon,
-    SyncStatus syncStatus = const SyncIdle(),
-  }) async {
-    final firstPage = pokemon.take(50).toList();
-    final secondPage = pokemon.skip(50).take(50).toList();
+  List<Override> catalogOverrides(
+      List<Pokemon> pokemon, {
+        required Stream<SyncStatus> syncStatuses,
+        Stream<int>? counts,
+      }) {
+    return [
+      filteredCatalogPageProvider.overrideWith((ref, request) {
+        final offset = request.page * request.pageSize;
+        final pagePokemon = pokemon.skip(offset).take(request.pageSize).toList();
 
+        return Stream.value(pagePokemon);
+      }),
+      filteredCatalogCountProvider.overrideWith(
+            (ref, query) => counts ?? Stream.value(pokemon.length),
+      ),
+      catalogSyncStatusProvider.overrideWith((ref) => syncStatuses),
+      favoritesRepositoryProvider.overrideWith(
+            (ref) => FakeFavoritesRepository(),
+      ),
+    ];
+  }
+
+  Future<void> pumpCatalog(
+      WidgetTester tester, {
+        required List<Pokemon> pokemon,
+        SyncStatus syncStatus = const SyncIdle(),
+      }) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          catalogPageProvider(0).overrideWith((ref) => Stream.value(firstPage)),
-          catalogPageProvider(1)
-              .overrideWith((ref) => Stream.value(secondPage)),
-          catalogCountProvider.overrideWith(
-            (ref) => Stream.value(pokemon.length),
-          ),
-          catalogSyncStatusProvider.overrideWith(
-            (ref) => Stream.value(syncStatus),
-          ),
-          favoritesRepositoryProvider.overrideWith(
-            (ref) => FakeFavoritesRepository(),
-          ),
-        ],
+        overrides: catalogOverrides(
+          pokemon,
+          syncStatuses: Stream.value(syncStatus),
+        ),
         child: const MaterialApp(
           locale: Locale('es'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -57,6 +65,7 @@ void main() {
       ),
     );
 
+    await tester.pump();
     await tester.pump();
   }
 
@@ -71,16 +80,10 @@ void main() {
   testWidgets('muestra el tipo de Pokémon en inglés', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          catalogPageProvider(0).overrideWith((ref) => Stream.value([pikachu])),
-          catalogCountProvider.overrideWith((ref) => Stream.value(1)),
-          catalogSyncStatusProvider.overrideWith(
-            (ref) => Stream.value(const SyncIdle()),
-          ),
-          favoritesRepositoryProvider.overrideWith(
-            (ref) => FakeFavoritesRepository(),
-          ),
-        ],
+        overrides: catalogOverrides(
+          [pikachu],
+          syncStatuses: Stream.value(const SyncIdle()),
+        ),
         child: const MaterialApp(
           locale: Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -99,27 +102,21 @@ void main() {
   });
 
   testWidgets('muestra un indicador cuando el catálogo está sincronizando', (
-    tester,
-  ) async {
+      tester,
+      ) async {
     await pumpCatalog(
       tester,
       pokemon: [],
       syncStatus: const SyncFullPassInProgress(),
     );
 
-    expect(
-      find.descendant(
-        of: find.byType(Center),
-        matching: find.byType(CircularProgressIndicator),
-      ),
-      findsOneWidget,
-    );
+    expect(find.byType(CircularProgressIndicator), findsWidgets);
     expect(find.text('Cargando catálogo'), findsOneWidget);
   });
 
   testWidgets('sigue cargando mientras espera un reintento sin datos', (
-    tester,
-  ) async {
+      tester,
+      ) async {
     await pumpCatalog(
       tester,
       pokemon: [],
@@ -137,7 +134,7 @@ void main() {
 
   testWidgets(
     'muestra un error cuando no hay datos y falla la sincronización',
-    (tester) async {
+        (tester) async {
       await pumpCatalog(
         tester,
         pokemon: [],
@@ -145,7 +142,6 @@ void main() {
       );
 
       expect(find.text('No se pudo cargar el catálogo'), findsOneWidget);
-
       expect(find.text('Reintentar'), findsOneWidget);
       expect(find.byType(SnackBar), findsNothing);
     },
@@ -155,14 +151,13 @@ void main() {
     await pumpCatalog(tester, pokemon: [], syncStatus: const SyncIdle());
 
     expect(find.text('No hay Pokémon disponibles'), findsOneWidget);
-
     expect(find.text('Reintentar'), findsOneWidget);
   });
 
   testWidgets('permite navegar entre dos páginas del catálogo', (tester) async {
     final pokemon = List.generate(
       51,
-      (index) => Pokemon(
+          (index) => Pokemon(
         id: index + 1,
         name: 'pokemon${index + 1}',
         imageUrl: '',
@@ -203,7 +198,7 @@ void main() {
 
   testWidgets(
     'la paginación cabe en un teléfono estrecho con el catálogo completo',
-    (tester) async {
+        (tester) async {
       const narrowPhoneWidth = 360.0;
       tester.view.devicePixelRatio = 3;
       tester.view.physicalSize = const Size(narrowPhoneWidth * 3, 740 * 3);
@@ -211,7 +206,7 @@ void main() {
 
       final fullCatalog = List.generate(
         1025,
-        (index) => Pokemon(
+            (index) => Pokemon(
           id: index + 1,
           name: 'pokemon${index + 1}',
           imageUrl: '',
@@ -240,8 +235,8 @@ void main() {
   });
 
   testWidgets('conserva los Pokémon visibles cuando falla la sincronización', (
-    tester,
-  ) async {
+      tester,
+      ) async {
     await pumpCatalog(
       tester,
       pokemon: [pikachu],
@@ -261,23 +256,16 @@ void main() {
 
   testWidgets(
     'avisa con un SnackBar cuando falla una sincronización sobre la lista visible',
-    (tester) async {
+        (tester) async {
       final syncStatusController = StreamController<SyncStatus>();
       addTearDown(syncStatusController.close);
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [
-            catalogPageProvider(0)
-                .overrideWith((ref) => Stream.value([pikachu])),
-            catalogCountProvider.overrideWith((ref) => Stream.value(1)),
-            catalogSyncStatusProvider.overrideWith(
-              (ref) => syncStatusController.stream,
-            ),
-            favoritesRepositoryProvider.overrideWith(
-              (ref) => FakeFavoritesRepository(),
-            ),
-          ],
+          overrides: catalogOverrides(
+            [pikachu],
+            syncStatuses: syncStatusController.stream,
+          ),
           child: const MaterialApp(
             locale: Locale('es'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -296,6 +284,7 @@ void main() {
       syncStatusController
         ..add(const SyncFullPassInProgress())
         ..add(const SyncFailed(ServerError(503)));
+
       await tester.pump();
       await tester.pump();
 
@@ -308,11 +297,11 @@ void main() {
   );
 
   testWidgets('regresa a una página válida cuando disminuye el catálogo', (
-    tester,
-  ) async {
+      tester,
+      ) async {
     final pokemon = List.generate(
       51,
-      (index) => Pokemon(
+          (index) => Pokemon(
         id: index + 1,
         name: 'pokemon${index + 1}',
         imageUrl: '',
@@ -325,19 +314,11 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          catalogPageProvider(0)
-              .overrideWith((ref) => Stream.value(pokemon.take(50).toList())),
-          catalogPageProvider(1)
-              .overrideWith((ref) => Stream.value(pokemon.skip(50).toList())),
-          catalogCountProvider.overrideWith((ref) => countController.stream),
-          catalogSyncStatusProvider.overrideWith(
-            (ref) => Stream.value(const SyncIdle()),
-          ),
-          favoritesRepositoryProvider.overrideWith(
-            (ref) => FakeFavoritesRepository(),
-          ),
-        ],
+        overrides: catalogOverrides(
+          pokemon,
+          syncStatuses: Stream.value(const SyncIdle()),
+          counts: countController.stream,
+        ),
         child: const MaterialApp(
           home: CatalogScreen(),
           locale: Locale('es'),

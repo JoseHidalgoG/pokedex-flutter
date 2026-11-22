@@ -237,4 +237,44 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get triviaComingSoon => 'Próximamente';
+
+  @override
+  String get catalogSearchHint => 'Buscar por nombre o número';
+
+  @override
+  String get catalogTypeFilter => 'Tipo';
+
+  @override
+  String get catalogAllTypes => 'Todos los tipos';
+
+  @override
+  String get catalogSortBy => 'Ordenar por';
+
+  @override
+  String get catalogSortNumberAsc => 'Número (ascendente)';
+
+  @override
+  String get catalogSortNumberDesc => 'Número (descendente)';
+
+  @override
+  String get catalogSortNameAsc => 'Nombre (A-Z)';
+
+  @override
+  String get catalogSortNameDesc => 'Nombre (Z-A)';
+
+  @override
+  String get catalogSortStatsAsc => 'Estadísticas base (menor a mayor)';
+
+  @override
+  String get catalogSortStatsDesc => 'Estadísticas base (mayor a menor)';
+
+  @override
+  String get catalogNoResults => 'No se encontraron Pokémon';
+
+  @override
+  String get catalogNoResultsMessage =>
+      'Prueba con otra búsqueda o cambia los filtros.';
+
+  @override
+  String get catalogClearFilters => 'Limpiar filtros';
 }
