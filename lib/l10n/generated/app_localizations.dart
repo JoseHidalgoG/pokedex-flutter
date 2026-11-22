@@ -18,7 +18,7 @@ import 'app_localizations_es.dart';
 /// `supportedLocales` list. For example:
 ///
 /// ```dart
-/// import 'l10n/app_localizations.dart';
+/// import 'generated/app_localizations.dart';
 ///
 /// return MaterialApp(
 ///   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -163,6 +163,78 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Error al cargar favorito'**
   String get favoriteLoadError;
+
+  /// No description provided for @settingsTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Ajustes'**
+  String get settingsTitle;
+
+  /// No description provided for @languageTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Idioma'**
+  String get languageTitle;
+
+  /// No description provided for @languageDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Selecciona el idioma de la aplicación'**
+  String get languageDescription;
+
+  /// No description provided for @themeTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Tema'**
+  String get themeTitle;
+
+  /// No description provided for @themeDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Selecciona la apariencia de la aplicación'**
+  String get themeDescription;
+
+  /// No description provided for @systemOption.
+  ///
+  /// In es, this message translates to:
+  /// **'Automático (sistema)'**
+  String get systemOption;
+
+  /// No description provided for @spanishOption.
+  ///
+  /// In es, this message translates to:
+  /// **'Español'**
+  String get spanishOption;
+
+  /// No description provided for @englishOption.
+  ///
+  /// In es, this message translates to:
+  /// **'Inglés'**
+  String get englishOption;
+
+  /// No description provided for @lightTheme.
+  ///
+  /// In es, this message translates to:
+  /// **'Claro'**
+  String get lightTheme;
+
+  /// No description provided for @darkTheme.
+  ///
+  /// In es, this message translates to:
+  /// **'Oscuro'**
+  String get darkTheme;
+
+  /// No description provided for @languageChangeError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo cambiar el idioma'**
+  String get languageChangeError;
+
+  /// No description provided for @themeChangeError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo cambiar el tema'**
+  String get themeChangeError;
 }
 
 class _AppLocalizationsDelegate

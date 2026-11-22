@@ -12,6 +12,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_li
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_pagination.dart';
 import 'package:pokedex_flutter/features/favorites/presentation/screens/favorites_screen.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
+import 'package:pokedex_flutter/features/settings/presentation/screens/settings_screen.dart';
 
 const _maxVisiblePageButtons = 5;
 const _pageButtonSpacing = 6.0;
@@ -234,6 +235,15 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                 MaterialPageRoute<void>(
                   builder: (_) => const FavoritesScreen(),
                 ),
+              );
+            },
+          ),
+          IconButton(
+            tooltip: AppLocalizations.of(context)!.settingsTitle,
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
               );
             },
           ),

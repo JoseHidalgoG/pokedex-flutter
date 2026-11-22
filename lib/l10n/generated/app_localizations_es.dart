@@ -44,4 +44,40 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get favoriteLoadError => 'Error al cargar favorito';
+
+  @override
+  String get settingsTitle => 'Ajustes';
+
+  @override
+  String get languageTitle => 'Idioma';
+
+  @override
+  String get languageDescription => 'Selecciona el idioma de la aplicación';
+
+  @override
+  String get themeTitle => 'Tema';
+
+  @override
+  String get themeDescription => 'Selecciona la apariencia de la aplicación';
+
+  @override
+  String get systemOption => 'Automático (sistema)';
+
+  @override
+  String get spanishOption => 'Español';
+
+  @override
+  String get englishOption => 'Inglés';
+
+  @override
+  String get lightTheme => 'Claro';
+
+  @override
+  String get darkTheme => 'Oscuro';
+
+  @override
+  String get languageChangeError => 'No se pudo cambiar el idioma';
+
+  @override
+  String get themeChangeError => 'No se pudo cambiar el tema';
 }

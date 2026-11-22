@@ -13,6 +13,7 @@ class ConnectivityBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     final connectivityAsync = ref.watch(connectivityStatusProvider);
     final syncAsync = ref.watch(catalogSyncStatusProvider);
     final lastSyncAsync = ref.watch(lastCatalogSyncProvider);
@@ -41,23 +42,23 @@ class ConnectivityBanner extends ConsumerWidget {
               : 'Actualizando información local';
 
           icon = Icons.sync;
-          color = const Color(0xFF2453A6);
-          backgroundColor = const Color(0xFFE6EDF8);
+          color = colorScheme.onPrimaryContainer;
+          backgroundColor = colorScheme.primaryContainer;
         } else {
           switch (connectivityStatus) {
             case ConnectivityStatus.online:
               title = 'En línea';
               subtitle = 'API disponible · datos locales · $lastSyncText';
               icon = Icons.cloud_done;
-              color = const Color(0xFF245B38);
-              backgroundColor = const Color(0xFFE5F1E8);
+              color = colorScheme.onTertiaryContainer;
+              backgroundColor = colorScheme.tertiaryContainer;
 
             case ConnectivityStatus.offline:
               title = 'Sin conexión';
               subtitle = 'Datos locales · $lastSyncText';
               icon = Icons.cloud_off;
-              color = const Color(0xFF47505E);
-              backgroundColor = const Color(0xFFE5E7EB);
+              color = colorScheme.onSurfaceVariant;
+              backgroundColor = colorScheme.surfaceContainerHighest;
 
             case ConnectivityStatus.serviceUnavailable:
               title = 'Servicio no disponible';
@@ -65,8 +66,8 @@ class ConnectivityBanner extends ConsumerWidget {
                   'Red activa, API sin respuesta · datos locales · $lastSyncText';
 
               icon = Icons.warning_amber_rounded;
-              color = const Color(0xFF805300);
-              backgroundColor = const Color(0xFFFFF1D6);
+              color = colorScheme.onErrorContainer;
+              backgroundColor = colorScheme.errorContainer;
           }
 
           if (syncStatus is SyncFailed) {
@@ -84,12 +85,12 @@ class ConnectivityBanner extends ConsumerWidget {
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFAFAFA),
+              color: colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFDCE0E7), width: 1),
+              border: Border.all(color: colorScheme.outlineVariant, width: 1),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
+                  color: colorScheme.shadow.withValues(alpha: 0.06),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -99,12 +100,12 @@ class ConnectivityBanner extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'Pokédex',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF202939),
+                    color: colorScheme.onSurface,
                   ),
                 ),
 
@@ -161,10 +162,10 @@ class ConnectivityBanner extends ConsumerWidget {
                   const SizedBox(height: 6),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: const LinearProgressIndicator(
+                    child: LinearProgressIndicator(
                       minHeight: 4,
-                      backgroundColor: Color(0xFFE6EAF0),
-                      color: Color(0xFF2453A6),
+                      backgroundColor: colorScheme.primaryContainer,
+                      color: colorScheme.primary,
                     ),
                   ),
                 ],

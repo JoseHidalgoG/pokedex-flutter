@@ -10,5 +10,18 @@
   "favoritePokemonLoadError": "No se pudieron cargar los Pokémon favoritos.",
   "favoritesLoadError": "No se pudieron consultar los favoritos.",
   "favoriteUpdateError": "No se pudo actualizar el favorito",
-  "favoriteLoadError": "Error al cargar favorito"
+  "favoriteLoadError": "Error al cargar favorito",
+
+  "settingsTitle": "Ajustes",
+  "languageTitle": "Idioma",
+  "languageDescription": "Selecciona el idioma de la aplicación",
+  "themeTitle": "Tema",
+  "themeDescription": "Selecciona la apariencia de la aplicación",
+  "systemOption": "Automático (sistema)",
+  "spanishOption": "Español",
+  "englishOption": "Inglés",
+  "lightTheme": "Claro",
+  "darkTheme": "Oscuro",
+  "languageChangeError": "No se pudo cambiar el idioma",
+  "themeChangeError": "No se pudo cambiar el tema"
 }

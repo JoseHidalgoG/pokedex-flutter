@@ -10,5 +10,18 @@
   "favoritePokemonLoadError": "Could not load favorite Pokémon.",
   "favoritesLoadError": "Could not retrieve favorites.",
   "favoriteUpdateError": "Could not update favorite",
-  "favoriteLoadError": "Error loading favorite"
+  "favoriteLoadError": "Error loading favorite",
+
+  "settingsTitle": "Settings",
+  "languageTitle": "Language",
+  "languageDescription": "Select the application language",
+  "themeTitle": "Theme",
+  "themeDescription": "Select the application appearance",
+  "systemOption": "Automatic (system)",
+  "spanishOption": "Spanish",
+  "englishOption": "English",
+  "lightTheme": "Light",
+  "darkTheme": "Dark",
+  "languageChangeError": "Could not change the language",
+  "themeChangeError": "Could not change the theme"
 }
