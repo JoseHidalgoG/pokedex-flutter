@@ -97,6 +97,12 @@
     }
   },
   "bannerSyncFailedOffline": "No se pudo sincronizar · Sin conexión",
-  "bannerSyncFailedLocal": "No se pudo sincronizar · Se conservan los datos locales"
+  "bannerSyncFailedLocal": "No se pudo sincronizar · Se conservan los datos locales",
+
+  "navigationCatalog": "Catálogo",
+  "navigationFavorites": "Favoritos",
+  "navigationTrivia": "Trivia",
+  "navigationSettings": "Ajustes",
+  "triviaComingSoon": "Próximamente"
 
 }

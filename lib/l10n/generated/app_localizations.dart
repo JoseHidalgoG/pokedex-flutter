@@ -493,6 +493,36 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'No se pudo sincronizar · Se conservan los datos locales'**
   String get bannerSyncFailedLocal;
+
+  /// No description provided for @navigationCatalog.
+  ///
+  /// In es, this message translates to:
+  /// **'Catálogo'**
+  String get navigationCatalog;
+
+  /// No description provided for @navigationFavorites.
+  ///
+  /// In es, this message translates to:
+  /// **'Favoritos'**
+  String get navigationFavorites;
+
+  /// No description provided for @navigationTrivia.
+  ///
+  /// In es, this message translates to:
+  /// **'Trivia'**
+  String get navigationTrivia;
+
+  /// No description provided for @navigationSettings.
+  ///
+  /// In es, this message translates to:
+  /// **'Ajustes'**
+  String get navigationSettings;
+
+  /// No description provided for @triviaComingSoon.
+  ///
+  /// In es, this message translates to:
+  /// **'Próximamente'**
+  String get triviaComingSoon;
 }
 
 class _AppLocalizationsDelegate

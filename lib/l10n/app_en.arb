@@ -97,6 +97,12 @@
     }
   },
   "bannerSyncFailedOffline": "Sync failed · No connection",
-  "bannerSyncFailedLocal": "Sync failed · Local data preserved"
+  "bannerSyncFailedLocal": "Sync failed · Local data preserved",
+
+  "navigationCatalog": "Catalog",
+  "navigationFavorites": "Favorites",
+  "navigationTrivia": "Trivia",
+  "navigationSettings": "Settings",
+  "triviaComingSoon": "Coming soon"
 
 }

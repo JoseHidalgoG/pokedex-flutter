@@ -222,4 +222,19 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get bannerSyncFailedLocal =>
       'No se pudo sincronizar · Se conservan los datos locales';
+
+  @override
+  String get navigationCatalog => 'Catálogo';
+
+  @override
+  String get navigationFavorites => 'Favoritos';
+
+  @override
+  String get navigationTrivia => 'Trivia';
+
+  @override
+  String get navigationSettings => 'Ajustes';
+
+  @override
+  String get triviaComingSoon => 'Próximamente';
 }
