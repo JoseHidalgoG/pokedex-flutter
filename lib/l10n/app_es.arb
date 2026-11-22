@@ -23,5 +23,80 @@
   "lightTheme": "Claro",
   "darkTheme": "Oscuro",
   "languageChangeError": "No se pudo cambiar el idioma",
-  "themeChangeError": "No se pudo cambiar el tema"
+  "themeChangeError": "No se pudo cambiar el tema",
+
+  "catalogSyncOfflineError": "Sin conexión: se muestran los Pokémon guardados.",
+  "catalogSyncError": "No se pudo sincronizar el catálogo. Inténtalo nuevamente.",
+  "previousPage": "Página anterior",
+  "nextPage": "Página siguiente",
+  "catalogLoading": "Cargando catálogo",
+  "catalogLoadError": "No se pudo cargar el catálogo",
+  "catalogEmpty": "No hay Pokémon disponibles",
+  "catalogConnectionError": "Comprueba tu conexión e inténtalo nuevamente.",
+  "catalogEmptyMessage": "Todavía no hay Pokémon guardados en el catálogo.",
+  "retry": "Reintentar",
+  "catalogSyncing": "Sincronizando...",
+  "syncCatalog": "Sincronizar catálogo",
+
+  "pokemonTypeNormal": "Normal",
+  "pokemonTypeFire": "Fuego",
+  "pokemonTypeWater": "Agua",
+  "pokemonTypeElectric": "Eléctrico",
+  "pokemonTypeGrass": "Planta",
+  "pokemonTypeIce": "Hielo",
+  "pokemonTypeFighting": "Lucha",
+  "pokemonTypePoison": "Veneno",
+  "pokemonTypeGround": "Tierra",
+  "pokemonTypeFlying": "Volador",
+  "pokemonTypePsychic": "Psíquico",
+  "pokemonTypeBug": "Bicho",
+  "pokemonTypeRock": "Roca",
+  "pokemonTypeGhost": "Fantasma",
+  "pokemonTypeDragon": "Dragón",
+  "pokemonTypeDark": "Siniestro",
+  "pokemonTypeSteel": "Acero",
+  "pokemonTypeFairy": "Hada",
+
+  "bannerNoPreviousSync": "Sin sincronizaciones anteriores",
+  "bannerLastSync": "Última sync: {date}",
+  "@bannerLastSync": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "bannerSyncing": "Sincronizando...",
+  "bannerOnline": "En línea",
+  "bannerOffline": "Sin conexión",
+  "bannerServiceUnavailable": "Servicio no disponible",
+  "bannerContinueBrowsing": "En línea · Puedes seguir navegando",
+  "bannerUpdatingLocal": "Actualizando información local",
+  "bannerOnlineDetails": "API disponible · datos locales · {lastSync}",
+  "@bannerOnlineDetails": {
+    "placeholders": {
+      "lastSync": {
+        "type": "String"
+      }
+    }
+  },
+  "bannerOfflineDetails": "Datos locales · {lastSync}",
+  "@bannerOfflineDetails": {
+    "placeholders": {
+      "lastSync": {
+        "type": "String"
+      }
+    }
+  },
+  "bannerServiceUnavailableDetails": "Red activa, API sin respuesta · datos locales · {lastSync}",
+  "@bannerServiceUnavailableDetails": {
+    "placeholders": {
+      "lastSync": {
+        "type": "String"
+      }
+    }
+  },
+  "bannerSyncFailedOffline": "No se pudo sincronizar · Sin conexión",
+  "bannerSyncFailedLocal": "No se pudo sincronizar · Se conservan los datos locales"
+
 }

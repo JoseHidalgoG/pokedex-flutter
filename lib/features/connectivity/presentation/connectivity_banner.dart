@@ -7,6 +7,7 @@ import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 class ConnectivityBanner extends ConsumerWidget {
   const ConnectivityBanner({super.key});
@@ -14,6 +15,7 @@ class ConnectivityBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final connectivityAsync = ref.watch(connectivityStatusProvider);
     final syncAsync = ref.watch(catalogSyncStatusProvider);
     final lastSyncAsync = ref.watch(lastCatalogSyncProvider);
@@ -21,8 +23,8 @@ class ConnectivityBanner extends ConsumerWidget {
     final lastSyncAt = lastSyncAsync.asData?.value;
 
     final lastSyncText = lastSyncAt == null
-        ? 'Sin sincronizaciones anteriores'
-        : 'Última sync: ${_formatDateTime(lastSyncAt)}';
+        ? l10n.bannerNoPreviousSync
+        : l10n.bannerLastSync(_formatDateTime(lastSyncAt));
 
     return connectivityAsync.when(
       data: (connectivityStatus) {
@@ -36,10 +38,10 @@ class ConnectivityBanner extends ConsumerWidget {
         late final Color backgroundColor;
 
         if (isSyncing) {
-          title = 'Sincronizando...';
+          title = l10n.bannerSyncing;
           subtitle = connectivityStatus == ConnectivityStatus.online
-              ? 'En línea · Puedes seguir navegando'
-              : 'Actualizando información local';
+              ? l10n.bannerContinueBrowsing
+              : l10n.bannerUpdatingLocal;
 
           icon = Icons.sync;
           color = colorScheme.onPrimaryContainer;
@@ -47,24 +49,22 @@ class ConnectivityBanner extends ConsumerWidget {
         } else {
           switch (connectivityStatus) {
             case ConnectivityStatus.online:
-              title = 'En línea';
-              subtitle = 'API disponible · datos locales · $lastSyncText';
+              title = l10n.bannerOnline;
+              subtitle = l10n.bannerOnlineDetails(lastSyncText);
               icon = Icons.cloud_done;
               color = colorScheme.onTertiaryContainer;
               backgroundColor = colorScheme.tertiaryContainer;
 
             case ConnectivityStatus.offline:
-              title = 'Sin conexión';
-              subtitle = 'Datos locales · $lastSyncText';
+              title = l10n.bannerOffline;
+              subtitle = l10n.bannerOfflineDetails(lastSyncText);
               icon = Icons.cloud_off;
               color = colorScheme.onSurfaceVariant;
               backgroundColor = colorScheme.surfaceContainerHighest;
 
             case ConnectivityStatus.serviceUnavailable:
-              title = 'Servicio no disponible';
-              subtitle =
-                  'Red activa, API sin respuesta · datos locales · $lastSyncText';
-
+              title = l10n.bannerServiceUnavailable;
+              subtitle = l10n.bannerServiceUnavailableDetails(lastSyncText);
               icon = Icons.warning_amber_rounded;
               color = colorScheme.onErrorContainer;
               backgroundColor = colorScheme.errorContainer;
@@ -72,8 +72,8 @@ class ConnectivityBanner extends ConsumerWidget {
 
           if (syncStatus is SyncFailed) {
             subtitle = syncStatus.failure is NoConnection
-                ? 'No se pudo sincronizar · Sin conexión'
-                : 'No se pudo sincronizar · Se conservan los datos locales';
+                ? l10n.bannerSyncFailedOffline
+                : l10n.bannerSyncFailedLocal;
           }
         }
 

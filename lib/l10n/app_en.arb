@@ -23,5 +23,80 @@
   "lightTheme": "Light",
   "darkTheme": "Dark",
   "languageChangeError": "Could not change the language",
-  "themeChangeError": "Could not change the theme"
+  "themeChangeError": "Could not change the theme",
+
+  "catalogSyncOfflineError": "No connection: showing saved Pokémon.",
+  "catalogSyncError": "Could not sync the catalog. Please try again.",
+  "previousPage": "Previous page",
+  "nextPage": "Next page",
+  "catalogLoading": "Loading catalog",
+  "catalogLoadError": "Could not load the catalog",
+  "catalogEmpty": "No Pokémon available",
+  "catalogConnectionError": "Check your connection and try again.",
+  "catalogEmptyMessage": "There are no Pokémon saved in the catalog yet.",
+  "retry": "Retry",
+  "catalogSyncing": "Syncing...",
+  "syncCatalog": "Sync catalog",
+
+  "pokemonTypeNormal": "Normal",
+  "pokemonTypeFire": "Fire",
+  "pokemonTypeWater": "Water",
+  "pokemonTypeElectric": "Electric",
+  "pokemonTypeGrass": "Grass",
+  "pokemonTypeIce": "Ice",
+  "pokemonTypeFighting": "Fighting",
+  "pokemonTypePoison": "Poison",
+  "pokemonTypeGround": "Ground",
+  "pokemonTypeFlying": "Flying",
+  "pokemonTypePsychic": "Psychic",
+  "pokemonTypeBug": "Bug",
+  "pokemonTypeRock": "Rock",
+  "pokemonTypeGhost": "Ghost",
+  "pokemonTypeDragon": "Dragon",
+  "pokemonTypeDark": "Dark",
+  "pokemonTypeSteel": "Steel",
+  "pokemonTypeFairy": "Fairy",
+
+  "bannerNoPreviousSync": "No previous synchronizations",
+  "bannerLastSync": "Last sync: {date}",
+  "@bannerLastSync": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "bannerSyncing": "Syncing...",
+  "bannerOnline": "Online",
+  "bannerOffline": "Offline",
+  "bannerServiceUnavailable": "Service unavailable",
+  "bannerContinueBrowsing": "Online · You can keep browsing",
+  "bannerUpdatingLocal": "Updating local information",
+  "bannerOnlineDetails": "API available · local data · {lastSync}",
+  "@bannerOnlineDetails": {
+    "placeholders": {
+      "lastSync": {
+        "type": "String"
+      }
+    }
+  },
+  "bannerOfflineDetails": "Local data · {lastSync}",
+  "@bannerOfflineDetails": {
+    "placeholders": {
+      "lastSync": {
+        "type": "String"
+      }
+    }
+  },
+  "bannerServiceUnavailableDetails": "Network active, API not responding · local data · {lastSync}",
+  "@bannerServiceUnavailableDetails": {
+    "placeholders": {
+      "lastSync": {
+        "type": "String"
+      }
+    }
+  },
+  "bannerSyncFailedOffline": "Sync failed · No connection",
+  "bannerSyncFailedLocal": "Sync failed · Local data preserved"
+
 }

@@ -59,9 +59,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 
   String _syncFailureMessage(SyncFailure failure) {
+    final l10n = AppLocalizations.of(context)!;
+
     return switch (failure) {
-      NoConnection() => 'Sin conexión: se muestran los Pokémon guardados.',
-      _ => 'No se pudo sincronizar el catálogo. Inténtalo nuevamente.',
+      NoConnection() => l10n.catalogSyncOfflineError,
+      _ => l10n.catalogSyncError,
     };
   }
 
@@ -91,7 +93,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
-                tooltip: 'Página anterior',
+                tooltip: AppLocalizations.of(context)!.previousPage,
                 onPressed: _currentPage > 0
                     ? () => setState(() => _currentPage--)
                     : null,
@@ -120,7 +122,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   ),
                 ),
               IconButton(
-                tooltip: 'Página siguiente',
+                tooltip: AppLocalizations.of(context)!.nextPage,
                 onPressed: _currentPage < totalPages - 1
                     ? () => setState(() => _currentPage++)
                     : null,
@@ -147,13 +149,15 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 
   Widget _buildLoading() {
-    return const Center(
+    final l10n = AppLocalizations.of(context)!;
+
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Cargando catálogo'),
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(l10n.catalogLoading),
         ],
       ),
     );
@@ -164,15 +168,15 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     WidgetRef ref, {
     required bool hasError,
   }) {
+    final l10n = AppLocalizations.of(context)!;
+
     return CatalogEmptyState(
       icon: hasError ? Icons.cloud_off : Icons.catching_pokemon,
-      title: hasError
-          ? 'No se pudo cargar el catálogo'
-          : 'No hay Pokémon disponibles',
+      title: hasError ? l10n.catalogLoadError : l10n.catalogEmpty,
       message: hasError
-          ? 'Comprueba tu conexión e inténtalo nuevamente.'
-          : 'Todavía no hay Pokémon guardados en el catálogo.',
-      actionLabel: 'Reintentar',
+          ? l10n.catalogConnectionError
+          : l10n.catalogEmptyMessage,
+      actionLabel: l10n.retry,
       onAction: _retrySync,
     );
   }
@@ -221,6 +225,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     );
 
     final isSyncing = syncStatus is SyncFullPassInProgress;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
@@ -248,7 +253,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             },
           ),
           IconButton(
-            tooltip: isSyncing ? 'Sincronizando...' : 'Sincronizar catálogo',
+            tooltip: isSyncing ? l10n.catalogSyncing : l10n.syncCatalog,
             onPressed: isSyncing ? null : _retrySync,
             icon: isSyncing
                 ? const SizedBox(

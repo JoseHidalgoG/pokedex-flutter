@@ -9,11 +9,13 @@ import 'package:pokedex_flutter/features/connectivity/presentation/connectivity_
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 Widget buildBanner({
   required ConnectivityStatus connectivityStatus,
   SyncStatus syncStatus = const SyncIdle(),
   DateTime? lastSyncAt,
+  Locale locale = const Locale('es'),
 }) {
   return ProviderScope(
     overrides: [
@@ -23,7 +25,12 @@ Widget buildBanner({
       catalogSyncStatusProvider.overrideWith((ref) => Stream.value(syncStatus)),
       lastCatalogSyncProvider.overrideWith((ref) async => lastSyncAt),
     ],
-    child: const MaterialApp(home: Scaffold(body: ConnectivityBanner())),
+    child: MaterialApp(
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const Scaffold(body: ConnectivityBanner()),
+    ),
   );
 }
 
@@ -125,6 +132,25 @@ void main() {
       );
 
       expect(semanticsFinder, findsOneWidget);
+    });
+
+    testWidgets('muestra el estado online en inglés', (tester) async {
+      await tester.pumpWidget(
+        buildBanner(
+          connectivityStatus: ConnectivityStatus.online,
+          locale: const Locale('en'),
+        ),
+      );
+
+      await tester.pump();
+
+      expect(find.text('Online'), findsOneWidget);
+      expect(find.textContaining('API available'), findsOneWidget);
+      expect(
+        find.textContaining('No previous synchronizations'),
+        findsOneWidget,
+      );
+      expect(find.text('En línea'), findsNothing);
     });
   });
 }

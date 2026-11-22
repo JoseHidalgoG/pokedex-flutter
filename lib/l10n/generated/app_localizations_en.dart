@@ -78,4 +78,143 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get themeChangeError => 'Could not change the theme';
+
+  @override
+  String get catalogSyncOfflineError => 'No connection: showing saved Pokémon.';
+
+  @override
+  String get catalogSyncError =>
+      'Could not sync the catalog. Please try again.';
+
+  @override
+  String get previousPage => 'Previous page';
+
+  @override
+  String get nextPage => 'Next page';
+
+  @override
+  String get catalogLoading => 'Loading catalog';
+
+  @override
+  String get catalogLoadError => 'Could not load the catalog';
+
+  @override
+  String get catalogEmpty => 'No Pokémon available';
+
+  @override
+  String get catalogConnectionError => 'Check your connection and try again.';
+
+  @override
+  String get catalogEmptyMessage =>
+      'There are no Pokémon saved in the catalog yet.';
+
+  @override
+  String get retry => 'Retry';
+
+  @override
+  String get catalogSyncing => 'Syncing...';
+
+  @override
+  String get syncCatalog => 'Sync catalog';
+
+  @override
+  String get pokemonTypeNormal => 'Normal';
+
+  @override
+  String get pokemonTypeFire => 'Fire';
+
+  @override
+  String get pokemonTypeWater => 'Water';
+
+  @override
+  String get pokemonTypeElectric => 'Electric';
+
+  @override
+  String get pokemonTypeGrass => 'Grass';
+
+  @override
+  String get pokemonTypeIce => 'Ice';
+
+  @override
+  String get pokemonTypeFighting => 'Fighting';
+
+  @override
+  String get pokemonTypePoison => 'Poison';
+
+  @override
+  String get pokemonTypeGround => 'Ground';
+
+  @override
+  String get pokemonTypeFlying => 'Flying';
+
+  @override
+  String get pokemonTypePsychic => 'Psychic';
+
+  @override
+  String get pokemonTypeBug => 'Bug';
+
+  @override
+  String get pokemonTypeRock => 'Rock';
+
+  @override
+  String get pokemonTypeGhost => 'Ghost';
+
+  @override
+  String get pokemonTypeDragon => 'Dragon';
+
+  @override
+  String get pokemonTypeDark => 'Dark';
+
+  @override
+  String get pokemonTypeSteel => 'Steel';
+
+  @override
+  String get pokemonTypeFairy => 'Fairy';
+
+  @override
+  String get bannerNoPreviousSync => 'No previous synchronizations';
+
+  @override
+  String bannerLastSync(String date) {
+    return 'Last sync: $date';
+  }
+
+  @override
+  String get bannerSyncing => 'Syncing...';
+
+  @override
+  String get bannerOnline => 'Online';
+
+  @override
+  String get bannerOffline => 'Offline';
+
+  @override
+  String get bannerServiceUnavailable => 'Service unavailable';
+
+  @override
+  String get bannerContinueBrowsing => 'Online · You can keep browsing';
+
+  @override
+  String get bannerUpdatingLocal => 'Updating local information';
+
+  @override
+  String bannerOnlineDetails(String lastSync) {
+    return 'API available · local data · $lastSync';
+  }
+
+  @override
+  String bannerOfflineDetails(String lastSync) {
+    return 'Local data · $lastSync';
+  }
+
+  @override
+  String bannerServiceUnavailableDetails(String lastSync) {
+    return 'Network active, API not responding · local data · $lastSync';
+  }
+
+  @override
+  String get bannerSyncFailedOffline => 'Sync failed · No connection';
+
+  @override
+  String get bannerSyncFailedLocal => 'Sync failed · Local data preserved';
 }
