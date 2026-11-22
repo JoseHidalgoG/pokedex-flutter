@@ -5,6 +5,7 @@ import 'package:pokedex_flutter/features/catalog/data/catalog_fingerprint.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_tables.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_constants.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query.dart';
 
 part 'catalog_dao.g.dart';
 
@@ -106,6 +107,41 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
       ..addColumns([countExpression])
       ..where(_isDefaultPokemon);
     return defaultPokemonCount.watchSingle().map(
+      (row) => row.read(countExpression) ?? 0,
+    );
+  }
+
+  Stream<List<CatalogEntry>> watchFilteredCatalogPage({
+    required int limit,
+    required int offset,
+    required CatalogQuery query,
+  }) {
+    final condition = _catalogCondition(query);
+    final ordering = _catalogOrdering(query.sort);
+
+    final pageIds = selectOnly(pokemonTable)
+      ..addColumns([pokemonTable.id])
+      ..where(condition)
+      ..orderBy(ordering)
+      ..limit(limit, offset: offset);
+
+    final selectedPokemon = _pokemonWithTypes()
+      ..where(pokemonTable.id.isInQuery(pageIds));
+
+    return selectedPokemon.watch().map((rows) {
+      final entries = _groupTypesByPokemon(rows);
+      return _orderFilteredEntries(entries, query.sort, rows);
+    });
+  }
+
+  Stream<int> watchFilteredCatalogCount(CatalogQuery query) {
+    final countExpression = pokemonTable.id.count();
+
+    final countQuery = selectOnly(pokemonTable)
+      ..addColumns([countExpression])
+      ..where(_catalogCondition(query));
+
+    return countQuery.watchSingle().map(
       (row) => row.read(countExpression) ?? 0,
     );
   }
@@ -299,6 +335,122 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   }
 
   Expression<bool> get _isDefaultPokemon => pokemonTable.isDefault.equals(true);
+
+  Expression<bool> _catalogCondition(CatalogQuery query) {
+    Expression<bool> condition = _isDefaultPokemon;
+
+    final search = query.search.trim();
+
+    if (search.isNotEmpty) {
+      final pokemonId = int.tryParse(search);
+
+      if (pokemonId != null) {
+        condition = condition & pokemonTable.id.equals(pokemonId);
+      } else {
+        final escapedSearch = search
+            .replaceAll(r'\', r'\\')
+            .replaceAll('%', r'\%')
+            .replaceAll('_', r'\_');
+
+        condition =
+            condition &
+            pokemonTable.name.like('%$escapedSearch%', escapeChar: r'\');
+      }
+    }
+
+    final type = query.type;
+
+    if (type != null && type.isNotEmpty) {
+      final matchingTypes = selectOnly(pokemonTypesTable)
+        ..addColumns([pokemonTypesTable.pokemonId])
+        ..where(pokemonTypesTable.typeName.equals(type));
+
+      condition = condition & pokemonTable.id.isInQuery(matchingTypes);
+    }
+
+    return condition;
+  }
+
+  List<OrderingTerm> _catalogOrdering(CatalogSort sort) {
+    return switch (sort) {
+      CatalogSort.numberAscending => [OrderingTerm.asc(pokemonTable.id)],
+      CatalogSort.numberDescending => [OrderingTerm.desc(pokemonTable.id)],
+      CatalogSort.nameAscending => [
+        OrderingTerm.asc(pokemonTable.name.collate(Collate.noCase)),
+        OrderingTerm.asc(pokemonTable.id),
+      ],
+      CatalogSort.nameDescending => [
+        OrderingTerm.desc(pokemonTable.name.collate(Collate.noCase)),
+        OrderingTerm.asc(pokemonTable.id),
+      ],
+      CatalogSort.baseStatTotalAscending => [
+        OrderingTerm.asc(pokemonTable.baseStatTotal, nulls: NullsOrder.last),
+        OrderingTerm.asc(pokemonTable.id),
+      ],
+      CatalogSort.baseStatTotalDescending => [
+        OrderingTerm.desc(pokemonTable.baseStatTotal, nulls: NullsOrder.last),
+        OrderingTerm.asc(pokemonTable.id),
+      ],
+    };
+  }
+
+  List<CatalogEntry> _orderFilteredEntries(
+    List<CatalogEntry> entries,
+    CatalogSort sort,
+    List<TypedResult> rows,
+  ) {
+    final pokemonRows = <int, PokemonRow>{};
+
+    for (final row in rows) {
+      final pokemon = row.readTable(pokemonTable);
+      pokemonRows[pokemon.id] = pokemon;
+    }
+
+    final sorted = [...entries];
+
+    sorted.sort((a, b) {
+      final first = pokemonRows[a.id]!;
+      final second = pokemonRows[b.id]!;
+
+      int comparison;
+
+      switch (sort) {
+        case CatalogSort.numberAscending:
+          comparison = first.id.compareTo(second.id);
+        case CatalogSort.numberDescending:
+          comparison = second.id.compareTo(first.id);
+        case CatalogSort.nameAscending:
+          comparison = first.name.toLowerCase().compareTo(
+            second.name.toLowerCase(),
+          );
+        case CatalogSort.nameDescending:
+          comparison = second.name.toLowerCase().compareTo(
+            first.name.toLowerCase(),
+          );
+        case CatalogSort.baseStatTotalAscending:
+          comparison = _compareNullableStats(
+            first.baseStatTotal,
+            second.baseStatTotal,
+          );
+        case CatalogSort.baseStatTotalDescending:
+          comparison = _compareNullableStats(
+            second.baseStatTotal,
+            first.baseStatTotal,
+          );
+      }
+
+      return comparison != 0 ? comparison : first.id.compareTo(second.id);
+    });
+
+    return sorted;
+  }
+
+  int _compareNullableStats(int? first, int? second) {
+    if (first == null && second == null) return 0;
+    if (first == null) return 1;
+    if (second == null) return -1;
+    return first.compareTo(second);
+  }
 
   JoinedSelectStatement<HasResultSet, dynamic> _pokemonWithTypes() {
     return select(pokemonTable).join([

@@ -7,6 +7,7 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progres
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query.dart';
 
 class InMemoryCatalogRepository implements CatalogRepository {
   int syncRequests = 0;
@@ -43,6 +44,60 @@ class InMemoryCatalogRepository implements CatalogRepository {
   @override
   Stream<int> watchCatalogCount() {
     return Stream.value(_pokemon.length);
+  }
+
+  @override
+  Stream<List<Pokemon>> watchFilteredCatalogPage({
+    required int page,
+    required int pageSize,
+    required CatalogQuery query,
+  }) {
+    final filtered = _filteredPokemon(query);
+    final offset = page * pageSize;
+
+    return Stream.value(filtered.skip(offset).take(pageSize).toList());
+  }
+
+  @override
+  Stream<int> watchFilteredCatalogCount(CatalogQuery query) {
+    return Stream.value(_filteredPokemon(query).length);
+  }
+
+  List<Pokemon> _filteredPokemon(CatalogQuery query) {
+    final search = query.search.trim().toLowerCase();
+    final searchedId = int.tryParse(search);
+
+    final filtered = _pokemon.where((pokemon) {
+      final matchesSearch =
+          search.isEmpty ||
+          (searchedId != null
+              ? pokemon.id == searchedId
+              : pokemon.name.toLowerCase().contains(search));
+
+      final matchesType =
+          query.type == null || pokemon.typeNames.contains(query.type);
+
+      return matchesSearch && matchesType;
+    }).toList();
+
+    filtered.sort((a, b) {
+      final comparison = switch (query.sort) {
+        CatalogSort.numberAscending => a.id.compareTo(b.id),
+        CatalogSort.numberDescending => b.id.compareTo(a.id),
+        CatalogSort.nameAscending => a.name.toLowerCase().compareTo(
+          b.name.toLowerCase(),
+        ),
+        CatalogSort.nameDescending => b.name.toLowerCase().compareTo(
+          a.name.toLowerCase(),
+        ),
+        CatalogSort.baseStatTotalAscending => 0,
+        CatalogSort.baseStatTotalDescending => 0,
+      };
+
+      return comparison != 0 ? comparison : a.id.compareTo(b.id);
+    });
+
+    return filtered;
   }
 
   @override
