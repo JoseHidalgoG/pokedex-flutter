@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 class PokemonTypeChip extends StatelessWidget {
   const PokemonTypeChip({super.key, required this.typeName});
@@ -26,10 +27,39 @@ class PokemonTypeChip extends StatelessWidget {
     'fairy': Color(0xFFD685AD),
   };
 
+  String _localizedTypeName(String normalizedName, AppLocalizations l10n) {
+    return switch (normalizedName) {
+      'normal' => l10n.pokemonTypeNormal,
+      'fire' => l10n.pokemonTypeFire,
+      'water' => l10n.pokemonTypeWater,
+      'electric' => l10n.pokemonTypeElectric,
+      'grass' => l10n.pokemonTypeGrass,
+      'ice' => l10n.pokemonTypeIce,
+      'fighting' => l10n.pokemonTypeFighting,
+      'poison' => l10n.pokemonTypePoison,
+      'ground' => l10n.pokemonTypeGround,
+      'flying' => l10n.pokemonTypeFlying,
+      'psychic' => l10n.pokemonTypePsychic,
+      'bug' => l10n.pokemonTypeBug,
+      'rock' => l10n.pokemonTypeRock,
+      'ghost' => l10n.pokemonTypeGhost,
+      'dragon' => l10n.pokemonTypeDragon,
+      'dark' => l10n.pokemonTypeDark,
+      'steel' => l10n.pokemonTypeSteel,
+      'fairy' => l10n.pokemonTypeFairy,
+      _ =>
+        normalizedName.isEmpty
+            ? normalizedName
+            : normalizedName[0].toUpperCase() + normalizedName.substring(1),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
-    final normalizedName = typeName.toLowerCase();
+    final normalizedName = typeName.trim().toLowerCase();
     final color = _typeColors[normalizedName] ?? Colors.grey;
+    final l10n = AppLocalizations.of(context)!;
+    final displayName = _localizedTypeName(normalizedName, l10n);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -38,7 +68,7 @@ class PokemonTypeChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        normalizedName[0].toUpperCase() + normalizedName.substring(1),
+        displayName,
         style: TextStyle(
           color: color,
           fontWeight: FontWeight.w600,

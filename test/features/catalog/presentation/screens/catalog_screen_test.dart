@@ -65,7 +65,37 @@ void main() {
 
     expect(find.text('#0025'), findsOneWidget);
     expect(find.text('Pikachu'), findsOneWidget);
+    expect(find.text('Eléctrico'), findsOneWidget);
+  });
+
+  testWidgets('muestra el tipo de Pokémon en inglés', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          catalogPageProvider(0).overrideWith((ref) => Stream.value([pikachu])),
+          catalogCountProvider.overrideWith((ref) => Stream.value(1)),
+          catalogSyncStatusProvider.overrideWith(
+            (ref) => Stream.value(const SyncIdle()),
+          ),
+          favoritesRepositoryProvider.overrideWith(
+            (ref) => FakeFavoritesRepository(),
+          ),
+        ],
+        child: const MaterialApp(
+          locale: Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: CatalogScreen(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Pikachu'), findsOneWidget);
     expect(find.text('Electric'), findsOneWidget);
+    expect(find.text('Eléctrico'), findsNothing);
   });
 
   testWidgets('muestra un indicador cuando el catálogo está sincronizando', (
@@ -220,7 +250,7 @@ void main() {
 
     expect(find.text('#0025'), findsOneWidget);
     expect(find.text('Pikachu'), findsOneWidget);
-    expect(find.text('Electric'), findsOneWidget);
+    expect(find.text('Eléctrico'), findsOneWidget);
 
     expect(find.text('No se pudo cargar el catálogo'), findsNothing);
     expect(

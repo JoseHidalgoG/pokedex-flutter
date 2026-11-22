@@ -18,7 +18,7 @@ import 'app_localizations_es.dart';
 /// `supportedLocales` list. For example:
 ///
 /// ```dart
-/// import 'l10n/app_localizations.dart';
+/// import 'generated/app_localizations.dart';
 ///
 /// return MaterialApp(
 ///   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -163,6 +163,366 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Error al cargar favorito'**
   String get favoriteLoadError;
+
+  /// No description provided for @settingsTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Ajustes'**
+  String get settingsTitle;
+
+  /// No description provided for @languageTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Idioma'**
+  String get languageTitle;
+
+  /// No description provided for @languageDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Selecciona el idioma de la aplicación'**
+  String get languageDescription;
+
+  /// No description provided for @themeTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Tema'**
+  String get themeTitle;
+
+  /// No description provided for @themeDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Selecciona la apariencia de la aplicación'**
+  String get themeDescription;
+
+  /// No description provided for @systemOption.
+  ///
+  /// In es, this message translates to:
+  /// **'Automático (sistema)'**
+  String get systemOption;
+
+  /// No description provided for @spanishOption.
+  ///
+  /// In es, this message translates to:
+  /// **'Español'**
+  String get spanishOption;
+
+  /// No description provided for @englishOption.
+  ///
+  /// In es, this message translates to:
+  /// **'Inglés'**
+  String get englishOption;
+
+  /// No description provided for @lightTheme.
+  ///
+  /// In es, this message translates to:
+  /// **'Claro'**
+  String get lightTheme;
+
+  /// No description provided for @darkTheme.
+  ///
+  /// In es, this message translates to:
+  /// **'Oscuro'**
+  String get darkTheme;
+
+  /// No description provided for @languageChangeError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo cambiar el idioma'**
+  String get languageChangeError;
+
+  /// No description provided for @themeChangeError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo cambiar el tema'**
+  String get themeChangeError;
+
+  /// No description provided for @catalogSyncOfflineError.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin conexión: se muestran los Pokémon guardados.'**
+  String get catalogSyncOfflineError;
+
+  /// No description provided for @catalogSyncError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo sincronizar el catálogo. Inténtalo nuevamente.'**
+  String get catalogSyncError;
+
+  /// No description provided for @previousPage.
+  ///
+  /// In es, this message translates to:
+  /// **'Página anterior'**
+  String get previousPage;
+
+  /// No description provided for @nextPage.
+  ///
+  /// In es, this message translates to:
+  /// **'Página siguiente'**
+  String get nextPage;
+
+  /// No description provided for @catalogLoading.
+  ///
+  /// In es, this message translates to:
+  /// **'Cargando catálogo'**
+  String get catalogLoading;
+
+  /// No description provided for @catalogLoadError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo cargar el catálogo'**
+  String get catalogLoadError;
+
+  /// No description provided for @catalogEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay Pokémon disponibles'**
+  String get catalogEmpty;
+
+  /// No description provided for @catalogConnectionError.
+  ///
+  /// In es, this message translates to:
+  /// **'Comprueba tu conexión e inténtalo nuevamente.'**
+  String get catalogConnectionError;
+
+  /// No description provided for @catalogEmptyMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Todavía no hay Pokémon guardados en el catálogo.'**
+  String get catalogEmptyMessage;
+
+  /// No description provided for @retry.
+  ///
+  /// In es, this message translates to:
+  /// **'Reintentar'**
+  String get retry;
+
+  /// No description provided for @catalogSyncing.
+  ///
+  /// In es, this message translates to:
+  /// **'Sincronizando...'**
+  String get catalogSyncing;
+
+  /// No description provided for @syncCatalog.
+  ///
+  /// In es, this message translates to:
+  /// **'Sincronizar catálogo'**
+  String get syncCatalog;
+
+  /// No description provided for @pokemonTypeNormal.
+  ///
+  /// In es, this message translates to:
+  /// **'Normal'**
+  String get pokemonTypeNormal;
+
+  /// No description provided for @pokemonTypeFire.
+  ///
+  /// In es, this message translates to:
+  /// **'Fuego'**
+  String get pokemonTypeFire;
+
+  /// No description provided for @pokemonTypeWater.
+  ///
+  /// In es, this message translates to:
+  /// **'Agua'**
+  String get pokemonTypeWater;
+
+  /// No description provided for @pokemonTypeElectric.
+  ///
+  /// In es, this message translates to:
+  /// **'Eléctrico'**
+  String get pokemonTypeElectric;
+
+  /// No description provided for @pokemonTypeGrass.
+  ///
+  /// In es, this message translates to:
+  /// **'Planta'**
+  String get pokemonTypeGrass;
+
+  /// No description provided for @pokemonTypeIce.
+  ///
+  /// In es, this message translates to:
+  /// **'Hielo'**
+  String get pokemonTypeIce;
+
+  /// No description provided for @pokemonTypeFighting.
+  ///
+  /// In es, this message translates to:
+  /// **'Lucha'**
+  String get pokemonTypeFighting;
+
+  /// No description provided for @pokemonTypePoison.
+  ///
+  /// In es, this message translates to:
+  /// **'Veneno'**
+  String get pokemonTypePoison;
+
+  /// No description provided for @pokemonTypeGround.
+  ///
+  /// In es, this message translates to:
+  /// **'Tierra'**
+  String get pokemonTypeGround;
+
+  /// No description provided for @pokemonTypeFlying.
+  ///
+  /// In es, this message translates to:
+  /// **'Volador'**
+  String get pokemonTypeFlying;
+
+  /// No description provided for @pokemonTypePsychic.
+  ///
+  /// In es, this message translates to:
+  /// **'Psíquico'**
+  String get pokemonTypePsychic;
+
+  /// No description provided for @pokemonTypeBug.
+  ///
+  /// In es, this message translates to:
+  /// **'Bicho'**
+  String get pokemonTypeBug;
+
+  /// No description provided for @pokemonTypeRock.
+  ///
+  /// In es, this message translates to:
+  /// **'Roca'**
+  String get pokemonTypeRock;
+
+  /// No description provided for @pokemonTypeGhost.
+  ///
+  /// In es, this message translates to:
+  /// **'Fantasma'**
+  String get pokemonTypeGhost;
+
+  /// No description provided for @pokemonTypeDragon.
+  ///
+  /// In es, this message translates to:
+  /// **'Dragón'**
+  String get pokemonTypeDragon;
+
+  /// No description provided for @pokemonTypeDark.
+  ///
+  /// In es, this message translates to:
+  /// **'Siniestro'**
+  String get pokemonTypeDark;
+
+  /// No description provided for @pokemonTypeSteel.
+  ///
+  /// In es, this message translates to:
+  /// **'Acero'**
+  String get pokemonTypeSteel;
+
+  /// No description provided for @pokemonTypeFairy.
+  ///
+  /// In es, this message translates to:
+  /// **'Hada'**
+  String get pokemonTypeFairy;
+
+  /// No description provided for @bannerNoPreviousSync.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin sincronizaciones anteriores'**
+  String get bannerNoPreviousSync;
+
+  /// No description provided for @bannerLastSync.
+  ///
+  /// In es, this message translates to:
+  /// **'Última sync: {date}'**
+  String bannerLastSync(String date);
+
+  /// No description provided for @bannerSyncing.
+  ///
+  /// In es, this message translates to:
+  /// **'Sincronizando...'**
+  String get bannerSyncing;
+
+  /// No description provided for @bannerOnline.
+  ///
+  /// In es, this message translates to:
+  /// **'En línea'**
+  String get bannerOnline;
+
+  /// No description provided for @bannerOffline.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin conexión'**
+  String get bannerOffline;
+
+  /// No description provided for @bannerServiceUnavailable.
+  ///
+  /// In es, this message translates to:
+  /// **'Servicio no disponible'**
+  String get bannerServiceUnavailable;
+
+  /// No description provided for @bannerContinueBrowsing.
+  ///
+  /// In es, this message translates to:
+  /// **'En línea · Puedes seguir navegando'**
+  String get bannerContinueBrowsing;
+
+  /// No description provided for @bannerUpdatingLocal.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizando información local'**
+  String get bannerUpdatingLocal;
+
+  /// No description provided for @bannerOnlineDetails.
+  ///
+  /// In es, this message translates to:
+  /// **'API disponible · datos locales · {lastSync}'**
+  String bannerOnlineDetails(String lastSync);
+
+  /// No description provided for @bannerOfflineDetails.
+  ///
+  /// In es, this message translates to:
+  /// **'Datos locales · {lastSync}'**
+  String bannerOfflineDetails(String lastSync);
+
+  /// No description provided for @bannerServiceUnavailableDetails.
+  ///
+  /// In es, this message translates to:
+  /// **'Red activa, API sin respuesta · datos locales · {lastSync}'**
+  String bannerServiceUnavailableDetails(String lastSync);
+
+  /// No description provided for @bannerSyncFailedOffline.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo sincronizar · Sin conexión'**
+  String get bannerSyncFailedOffline;
+
+  /// No description provided for @bannerSyncFailedLocal.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo sincronizar · Se conservan los datos locales'**
+  String get bannerSyncFailedLocal;
+
+  /// No description provided for @navigationCatalog.
+  ///
+  /// In es, this message translates to:
+  /// **'Catálogo'**
+  String get navigationCatalog;
+
+  /// No description provided for @navigationFavorites.
+  ///
+  /// In es, this message translates to:
+  /// **'Favoritos'**
+  String get navigationFavorites;
+
+  /// No description provided for @navigationTrivia.
+  ///
+  /// In es, this message translates to:
+  /// **'Trivia'**
+  String get navigationTrivia;
+
+  /// No description provided for @navigationSettings.
+  ///
+  /// In es, this message translates to:
+  /// **'Ajustes'**
+  String get navigationSettings;
+
+  /// No description provided for @triviaComingSoon.
+  ///
+  /// In es, this message translates to:
+  /// **'Próximamente'**
+  String get triviaComingSoon;
 }
 
 class _AppLocalizationsDelegate

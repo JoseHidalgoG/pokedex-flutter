@@ -11,6 +11,7 @@ import 'package:pokedex_flutter/features/favorites/data/local/favorites_table.da
 import 'package:pokedex_flutter/features/settings/data/local/user_preferences_table.dart';
 import 'package:pokedex_flutter/features/trivia/data/local/trivia_tables.dart';
 import 'package:pokedex_flutter/features/favorites/data/local/favorites_dao.dart';
+import 'package:pokedex_flutter/features/settings/data/local/user_preferences_dao.dart';
 
 part 'app_database.g.dart';
 
@@ -35,7 +36,13 @@ part 'app_database.g.dart';
     UserPreferencesTable,
     SyncMetadataTable,
   ],
-  daos: [CatalogDao, PokemonDetailDao, SyncMetadataDao, FavoritesDao],
+  daos: [
+    CatalogDao,
+    PokemonDetailDao,
+    SyncMetadataDao,
+    FavoritesDao,
+    UserPreferencesDao,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
