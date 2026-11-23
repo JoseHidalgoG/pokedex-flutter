@@ -232,4 +232,245 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get triviaComingSoon => 'Coming soon';
+
+  @override
+  String get detailTabInfo => 'Info';
+
+  @override
+  String get detailTabStats => 'Stats';
+
+  @override
+  String get detailTabEvolutions => 'Evolutions';
+
+  @override
+  String get detailTabMoves => 'Moves';
+
+  @override
+  String get detailTabMatchups => 'Matchups';
+
+  @override
+  String get detailShowShiny => 'Show shiny version';
+
+  @override
+  String get detailShowNormal => 'Show normal version';
+
+  @override
+  String get detailShinyUnavailable => 'No shiny artwork available';
+
+  @override
+  String get detailShare => 'Share';
+
+  @override
+  String get detailLoadError => 'Couldn\'t load the detail';
+
+  @override
+  String get detailSectionPending => 'It will download when online';
+
+  @override
+  String get detailNoData => 'No data';
+
+  @override
+  String get detailFreshJustNow => 'Updated from PokeAPI just now';
+
+  @override
+  String detailFreshMinutesAgo(int minutes) {
+    return 'Updated from PokeAPI $minutes min ago';
+  }
+
+  @override
+  String detailFreshHoursAgo(int hours) {
+    return 'Updated from PokeAPI $hours h ago';
+  }
+
+  @override
+  String detailLocalData(String date) {
+    return 'Local data from $date';
+  }
+
+  @override
+  String get detailNotStored =>
+      'No saved detail · it will download when online';
+
+  @override
+  String get detailForms => 'Forms';
+
+  @override
+  String get detailHeight => 'Height';
+
+  @override
+  String get detailWeight => 'Weight';
+
+  @override
+  String get detailEggGroups => 'Egg groups';
+
+  @override
+  String get detailAbilities => 'Abilities';
+
+  @override
+  String get detailHiddenAbility => 'Hidden';
+
+  @override
+  String get detailGames => 'Games';
+
+  @override
+  String get detailStatTotal => 'Total';
+
+  @override
+  String get detailNoEvolutions => 'Does not evolve';
+
+  @override
+  String detailMovesOf(String versionGroup) {
+    return 'Moves from $versionGroup';
+  }
+
+  @override
+  String detailMoveLevel(int level) {
+    return 'Lv. $level';
+  }
+
+  @override
+  String get detailMoveOnEvolution => 'Evo.';
+
+  @override
+  String get detailSortByLevel => 'By level';
+
+  @override
+  String get detailSortByName => 'By name';
+
+  @override
+  String get detailNoMoves => 'No moves recorded';
+
+  @override
+  String get detailTypeTablePending => 'Type table pending';
+
+  @override
+  String detailShareBaseTotal(int total) {
+    return 'Base stat total: $total';
+  }
+
+  @override
+  String get statHp => 'HP';
+
+  @override
+  String get statAttack => 'Attack';
+
+  @override
+  String get statDefense => 'Defense';
+
+  @override
+  String get statSpecialAttack => 'Sp. Atk';
+
+  @override
+  String get statSpecialDefense => 'Sp. Def';
+
+  @override
+  String get statSpeed => 'Speed';
+
+  @override
+  String get moveMethodLevelUp => 'Level';
+
+  @override
+  String get moveMethodMachine => 'TM';
+
+  @override
+  String get moveMethodTutor => 'Tutor';
+
+  @override
+  String get moveMethodEgg => 'Egg';
+
+  @override
+  String get eggGroupMonster => 'Monster';
+
+  @override
+  String get eggGroupWater1 => 'Water 1';
+
+  @override
+  String get eggGroupWater2 => 'Water 2';
+
+  @override
+  String get eggGroupWater3 => 'Water 3';
+
+  @override
+  String get eggGroupBug => 'Bug';
+
+  @override
+  String get eggGroupFlying => 'Flying';
+
+  @override
+  String get eggGroupField => 'Field';
+
+  @override
+  String get eggGroupFairy => 'Fairy';
+
+  @override
+  String get eggGroupGrass => 'Grass';
+
+  @override
+  String get eggGroupHumanLike => 'Human-Like';
+
+  @override
+  String get eggGroupMineral => 'Mineral';
+
+  @override
+  String get eggGroupAmorphous => 'Amorphous';
+
+  @override
+  String get eggGroupDitto => 'Ditto';
+
+  @override
+  String get eggGroupDragon => 'Dragon';
+
+  @override
+  String get eggGroupUndiscovered => 'Undiscovered';
+
+  @override
+  String evolutionLevel(int level) {
+    return 'Level $level';
+  }
+
+  @override
+  String get evolutionLevelUp => 'Level up';
+
+  @override
+  String get evolutionTrade => 'Trade';
+
+  @override
+  String get evolutionFriendship => 'Friendship';
+
+  @override
+  String evolutionHolding(String item) {
+    return 'holding $item';
+  }
+
+  @override
+  String evolutionKnowingMoveType(String type) {
+    return 'knowing a $type move';
+  }
+
+  @override
+  String get evolutionOther => 'Other method';
+
+  @override
+  String get timeOfDayDay => 'During the day';
+
+  @override
+  String get timeOfDayNight => 'At night';
+
+  @override
+  String get timeOfDayDusk => 'At dusk';
+
+  @override
+  String get matchupQuadrupleWeakness => 'Very weak · ×4';
+
+  @override
+  String get matchupWeakness => 'Weak · ×2';
+
+  @override
+  String get matchupResistance => 'Resists · ×0.5';
+
+  @override
+  String get matchupDoubleResistance => 'Strongly resists · ×0.25';
+
+  @override
+  String get matchupImmunity => 'Immune · ×0';
 }
