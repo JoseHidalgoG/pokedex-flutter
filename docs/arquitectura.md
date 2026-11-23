@@ -6,6 +6,7 @@ La app sigue una arquitectura por capas dentro de cada funcionalidad: `presentat
 - [ADR-0002: Drift sobre SQLite como base de datos local](adr/0002-drift-como-base-local.md)
 - [ADR-0003: Riverpod para el estado y la inyección de dependencias](adr/0003-riverpod-para-estado-e-inyeccion.md)
 - [ADR-0004: Reintentos con backoff, presupuesto de llamadas y una sola sincronización por recurso](adr/0004-reintentos-presupuesto-y-una-sincronizacion-por-recurso.md)
+- [ADR-0005: Detección de alteraciones por huella y restauración desde PokeAPI](adr/0005-deteccion-de-alteraciones-y-restauracion.md)
 - [ADR-0006: Preferencia online dentro del presupuesto](adr/0006-preferencia-online-dentro-del-presupuesto.md)
 
 ## Estructura de carpetas
@@ -15,15 +16,26 @@ lib/
   main.dart        arranque, MainApp y SyncLifecycle
   core/
     database/      AppDatabase y su provider
-    network/       cliente GraphQL de PokeAPI, CallBudgetLink y su provider
+    network/       cliente GraphQL de PokeAPI, LoggingLink, CallBudgetLink y su provider
+    share/         provider para compartir texto con share_plus
     sync/          SyncScheduler y sus providers
       domain/      SyncFailure, SyncStatus, SyncJob, RetryPolicy, CallBudget
       data/        tabla sync_metadata, SyncMetadataDao, traductor de fallos
   features/
     catalog/
-      data/        local (Drift), remote (GraphQL), sync, repositorio
-      domain/      entidades, contrato CatalogRepository, casos de uso
-      presentation/ pantallas, widgets, providers
+      data/        huella, diferencias, repositorios offline-first
+        local/     CatalogDao, PokemonDetailDao, tablas del catálogo y del detalle
+        remote/    consultas GraphQL, DTOs y mappers
+        sync/      pasada completa, lo visible, restauración, detalle y tabla de tipos
+      domain/
+        entities/  Pokemon, PokemonDetail, árbol de evoluciones, matchups, vigencia, movimientos
+        repositories/ contratos CatalogRepository y PokemonDetailRepository
+        usecases/  casos de uso del catálogo y del detalle
+      presentation/
+        providers/ catálogo y detalle
+        screens/   CatalogScreen y PokemonDetailScreen
+        texts/     nombres y frases traducidos del catálogo y del detalle
+        widgets/   lista del catálogo y, en detail/, el encabezado y las cinco pestañas
     connectivity/
       data/        ConnectivityService y repositorio
       domain/      ConnectivityStatus y contrato
@@ -32,8 +44,12 @@ lib/
       data/        tabla favorites, FavoritesDao y DriftFavoritesRepository
       domain/      contrato FavoritesRepository y casos de uso
       presentation/ FavoritesScreen, FavoriteButton y providers
+    navigation/
+      presentation/ MainNavigationScreen con NavigationBar
     settings/
-      data/        tabla user_preferences
+      data/        tabla user_preferences, UserPreferencesDao y repositorio
+      domain/      contrato SettingsRepository
+      presentation/ SettingsScreen (idioma y tema) y providers
     trivia/
       data/        tablas trivia_results, trivia_answers y achievements
   l10n/            textos en ARB (español e inglés) y AppLocalizations generado
@@ -41,52 +57,64 @@ lib/
 
 ## Capas y componentes
 
-La interfaz nunca habla con la red. Lee `Stream`s que salen de `CatalogDao`, y la única pieza del catálogo que toca GraphQL es `CatalogSyncService`, que escribe en la base. `SyncScheduler` decide cuándo corre cada sincronización y `CallBudgetLink` cuenta cada llamada antes de que salga a PokeAPI. `main.dart` une `presentation` con `data` sobrescribiendo `catalogRepositoryProvider`.
+La interfaz nunca habla con la red. Lee `Stream`s que salen de `CatalogDao` y `PokemonDetailDao`. Tres servicios de sincronización tocan GraphQL, todos a través de `CatalogRemoteDataSource`, y escriben en la base: `CatalogSyncService` (pasada completa y lo visible), `CatalogRestorationService` (huellas y restauración) y `PokemonDetailSyncService` (detalle y tabla de tipos). `SyncScheduler` decide cuándo corre cada uno. `LoggingLink` registra en consola cada consulta con sus variables y su duración, y `CallBudgetLink` la cuenta antes de que salga a PokeAPI. `main.dart` une `presentation` con `data` sobrescribiendo `catalogRepositoryProvider` y `pokemonDetailRepositoryProvider`.
 
 ```mermaid
 flowchart LR
   subgraph presentation
     Screen[CatalogScreen]
+    Detail[PokemonDetailScreen]
     Banner[ConnectivityBanner]
     Lifecycle[SyncLifecycle]
   end
 
   subgraph domain
     UseCases["WatchCatalogPage · WatchCatalogCount<br/>WatchPokemonByIds · WatchCatalogSyncStatus<br/>SyncCatalog · RevalidatePokemon"]
+    DetailUseCases["WatchPokemonDetail · WatchPokemonDetailFreshness<br/>WatchTypeEfficacy · RevalidatePokemonDetail<br/>StopRevalidatingPokemonDetail"]
     Contract[["CatalogRepository"]]
+    DetailContract[["PokemonDetailRepository"]]
   end
 
   subgraph data
     Repo[OfflineFirstCatalogRepository]
-    Sync[CatalogSyncService]
+    DetailRepo[OfflineFirstPokemonDetailRepository]
+    Sync["CatalogSyncService<br/>CatalogRestorationService<br/>PokemonDetailSyncService"]
     Dao[CatalogDao]
+    DetailDao[PokemonDetailDao]
     Remote[CatalogRemoteDataSource]
   end
 
   subgraph core
     Scheduler[SyncScheduler]
     Db[(AppDatabase<br/>SQLite)]
-    Client["PokeAPI GraphQLClient<br/>con CallBudgetLink"]
+    Client["PokeAPI GraphQLClient<br/>LoggingLink → CallBudgetLink → HttpLink"]
   end
 
   Screen --> UseCases
+  Detail --> DetailUseCases
   Lifecycle -- arranca --> Scheduler
   Banner --> UseCases
   Banner -- getLastSyncedAt --> Contract
   UseCases --> Contract
+  DetailUseCases --> DetailContract
   Repo -. implementa .-> Contract
+  DetailRepo -. implementa .-> DetailContract
   Repo -- lee --> Dao
+  DetailRepo -- lee --> DetailDao
   Repo -- encola --> Scheduler
+  DetailRepo -- encola --> Scheduler
   Scheduler -- ejecuta --> Sync
   Sync -- escribe --> Dao
+  Sync -- escribe --> DetailDao
   Sync --> Remote
   Remote --> Client
   Dao --> Db
+  DetailDao --> Db
 ```
 
 ## Sincronización al abrir la app
 
-`main` llama a `runApp` sin esperar a la red. `SyncLifecycle` arranca `SyncScheduler`, que lanza la pasada completa del catálogo al iniciar y otra vez cada vez que el estado pasa a `online`. Si al iniciar no hay conexión, la pasada queda pendiente hasta la reconexión; la pantalla se redibuja sola cada vez que se guarda un lote.
+`main` llama a `runApp` sin esperar a la red. `SyncLifecycle` arranca `SyncScheduler` y `catalogSyncTriggersProvider`, que lanzan tres trabajos al iniciar y otra vez cada vez que el estado pasa a `online`: la pasada completa del catálogo, la verificación de huellas y la tabla de tipos. Cada uno decide si hace falta llamar a PokeAPI. Si al iniciar no hay conexión, quedan pendientes hasta la reconexión; la pantalla se redibuja sola cada vez que se guarda un lote. El diagrama sigue la pasada completa; la verificación de huellas está en «Detección y restauración por huella».
 
 ```mermaid
 sequenceDiagram
@@ -141,7 +169,7 @@ sequenceDiagram
   Page->>Repo: revalidatePokemon(ids de la página), sin esperar
   Repo->>Scheduler: runOnEachReconnect(catalog:visible)
   alt sin conexión
-    Repo-->>Page: nada; la reconexión lo retoma
+    Repo-->>Page: nada, la reconexión lo retoma
   else con servicio
     Repo->>Sync: hasStalePokemonAmong(ids)
     Sync->>Dao: staleIdsAmong(ids, hace 15 min)
@@ -159,6 +187,86 @@ sequenceDiagram
     end
   end
 ```
+
+## Abrir un detalle
+
+`PokemonDetailScreen` pinta al instante el Pokémon que recibió del catálogo (OF-03): nombre, número, tipos e imagen. `pokemonDetailProvider` observa `PokemonDetailDao.watchDetail(id)`, que emite aunque el detalle nunca se haya descargado: las estadísticas, la altura y el peso ya vienen del catálogo. En la primera emisión pide la revalidación, sin esperarla. Si llega algo nuevo, entra por la base y la pantalla se repinta.
+
+- **Cuándo se descarga.** Con servicio, si no hay detalle guardado, si se guardó hace más de 5 min (`detailFreshnessWindow`) o si la huella del Pokémon no coincide (ADR-0005). Deslizar hacia abajo fuerza la descarga.
+- **Una consulta.** `PokemonDetail` trae en una sola llamada la especie, la cadena de evolución completa, las formas, las habilidades, los movimientos y los juegos. Tiene prioridad de usuario y un tiempo límite de 15 s (`detailRequestTimeout`). `saveDetail` lo guarda todo en una transacción.
+- **Tabla de tipos.** Si está vacía, se descarga a la vez con prioridad de usuario. Los matchups se calculan en el dominio a partir de ella.
+- **Vigencia.** La línea bajo el nombre dice «Actualizado desde PokeAPI» solo si `detail:{id}` se descargó en esta sesión. Si no, «Datos locales del …» o «Sin detalle guardado».
+- **Al cerrar.** `StopRevalidatingPokemonDetail` quita el trabajo de la lista de reconexión, para no descargar en cada reconexión un detalle que ya nadie mira.
+
+```mermaid
+sequenceDiagram
+  participant Screen as PokemonDetailScreen
+  participant Provider as pokemonDetailProvider
+  participant Repo as OfflineFirstPokemonDetailRepository
+  participant Scheduler as SyncScheduler
+  participant Sync as PokemonDetailSyncService
+  participant Dao as PokemonDetailDao
+  participant Remote as CatalogRemoteDataSource
+
+  Screen->>Screen: pinta el Pokémon del catálogo
+  Screen->>Provider: watch(id)
+  Provider->>Dao: watchDetail(id)
+  Dao-->>Screen: DetailEntry, con detailSyncedAt nulo si nunca se descargó
+  Provider->>Repo: revalidatePokemonDetail(id), sin esperar
+  Repo->>Scheduler: runOnEachReconnect(detail:id)
+  alt sin conexión
+    Repo-->>Provider: nada, la reconexión lo retoma mientras la pantalla siga abierta
+  else con servicio
+    Repo->>Scheduler: run(type_efficacy), solo si la tabla está vacía
+    Repo->>Sync: needsDetailDownload(id)
+    alt guardado hace menos de 5 min y huella correcta
+      Repo-->>Provider: nada, sin llamadas
+    else falta, venció o la huella no coincide
+      Repo->>Scheduler: runLatest(detail:id)
+      Scheduler->>Sync: perform(), con SyncRevalidating
+      Sync->>Remote: fetchPokemonDetail(id), prioridad user, 15 s
+      Remote-->>Sync: PokemonDetailDto
+      Sync->>Dao: saveDetail() en una transacción
+      Dao-->>Screen: watchDetail emite el detalle completo
+      Scheduler-->>Screen: SyncRevalidated, la línea dice «Actualizado desde PokeAPI»
+    end
+  end
+  Screen->>Provider: al cerrar la pantalla
+  Provider->>Repo: stopRevalidatingPokemonDetail(id)
+```
+
+Elegir una forma en el selector cambia el id observado: la pantalla pinta los campos de esa forma, que ya están en el catálogo, y su detalle se descarga igual, bajo demanda.
+
+## Detección y restauración por huella
+
+Cada Pokémon se guarda con `remote_fingerprint`, el SHA-256 de sus datos tal como llegaron de PokeAPI (ADR-0005). Verificar consiste en recalcular la huella con los datos locales y compararla con la guardada, sin llamar a PokeAPI. Solo los Pokémon que no coinciden se vuelven a pedir.
+
+```mermaid
+flowchart TD
+  Trigger["Arranque, reconexión<br/>o cada 60 s con servicio"] --> Read["readEntriesWithFingerprint()<br/>lecturas get() de pokemon, tipos y estadísticas"]
+  Read --> Stamp["sync_metadata catalog:restore<br/>last_verified_at = ahora"]
+  Stamp --> Compare{"¿Alguna huella recalculada<br/>distinta de la guardada?<br/>(las huellas nulas no cuentan)"}
+  Compare -- no --> UpToDate["upToDate, 0 llamadas"]
+  Compare -- sí --> Fetch["PokemonByIds de los ids alterados<br/>en grupos de 100, prioridad restoration"]
+  Fetch --> Returned{"¿PokeAPI devolvió el id?"}
+  Returned -- no --> Skip["Se deja como está<br/>y no se pide más en esta sesión"]
+  Returned -- sí --> Log["[sync] restauración #25 name: pikachux → pikachu"]
+  Log --> Save["saveRevalidated() en una transacción<br/>solo pokemon, pokemon_types y pokemon_stats"]
+  Save --> Repaint["Los Stream de Drift emiten<br/>y la pantalla se repinta"]
+
+  Open["Abrir el detalle de #25"] --> DetailCompare{"¿Coincide la huella de #25?"}
+  DetailCompare -- no --> DetailFetch["PokemonDetail aunque no hayan pasado 5 min"]
+  DetailFetch --> DetailSave["saveDetail() reescribe #25 y sus formas<br/>[sync] detalle #25 restaurado …"]
+
+  FullPass["Pasada completa"] --> FullCompare["Compara la huella de lo que llega<br/>con la guardada y registra los ids distintos"]
+  FullCompare --> Overwrite["Escribe siempre lo de PokeAPI"]
+```
+
+- **El valor de PokeAPI siempre gana.** No se fusiona nada con lo local.
+- **Lo del usuario no se toca.** `favorites`, `trivia_results`, `trivia_answers`, `achievements` y `user_preferences` no tienen clave foránea hacia el catálogo, y la restauración no las escribe (OF-21).
+- **Fuera del banner.** La clave `catalog:restore` no entra en el estado del catálogo: restaurar un Pokémon no es «lo que se está viendo», y una verificación por minuto haría parpadear el banner. La prueba de PA-16 es la consola.
+- **El inspector no repinta.** Un `UPDATE` hecho con la extensión de Drift para DevTools no avisa a los `Stream`s, así que la pantalla sigue mostrando el valor anterior hasta que la restauración escribe.
+- **Costo.** 0 llamadas si nada cambió, y 1 por cada 100 Pokémon alterados, con tope 70 para no quitar llamadas al usuario.
 
 ## Estados de la sincronización
 
@@ -187,7 +295,7 @@ stateDiagram-v2
   SyncRevalidating --> SyncRevalidated: PokemonByIds guardado
 ```
 
-La revalidación de lo visible pasa por los mismos reintentos, pausas y fallos que la pasada completa, con su propia clave.
+La revalidación de lo visible, el detalle (`detail:{id}`), la tabla de tipos (`type_efficacy`) y la restauración (`catalog:restore`) pasan por los mismos reintentos, pausas y fallos que la pasada completa, cada uno con su clave. Mientras corren publican `SyncRevalidating`. El banner solo lee `catalog` y `catalog:visible`; la línea de vigencia del detalle lee `detail:{id}`.
 
 `SyncFailed` lleva el `SyncFailure` que explica el fallo. `data` lo traduce desde las excepciones de GraphQL, así que ni `presentation` ni `domain` conocen `OperationException`.
 
@@ -210,7 +318,7 @@ La revalidación de lo visible pasa por los mismos reintentos, pausas y fallos q
 
 Mientras el estado es `serviceUnavailable`, el servicio repite la consulta de prueba, porque la API puede volver sin que cambie la red. La espera crece con cada fallo seguido: 15, 30, 60 y 120 s, y luego cada 5 min. Así, una hora sin servicio gasta 16 de las 100 llamadas por hora que permite PokeAPI, en vez de 240. Un cambio de red vuelve a empezar en 15 s. En cuanto la API responde, el estado pasa a `online` y el catálogo se sincroniza sin reiniciar la aplicación. En `online` y `offline` no repite la consulta.
 
-La consulta de prueba espera como máximo 5 s, para que el banner reaccione rápido. Cada lote del catálogo espera hasta 30 s (`catalogPageRequestTimeout`), porque trae 100 Pokémon con sus tipos y estadísticas y puede tardar más en una red móvil. La consulta de salud gasta del presupuesto con prioridad de usuario.
+La consulta de prueba espera como máximo 5 s, para que el banner reaccione rápido. Cada lote del catálogo espera hasta 30 s (`catalogPageRequestTimeout`), porque trae 100 Pokémon con sus tipos y estadísticas y puede tardar más en una red móvil. El detalle espera hasta 15 s (`detailRequestTimeout`): la respuesta de Pikachu pesa unos 13 KB comprimidos y tardó menos de 1 s en las pruebas. La consulta de salud gasta del presupuesto con prioridad de usuario.
 
 ```mermaid
 flowchart TD
@@ -261,7 +369,7 @@ Las reglas que hay que saber defender:
 - **Cascada solo desde `pokemon`, `species` y `trivia_results`.** Las filas que dependen de un Pokémon se borran con él. Ninguna clave foránea apunta a `abilities` ni a `moves`, así que el orden de inserción no importa.
 - **Upsert con `ON CONFLICT DO UPDATE`, nunca `INSERT OR REPLACE`.** REPLACE borra la fila antes de insertarla, y la cascada se llevaría sus tipos y estadísticas.
 - **Lo del usuario no depende del catálogo.** `favorites` y `trivia_answers` guardan el número del Pokémon sin clave foránea, para que ninguna operación sobre el catálogo borre lo que hizo el usuario.
-- **Una fila de `sync_metadata` por clave.** `catalog` y `catalog:visible` tienen cada una su estado, su intento y su último fallo.
+- **Una fila de `sync_metadata` por clave.** `catalog`, `catalog:visible`, `catalog:restore`, `type_efficacy` y cada `detail:{id}` tienen su estado, su intento y su último fallo. `last_synced_at` de `detail:{id}` es la hora de la última descarga del detalle, y `last_verified_at` de `catalog:restore`, la de la última verificación de huellas.
 - **Las formas son filas de `pokemon`.** Una forma regional tiene `is_default = false` y el mismo `species_id`; el catálogo solo muestra las filas por defecto.
 
 Catálogo y detalle. Las líneas punteadas son relaciones sin clave foránea.
@@ -390,7 +498,7 @@ erDiagram
     string value
   }
   sync_metadata {
-    string key PK "catalog, catalog:visible"
+    string key PK "catalog, catalog:visible, catalog:restore, type_efficacy, detail:25"
     int next_offset
     int total_count
     bool is_complete
