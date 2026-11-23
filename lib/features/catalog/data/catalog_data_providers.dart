@@ -53,6 +53,7 @@ final catalogSyncTriggersProvider = Provider<void>((ref) {
     ..runOnEachReconnect(fullPass)
     ..runOnEachReconnect(restoration)
     ..runOnEachReconnect(typeEfficacy)
+    ..runEveryWhileOnline(fullPass, catalogFullPassFreshness)
     ..runEveryWhileOnline(restoration, fingerprintVerificationInterval);
   unawaited(scheduler.run(fullPass));
   unawaited(scheduler.run(restoration));
