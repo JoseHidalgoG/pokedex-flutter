@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon_artwork.dart';
 
 void main() {
   const charizard = PokemonDto(
