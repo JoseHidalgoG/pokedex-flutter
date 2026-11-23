@@ -16,7 +16,7 @@ Cada recurso se pide a PokeAPI con una ventana de vigencia, y la pantalla nunca 
 
 | Recurso | Qué trae | Cuándo se pide | Llamadas | Vigencia |
 | --- | --- | --- | --- | --- |
-| `catalog`, pasada completa | Campos ligeros de los Pokémon por defecto: id, nombre, tipos, generación, especie, estadísticas, altura, peso e imagen | Primera ejecución, catálogo incompleto, o al iniciar o reconectar si la última pasada tiene más de 1 h | 11 | 1 h (`catalogFullPassFreshness`) |
+| `catalog`, pasada completa | Campos ligeros de los Pokémon por defecto: id, nombre, tipos, generación, especie, estadísticas, altura, peso e imagen | Primera ejecución, catálogo incompleto, o al iniciar o reconectar si la última pasada tiene más de 1 h; con servicio, cada hora desde la última descarga | 11 | 1 h (`catalogFullPassFreshness`) |
 | `catalog:visible` | Los mismos campos, solo de los ids en pantalla | Al mostrarse con servicio, si alguno se guardó hace más de 15 min | 1 por pantalla | 15 min (`visibleFreshnessWindow`) |
 | `detail:{id}` | Especie, grupos huevo, habilidades, movimientos de un version group, cadena de evolución, formas con sus campos del catálogo y juegos | En cada apertura con servicio, salvo si se descargó hace menos de 5 min; siempre si falta o su huella no coincide | 1 | 5 min (`detailFreshnessWindow`) |
 | `type_efficacy` | La tabla de tipos completa: 18 × 18 = 324 factores de daño | Al iniciar y al reconectar si tiene más de 24 h; al abrir un detalle si está vacía, con prioridad de usuario | 1 | 24 h (`typeEfficacyFreshness`) |
@@ -67,7 +67,7 @@ La regla inicial era «el version group más reciente que tenga movimientos por 
 
 ## Consecuencias
 
-- Con servicio, lo que el usuario ve tiene como mucho 15 minutos de diferencia con PokeAPI. El resto del catálogo se renueva al iniciar la app y en cada reconexión si la última pasada tiene más de 1 h.
+- Con servicio, lo que el usuario ve tiene como mucho 15 minutos de diferencia con PokeAPI; el resto del catálogo, como mucho 1 hora. La pasada completa se repite cada hora mientras hay servicio, contada desde la última descarga, además de al iniciar y al reconectar.
 - La primera pintura nunca espera a la red (OF-03) y los datos nuevos llegan por el `Stream` de Drift (OF-16).
 - Al abrir la app con datos viejos se gasta una llamada más: la página visible se revalida con prioridad de usuario mientras corre la pasada completa. En el emulador, un arranque con datos de dos días hizo 2 consultas de salud, 11 lotes y 1 consulta de la página visible.
 - Al volver a una página que sigue dentro de su ventana no se llama, y el banner conserva la hora de la última revalidación real, aunque fuera de otra página.

@@ -14,6 +14,10 @@ import 'package:pokedex_flutter/core/network/pokeapi_graphql_client_provider.dar
 import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_status.dart';
+import 'package:pokedex_flutter/core/sync/domain/retry_policy.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_job.dart';
+import 'package:pokedex_flutter/core/sync/sync_providers.dart';
+import 'package:pokedex_flutter/core/sync/sync_scheduler.dart';
 import 'package:pokedex_flutter/features/catalog/data/catalog_data_providers.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_query.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
@@ -59,6 +63,23 @@ class SavedBatchPokeApiLink extends Link {
       data: savedResponse['data'] as Map<String, Object?>?,
       response: savedResponse,
     );
+  }
+}
+
+class PeriodicJobsRecordingScheduler extends SyncScheduler {
+  PeriodicJobsRecordingScheduler(AppDatabase database)
+    : super(
+        budget: CallBudget(),
+        retryPolicy: RetryPolicy(),
+        store: database.syncMetadataDao,
+      );
+
+  final periods = <String, Duration>{};
+
+  @override
+  void runEveryWhileOnline(SyncJob job, Duration period) {
+    periods[job.key] = period;
+    super.runEveryWhileOnline(job, period);
   }
 }
 
@@ -186,6 +207,38 @@ void main() {
     expect(
       request.context.entry<CallPriorityEntry>()?.priority,
       CallPriority.restoration,
+    );
+  });
+
+  test('con servicio repite la pasada completa cada hora y la verificación de huellas cada 60 s', () async {
+    final scheduler = PeriodicJobsRecordingScheduler(database);
+    addTearDown(scheduler.dispose);
+    final container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(database),
+        connectivityStatusProvider.overrideWith((ref) => connectivity.stream),
+        pokeApiGraphQLClientProvider.overrideWithValue(
+          createPokeApiGraphQLClient(link: SavedBatchPokeApiLink()),
+        ),
+        syncSchedulerProvider.overrideWithValue(scheduler),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.listen(connectivityStatusProvider, (_, _) {});
+
+    container.listen(catalogSyncTriggersProvider, (_, _) {});
+
+    expect(scheduler.periods, {
+      'catalog': const Duration(hours: 1),
+      'catalog:restore': const Duration(seconds: 60),
+    });
+    await expectLater(
+      catalogStatusIn(container),
+      emitsThrough(isA<SyncRevalidated>()),
+    );
+    await expectLater(
+      database.pokemonDetailDao.watchTypeEfficacy(),
+      emitsThrough(hasLength(324)),
     );
   });
 

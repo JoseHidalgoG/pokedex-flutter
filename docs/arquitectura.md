@@ -116,6 +116,8 @@ flowchart LR
 
 `main` llama a `runApp` sin esperar a la red. `SyncLifecycle` arranca `SyncScheduler` y `catalogSyncTriggersProvider`, que lanzan tres trabajos al iniciar y otra vez cada vez que el estado pasa a `online`: la pasada completa del catálogo, la verificación de huellas y la tabla de tipos. Cada uno decide si hace falta llamar a PokeAPI. Si al iniciar no hay conexión, quedan pendientes hasta la reconexión; la pantalla se redibuja sola cada vez que se guarda un lote. El diagrama sigue la pasada completa; la verificación de huellas está en «Detección y restauración por huella».
 
+Mientras hay servicio, `runEveryWhileOnline` repite dos de ellos: la pasada completa cada hora (`catalogFullPassFreshness`) y la verificación de huellas cada 60 s. El temporizador se detiene sin conexión y vuelve a contar al reconectar. Además, cada descarga real (`SyncOutcome.revalidated`) lo reinicia, así que el periodo se cuenta desde la última descarga: cuando la pasada vuelve a correr, el catálogo ya tiene más de 1 h y se descarga, sin un «Sincronizando...» en vano.
+
 ```mermaid
 sequenceDiagram
   participant Connectivity as connectivityStatusProvider
@@ -126,6 +128,7 @@ sequenceDiagram
   participant Screen as CatalogScreen
 
   Connectivity->>Scheduler: arranque de la app, o paso a online
+  Note over Scheduler: también cada hora en línea, desde la última descarga
   Scheduler->>Dao: sync_metadata.status = in_progress
   Scheduler->>Sync: perform() de la pasada completa
   Sync->>Dao: readCatalogSyncProgress()
@@ -149,7 +152,7 @@ Si la descarga se corta, `sync_metadata.next_offset` guarda dónde se quedó y l
 
 ## Revalidación de lo visible
 
-La pasada completa solo corre si la última tiene más de 1 h, así que la página que se está viendo se revalida aparte. `catalogPageProvider` llama a `RevalidatePokemon` con los ids de la página la primera vez que la página trae Pokémon y cada vez que vuelve a mostrarse. No espera la respuesta: si llegan datos nuevos, entran por la base y `watchCatalogPage` vuelve a emitir.
+La pasada completa solo descarga si la última tiene más de 1 h, así que la página que se está viendo se revalida aparte. `catalogPageProvider` llama a `RevalidatePokemon` con los ids de la página la primera vez que la página trae Pokémon y cada vez que vuelve a mostrarse. No espera la respuesta: si llegan datos nuevos, entran por la base y `watchCatalogPage` vuelve a emitir.
 
 - **Sin conexión** no se hace nada. El repositorio deja la petición registrada con `runOnEachReconnect` y `SyncScheduler` la repite en la siguiente reconexión.
 - **Con servicio** solo se llama si algún id tiene `pokemon.updated_at` de hace más de 15 min (`visibleFreshnessWindow`). Si todos están frescos, no hay llamada ni cambio de estado.
@@ -258,7 +261,7 @@ flowchart TD
   DetailCompare -- no --> DetailFetch["PokemonDetail aunque no hayan pasado 5 min"]
   DetailFetch --> DetailSave["saveDetail() reescribe #25 y sus formas<br/>[sync] detalle #25 restaurado …"]
 
-  FullPass["Pasada completa"] --> FullCompare["Compara la huella de lo que llega<br/>con la guardada y registra los ids distintos"]
+  FullPass["Pasada completa<br/>al iniciar, al reconectar y cada hora"] --> FullCompare["Compara la huella de lo que llega<br/>con la guardada y registra los ids distintos"]
   FullCompare --> Overwrite["Escribe siempre lo de PokeAPI"]
 ```
 
@@ -279,7 +282,7 @@ Un fallo reintentable espera 2, 4, 8, 16 y 32 s (`RetryPolicy`) y después queda
 ```mermaid
 stateDiagram-v2
   [*] --> SyncIdle
-  SyncIdle --> SyncFullPassInProgress: arranque, reconexión o syncCatalog()
+  SyncIdle --> SyncFullPassInProgress: arranque, reconexión, cada hora o syncCatalog()
   SyncFullPassInProgress --> SyncIdle: catálogo fresco, sin llamadas
   SyncFullPassInProgress --> SyncRevalidated: descarga completa
   SyncFullPassInProgress --> SyncWaitingRetry: fallo reintentable en línea
@@ -288,7 +291,7 @@ stateDiagram-v2
   SyncPaused --> SyncFullPassInProgress: se libera un hueco
   SyncFullPassInProgress --> SyncFailed: QueryError, 5 reintentos o sin conexión
   SyncWaitingRetry --> SyncFailed: se pierde la conexión
-  SyncRevalidated --> SyncFullPassInProgress: reconexión o Reintentar
+  SyncRevalidated --> SyncFullPassInProgress: reconexión, cada hora o Reintentar
   SyncFailed --> SyncFullPassInProgress: reconexión o Reintentar
   SyncIdle --> SyncRevalidating: página con datos de más de 15 min
   SyncRevalidated --> SyncRevalidating: página con datos de más de 15 min

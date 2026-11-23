@@ -198,6 +198,9 @@ class SyncScheduler {
       final outcome = await job.perform();
       await _store.recordSucceeded(job.key);
       _emit(job.key, _statusAfter(job.key, outcome));
+      if (outcome == SyncOutcome.revalidated && _isOnline) {
+        _startPeriodicTimer(job.key);
+      }
     } on CallBudgetExhausted catch (exhausted) {
       await _pauseUntil(job, exhausted.until, retriesSoFar: retriesSoFar);
     } on SyncFailure catch (failure) {
