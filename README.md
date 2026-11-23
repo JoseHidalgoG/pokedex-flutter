@@ -62,7 +62,7 @@ Para evitar cambios visuales demasiado frecuentes, el estado de conectividad uti
 
 La aplicación solicita una sincronización al iniciarse y cuando detecta que se ha recuperado la conexión.
 
-El servicio de sincronización descarga el catálogo en lotes de 100 Pokémon y omite la descarga cuando la última pasada completa tiene menos de 1 hora. Con cada Pokémon guarda la huella SHA-256 de sus datos tal como llegaron de PokeAPI.
+El servicio de sincronización descarga el catálogo en lotes de 100 Pokémon y omite la descarga cuando la última pasada completa tiene menos de 1 hora. Mientras hay servicio, repite la pasada cada hora, contada desde la última descarga. Con cada Pokémon guarda la huella SHA-256 de sus datos tal como llegaron de PokeAPI.
 
 Con servicio, la página que se está viendo se revalida aparte: si alguno de sus Pokémon se guardó hace más de 15 minutos, la app los pide de nuevo a PokeAPI en una sola consulta y la lista se actualiza sola. Sin conexión no se hace ninguna llamada, y la revalidación se repite al recuperar la conexión.
 
