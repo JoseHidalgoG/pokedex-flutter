@@ -103,6 +103,149 @@
   "navigationFavorites": "Favoritos",
   "navigationTrivia": "Trivia",
   "navigationSettings": "Ajustes",
-  "triviaComingSoon": "Próximamente"
+  "triviaComingSoon": "Próximamente",
+
+  "detailTabInfo": "Información",
+  "detailTabStats": "Estadísticas",
+  "detailTabEvolutions": "Evoluciones",
+  "detailTabMoves": "Movimientos",
+  "detailTabMatchups": "Matchups",
+  "detailShowShiny": "Ver versión shiny",
+  "detailShowNormal": "Ver versión normal",
+  "detailShinyUnavailable": "No hay imagen shiny disponible",
+  "detailShare": "Compartir",
+  "detailLoadError": "No se pudo cargar el detalle",
+  "detailSectionPending": "Se descargará con conexión",
+  "detailNoData": "Sin datos",
+  "detailFreshJustNow": "Actualizado desde PokeAPI hace un momento",
+  "detailFreshMinutesAgo": "Actualizado desde PokeAPI hace {minutes} min",
+  "@detailFreshMinutesAgo": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "detailFreshHoursAgo": "Actualizado desde PokeAPI hace {hours} h",
+  "@detailFreshHoursAgo": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "detailLocalData": "Datos locales del {date}",
+  "@detailLocalData": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "detailNotStored": "Sin detalle guardado · se descargará con conexión",
+  "detailForms": "Formas",
+  "detailHeight": "Altura",
+  "detailWeight": "Peso",
+  "detailEggGroups": "Grupos huevo",
+  "detailAbilities": "Habilidades",
+  "detailHiddenAbility": "Oculta",
+  "detailGames": "Juegos",
+  "detailStatTotal": "Total",
+  "detailNoEvolutions": "No evoluciona",
+  "detailMovesOf": "Movimientos de {versionGroup}",
+  "@detailMovesOf": {
+    "placeholders": {
+      "versionGroup": {
+        "type": "String"
+      }
+    }
+  },
+  "detailMoveLevel": "Nv. {level}",
+  "@detailMoveLevel": {
+    "placeholders": {
+      "level": {
+        "type": "int"
+      }
+    }
+  },
+  "detailMoveOnEvolution": "Evo.",
+  "detailSortByLevel": "Por nivel",
+  "detailSortByName": "Por nombre",
+  "detailNoMoves": "Sin movimientos registrados",
+  "detailTypeTablePending": "Tabla de tipos pendiente",
+  "detailShareBaseTotal": "Total base: {total}",
+  "@detailShareBaseTotal": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+
+  "statHp": "PS",
+  "statAttack": "Ataque",
+  "statDefense": "Defensa",
+  "statSpecialAttack": "At. esp.",
+  "statSpecialDefense": "Def. esp.",
+  "statSpeed": "Velocidad",
+
+  "moveMethodLevelUp": "Nivel",
+  "moveMethodMachine": "MT",
+  "moveMethodTutor": "Tutor",
+  "moveMethodEgg": "Huevo",
+
+  "eggGroupMonster": "Monstruo",
+  "eggGroupWater1": "Agua 1",
+  "eggGroupWater2": "Agua 2",
+  "eggGroupWater3": "Agua 3",
+  "eggGroupBug": "Bicho",
+  "eggGroupFlying": "Volador",
+  "eggGroupField": "Campo",
+  "eggGroupFairy": "Hada",
+  "eggGroupGrass": "Planta",
+  "eggGroupHumanLike": "Humanoide",
+  "eggGroupMineral": "Mineral",
+  "eggGroupAmorphous": "Amorfo",
+  "eggGroupDitto": "Ditto",
+  "eggGroupDragon": "Dragón",
+  "eggGroupUndiscovered": "Desconocido",
+
+  "evolutionLevel": "Nivel {level}",
+  "@evolutionLevel": {
+    "placeholders": {
+      "level": {
+        "type": "int"
+      }
+    }
+  },
+  "evolutionLevelUp": "Subir de nivel",
+  "evolutionTrade": "Intercambio",
+  "evolutionFriendship": "Amistad",
+  "evolutionHolding": "con {item} equipado",
+  "@evolutionHolding": {
+    "placeholders": {
+      "item": {
+        "type": "String"
+      }
+    }
+  },
+  "evolutionKnowingMoveType": "con un movimiento de tipo {type}",
+  "@evolutionKnowingMoveType": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "evolutionOther": "Otro método",
+  "timeOfDayDay": "De día",
+  "timeOfDayNight": "De noche",
+  "timeOfDayDusk": "Al anochecer",
+
+  "matchupQuadrupleWeakness": "Muy débil · ×4",
+  "matchupWeakness": "Débil · ×2",
+  "matchupResistance": "Resiste · ×0,5",
+  "matchupDoubleResistance": "Resiste mucho · ×0,25",
+  "matchupImmunity": "Inmune · ×0"
 
 }

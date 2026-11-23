@@ -15,6 +15,7 @@ La aplicación sigue una arquitectura **offline-first**, por lo que los Pokémon
 - **internet_connection_checker_plus:** comprobación de acceso a Internet.
 - **cached_network_image:** almacenamiento temporal de imágenes descargadas.
 - **crypto:** huella SHA-256 de cada Pokémon, para detectar datos alterados en la base local.
+- **share_plus:** compartir un Pokémon como texto desde su detalle.
 - **flutter_test y mocktail:** pruebas automatizadas.
 - **http (solo en pruebas):** `MockClient` detrás de un `HttpLink` real, para comprobar cómo se traducen las respuestas HTTP de PokeAPI a fallos de sincronización.
 
@@ -24,9 +25,21 @@ La aplicación sigue una arquitectura **offline-first**, por lo que los Pokémon
 
 - Visualización del número, nombre, imagen y tipos de cada Pokémon.
 - Paginación del catálogo en grupos de 50 elementos.
-- Pantalla de detalles con información básica del Pokémon.
 - Estados visuales de carga, error y catálogo vacío.
 - Botón para reintentar la sincronización cuando sea necesario.
+
+### Detalle de un Pokémon
+
+- Encabezado con nombre, número, tipos y official-artwork (o el sprite `front_default` si falta), interruptor shiny, favorito y botón para compartir el Pokémon como texto.
+- El encabezado se pinta al instante con los datos del catálogo y se completa cuando llega el detalle guardado.
+- Una línea bajo el nombre dice de cuándo son los datos: «Actualizado desde PokeAPI hace 3 min» solo si el detalle se revalidó en esta sesión; si no, «Datos locales del 10/11 · 09:15», o «Sin detalle guardado · se descargará con conexión».
+- Pestañas:
+  - **Información:** altura, peso, grupos huevo, habilidades (con «Oculta» y el efecto recortado), juegos y selector de formas.
+  - **Estadísticas:** barras con el valor y el porcentaje sobre 255, y el total.
+  - **Evoluciones:** árbol desde la especie base con el trigger de cada paso.
+  - **Movimientos:** los del version group más reciente, por nivel, MT, tutor o huevo, ordenados por nivel o por nombre.
+  - **Matchups:** debilidades, resistencias e inmunidades según la tabla de tipos guardada.
+- Deslizar hacia abajo en cualquier pestaña fuerza la descarga del detalle.
 
 ### Funcionamiento offline-first
 
@@ -180,6 +193,7 @@ La conectividad se supervisa de forma independiente y permite solicitar una nuev
 - El tiempo de sincronización depende de la conexión y de la disponibilidad de PokéAPI.
 - PokeAPI permite 100 llamadas por hora. La app se detiene en 80 y lleva la cuenta en memoria, así que la cuenta vuelve a cero si se cierra la app, aunque PokeAPI siga contando las llamadas anteriores.
 - Los estados de sincronización guardados en `sync_metadata` no se restauran al reiniciar: la app vuelve a decidir desde cero qué sincronizar.
+- Los objetos, juegos, version groups y métodos de evolución poco comunes se muestran con el identificador de PokeAPI en inglés, formateado (por ejemplo `thunder-stone` → «Thunder Stone»), porque la app no descarga sus nombres traducidos. Los tipos, grupos huevo, métodos de aprendizaje, momentos del día y triggers habituales sí están traducidos.
 
 ## Proyecto académico
 
