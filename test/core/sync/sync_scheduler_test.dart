@@ -776,6 +776,57 @@ void main() {
       });
     });
 
+    test('una descarga real vuelve a contar el periodo desde ese momento', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.revalidated]);
+        final fullPass = catalogJob(work);
+
+        scheduler.runEveryWhileOnline(fullPass, const Duration(hours: 1));
+        async.elapse(const Duration(minutes: 10));
+        unawaited(scheduler.run(fullPass));
+        async.flushMicrotasks();
+        expect(work.calls, 1);
+
+        async.elapse(const Duration(minutes: 59));
+        expect(work.calls, 1);
+
+        async.elapse(const Duration(minutes: 1));
+        expect(work.calls, 2);
+      });
+    });
+
+    test('una ejecución sin descarga no mueve el periodo', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.upToDate]);
+        final fullPass = catalogJob(work);
+
+        scheduler.runEveryWhileOnline(fullPass, const Duration(hours: 1));
+        async.elapse(const Duration(minutes: 10));
+        unawaited(scheduler.run(fullPass));
+        async.elapse(const Duration(minutes: 50));
+
+        expect(work.calls, 2);
+      });
+    });
+
+    test('una descarga sin conexión no arranca el temporizador', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final work = ScriptedWork([SyncOutcome.revalidated]);
+        final fullPass = catalogJob(work);
+
+        scheduler.runEveryWhileOnline(fullPass, const Duration(hours: 1));
+        unawaited(scheduler.run(fullPass));
+        async.elapse(const Duration(hours: 3));
+
+        expect(work.calls, 1);
+      });
+    });
+
     test('dispose cancela el temporizador', () {
       fakeAsync((async) {
         final clock = async.getClock(start);
