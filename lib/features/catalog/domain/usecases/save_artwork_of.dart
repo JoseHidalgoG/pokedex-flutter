@@ -5,5 +5,5 @@ class SaveArtworkOf {
 
   final PokemonImageRepository _repository;
 
-  Future<void> call(int pokemonId) => _repository.saveArtworkOf(pokemonId);
+  Future<bool> call(int pokemonId) => _repository.saveArtworkOf(pokemonId);
 }
