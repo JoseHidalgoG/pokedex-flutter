@@ -521,6 +521,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get imagesDeleteFailed => 'Images could not be deleted';
 
   @override
+  String get demoToolsTitle => 'Demo tools';
+
+  @override
+  String get demoToolsDescription => 'Only in debug and profile builds';
+
+  @override
+  String get simulateApiOutage => 'Simulate PokeAPI outage';
+
+  @override
+  String get simulateApiOutageDescription =>
+      'Answers HTTP 503 without using the network';
+
+  @override
+  String get simulateApiOutageSaveError =>
+      'The setting could not be saved; it lasts until the app closes';
+
+  @override
   String get catalogSearchHint => 'Search by name or number';
 
   @override

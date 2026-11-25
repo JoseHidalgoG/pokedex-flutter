@@ -1230,4 +1230,14 @@ void main() {
       },
     );
   });
+
+  test('la consola muestra la espera de un reintento con una décima', () {
+    final shown = [
+      const Duration(milliseconds: 1751),
+      const Duration(milliseconds: 6840),
+      const Duration(seconds: 32),
+    ].map(secondsWithOneDecimal);
+
+    expect(shown, ['1,8', '6,8', '32,0']);
+  });
 }

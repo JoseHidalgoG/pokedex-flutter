@@ -14,6 +14,11 @@ typedef _JobAfterRunning = ({SyncJob job, Completer<void> done});
 
 typedef _PeriodicJob = ({SyncJob job, Duration period});
 
+String secondsWithOneDecimal(Duration duration) {
+  final seconds = duration.inMilliseconds / Duration.millisecondsPerSecond;
+  return seconds.toStringAsFixed(1).replaceFirst('.', ',');
+}
+
 class SyncScheduler {
   SyncScheduler({
     required this._budget,
@@ -302,7 +307,7 @@ class SyncScheduler {
       failure: failure,
     );
     final maxAttempts = _retryPolicy.maxAttempts;
-    final secondsToWait = retryAt.difference(_now()).inSeconds;
+    final secondsToWait = secondsWithOneDecimal(retryAt.difference(_now()));
     developer.log(
       '${job.key}: reintento $retry/$maxAttempts en $secondsToWait s ($failure)',
       name: 'sync',

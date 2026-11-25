@@ -527,6 +527,23 @@ class AppLocalizationsEs extends AppLocalizations {
   String get imagesDeleteFailed => 'No se pudieron borrar las imágenes';
 
   @override
+  String get demoToolsTitle => 'Herramientas de demostración';
+
+  @override
+  String get demoToolsDescription => 'Solo en compilaciones debug y profile';
+
+  @override
+  String get simulateApiOutage => 'Simular caída de PokeAPI';
+
+  @override
+  String get simulateApiOutageDescription =>
+      'Responde HTTP 503 sin salir a la red';
+
+  @override
+  String get simulateApiOutageSaveError =>
+      'No se pudo guardar el ajuste; durará hasta cerrar la app';
+
+  @override
   String get catalogSearchHint => 'Buscar por nombre o número';
 
   @override

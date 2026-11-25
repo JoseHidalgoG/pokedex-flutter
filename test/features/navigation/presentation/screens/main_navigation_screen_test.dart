@@ -17,6 +17,7 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progres
 
 import '../../../catalog/fakes/fake_catalog_query_repository.dart';
 import '../../../favorites/fakes/fake_favorites_repository.dart';
+import '../../../settings/fakes/fake_settings_repository.dart';
 
 void main() {
   const pikachu = Pokemon(
@@ -68,6 +69,9 @@ void main() {
       languageProvider.overrideWith((ref) => Stream.value(locale.languageCode)),
 
       themeProvider.overrideWith((ref) => Stream.value('system')),
+      settingsRepositoryProvider.overrideWith(
+        (ref) => FakeSettingsRepository(),
+      ),
     ];
   }
 
