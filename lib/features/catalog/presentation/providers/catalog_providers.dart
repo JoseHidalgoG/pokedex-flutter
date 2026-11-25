@@ -104,8 +104,8 @@ final watchPokemonByIdsProvider = Provider<WatchPokemonByIds>(
   (ref) => WatchPokemonByIds(ref.watch(catalogRepositoryProvider)),
 );
 
-final filteredCatalogPageProvider =
-    StreamProvider.family<List<Pokemon>, CatalogPageRequest>((ref, request) {
+final filteredCatalogPageProvider = StreamProvider.autoDispose
+    .family<List<Pokemon>, CatalogPageRequest>((ref, request) {
       final revalidatePokemon = ref.watch(revalidatePokemonProvider);
       var shownIds = const <int>[];
 
@@ -136,6 +136,7 @@ final filteredCatalogPageProvider =
           });
     });
 
-final filteredCatalogCountProvider = StreamProvider.family<int, CatalogQuery>(
-  (ref, query) => ref.watch(watchFilteredCatalogCountProvider)(query),
-);
+final filteredCatalogCountProvider = StreamProvider.autoDispose
+    .family<int, CatalogQuery>(
+      (ref, query) => ref.watch(watchFilteredCatalogCountProvider)(query),
+    );

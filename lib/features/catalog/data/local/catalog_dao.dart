@@ -434,8 +434,9 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
           );
         case CatalogSort.baseStatTotalDescending:
           comparison = _compareNullableStats(
-            second.baseStatTotal,
             first.baseStatTotal,
+            second.baseStatTotal,
+            descending: true,
           );
       }
 
@@ -445,11 +446,16 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     return sorted;
   }
 
-  int _compareNullableStats(int? first, int? second) {
+  int _compareNullableStats(
+    int? first,
+    int? second, {
+    bool descending = false,
+  }) {
     if (first == null && second == null) return 0;
     if (first == null) return 1;
     if (second == null) return -1;
-    return first.compareTo(second);
+
+    return descending ? second.compareTo(first) : first.compareTo(second);
   }
 
   JoinedSelectStatement<HasResultSet, dynamic> _pokemonWithTypes() {

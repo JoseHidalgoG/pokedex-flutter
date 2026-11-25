@@ -26,13 +26,18 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
 
-    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-      if (!mounted) return;
+    setState(() {});
 
-      setState(() {
-        _search = value.trim().toLowerCase();
-      });
-    });
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 300),
+          () {
+        if (!mounted) return;
+
+        setState(() {
+          _search = value.trim().toLowerCase();
+        });
+      },
+    );
   }
 
   void _clearSearch() {

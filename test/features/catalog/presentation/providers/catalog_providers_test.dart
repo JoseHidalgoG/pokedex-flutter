@@ -8,11 +8,14 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_page_request.dart';
 
 class InMemoryCatalogRepository implements CatalogRepository {
   int syncRequests = 0;
   bool? lastForceValue;
   final revalidationRequests = <({List<int> ids, bool force})>[];
+  final filteredPageRequests = <CatalogPageRequest>[];
+  final filteredCountRequests = <CatalogQuery>[];
 
   final List<Pokemon> _pokemon = List.generate(
     51,
@@ -52,6 +55,10 @@ class InMemoryCatalogRepository implements CatalogRepository {
     required int pageSize,
     required CatalogQuery query,
   }) {
+    filteredPageRequests.add(
+      CatalogPageRequest(page: page, pageSize: pageSize, query: query),
+    );
+
     final filtered = _filteredPokemon(query);
     final offset = page * pageSize;
 
@@ -60,6 +67,7 @@ class InMemoryCatalogRepository implements CatalogRepository {
 
   @override
   Stream<int> watchFilteredCatalogCount(CatalogQuery query) {
+    filteredCountRequests.add(query);
     return Stream.value(_filteredPokemon(query).length);
   }
 
@@ -146,6 +154,46 @@ class ControlledPageCatalogRepository extends InMemoryCatalogRepository {
   }
 }
 
+class ControlledFilteredCatalogRepository
+    extends InMemoryCatalogRepository {
+  final filteredPageUpdates =
+  StreamController<List<Pokemon>>.broadcast();
+
+  final filteredCountUpdates =
+  StreamController<int>.broadcast();
+
+  @override
+  Stream<List<Pokemon>> watchFilteredCatalogPage({
+    required int page,
+    required int pageSize,
+    required CatalogQuery query,
+  }) {
+    filteredPageRequests.add(
+      CatalogPageRequest(
+        page: page,
+        pageSize: pageSize,
+        query: query,
+      ),
+    );
+
+    return filteredPageUpdates.stream;
+  }
+
+  @override
+  Stream<int> watchFilteredCatalogCount(CatalogQuery query) {
+    filteredCountRequests.add(query);
+
+    return filteredCountUpdates.stream;
+  }
+
+  Future<void> dispose() async {
+    await Future.wait([
+      filteredPageUpdates.close(),
+      filteredCountUpdates.close(),
+    ]);
+  }
+}
+
 void main() {
   late InMemoryCatalogRepository repository;
   late ProviderContainer container;
@@ -157,6 +205,30 @@ void main() {
       overrides: [catalogRepositoryProvider.overrideWithValue(repository)],
     );
   });
+
+  List<int> idsOf(List<Pokemon> pokemon) => [
+    for (final item in pokemon) item.id,
+  ];
+
+  List<List<int>> requestedIds() => [
+    for (final request in repository.revalidationRequests) request.ids,
+  ];
+
+  Future<List<Pokemon>> readFilteredPage(CatalogPageRequest request) async {
+    final provider = filteredCatalogPageProvider(request);
+
+    container.listen(provider, (_, _) {});
+
+    return container.read(provider.future);
+  }
+
+  Future<int> readFilteredCount(CatalogQuery query) async {
+    final provider = filteredCatalogCountProvider(query);
+
+    container.listen(provider, (_, _) {});
+
+    return container.read(provider.future);
+  }
 
   test('catalogProvider emite lo que entrega el repositorio', () async {
     container.listen(catalogProvider, (_, _) {});
@@ -325,6 +397,791 @@ void main() {
           [25],
         ]);
         expect(repository.revalidationRequests.single.force, isTrue);
+      },
+    );
+  });
+
+  group('providers de casos de uso filtrados', () {
+    test('watchFilteredCatalogPageProvider utiliza el repositorio', () async {
+      const query = CatalogQuery(search: '25');
+
+      final watchPage = container.read(watchFilteredCatalogPageProvider);
+
+      final result = await watchPage(page: 0, pageSize: 50, query: query).first;
+
+      expect(idsOf(result), [25]);
+
+      expect(repository.filteredPageRequests, [
+        const CatalogPageRequest(page: 0, pageSize: 50, query: query),
+      ]);
+    });
+
+    test('watchFilteredCatalogCountProvider utiliza el repositorio', () async {
+      const query = CatalogQuery(type: 'normal');
+
+      final watchCount = container.read(watchFilteredCatalogCountProvider);
+
+      expect(await watchCount(query).first, 51);
+      expect(repository.filteredCountRequests, [query]);
+    });
+  });
+
+  group('filteredCatalogPageProvider', () {
+    test('devuelve la primera página con la consulta predeterminada', () async {
+      const request = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(),
+      );
+
+      final result = await readFilteredPage(request);
+
+      expect(result, hasLength(50));
+      expect(result.first.id, 1);
+      expect(result.last.id, 50);
+      expect(repository.filteredPageRequests, [request]);
+    });
+
+    test('devuelve la segunda página', () async {
+      const request = CatalogPageRequest(
+        page: 1,
+        pageSize: 50,
+        query: CatalogQuery(),
+      );
+
+      final result = await readFilteredPage(request);
+
+      expect(idsOf(result), [51]);
+      expect(repository.filteredPageRequests, [request]);
+    });
+
+    test('respeta el tamaño de página solicitado', () async {
+      const request = CatalogPageRequest(
+        page: 1,
+        pageSize: 5,
+        query: CatalogQuery(),
+      );
+
+      final result = await readFilteredPage(request);
+
+      expect(idsOf(result), [6, 7, 8, 9, 10]);
+      expect(repository.filteredPageRequests, [request]);
+    });
+
+    test('transmite la búsqueda por nombre', () async {
+      const request = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(search: 'pokemon1'),
+      );
+
+      final result = await readFilteredPage(request);
+
+      expect(idsOf(result), [1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
+
+      expect(repository.filteredPageRequests, [request]);
+    });
+
+    test('transmite la búsqueda por número', () async {
+      const request = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(search: '25'),
+      );
+
+      final result = await readFilteredPage(request);
+
+      expect(idsOf(result), [25]);
+      expect(repository.filteredPageRequests, [request]);
+    });
+
+    test('transmite el filtro por tipo', () async {
+      const request = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(type: 'normal'),
+      );
+
+      final result = await readFilteredPage(request);
+
+      expect(result, hasLength(50));
+      expect(repository.filteredPageRequests, [request]);
+    });
+
+    test('transmite el ordenamiento descendente', () async {
+      const request = CatalogPageRequest(
+        page: 0,
+        pageSize: 5,
+        query: CatalogQuery(sort: CatalogSort.numberDescending),
+      );
+
+      final result = await readFilteredPage(request);
+
+      expect(idsOf(result), [51, 50, 49, 48, 47]);
+      expect(repository.filteredPageRequests, [request]);
+    });
+
+    test('transmite todos los criterios simultáneamente', () async {
+      const request = CatalogPageRequest(
+        page: 1,
+        pageSize: 3,
+        query: CatalogQuery(
+          search: 'pokemon1',
+          type: 'normal',
+          sort: CatalogSort.numberDescending,
+        ),
+      );
+
+      final result = await readFilteredPage(request);
+
+      expect(idsOf(result), [16, 15, 14]);
+      expect(repository.filteredPageRequests, [request]);
+    });
+
+    test('devuelve una lista vacía si no hay coincidencias', () async {
+      const request = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(type: 'electric'),
+      );
+
+      final result = await readFilteredPage(request);
+
+      expect(result, isEmpty);
+      expect(repository.filteredPageRequests, [request]);
+    });
+
+    test('devuelve una lista vacía si la página no existe', () async {
+      const request = CatalogPageRequest(
+        page: 5,
+        pageSize: 50,
+        query: CatalogQuery(),
+      );
+
+      final result = await readFilteredPage(request);
+
+      expect(result, isEmpty);
+      expect(repository.filteredPageRequests, [request]);
+    });
+  });
+
+  group('filteredCatalogCountProvider', () {
+    test('devuelve el total con la consulta predeterminada', () async {
+      const query = CatalogQuery();
+
+      expect(await readFilteredCount(query), 51);
+      expect(repository.filteredCountRequests, [query]);
+    });
+
+    test('devuelve el conteo de una búsqueda por nombre', () async {
+      const query = CatalogQuery(search: 'pokemon1');
+
+      expect(await readFilteredCount(query), 11);
+      expect(repository.filteredCountRequests, [query]);
+    });
+
+    test('devuelve el conteo de una búsqueda numérica', () async {
+      const query = CatalogQuery(search: '25');
+
+      expect(await readFilteredCount(query), 1);
+      expect(repository.filteredCountRequests, [query]);
+    });
+
+    test('devuelve el conteo correspondiente al tipo', () async {
+      const query = CatalogQuery(type: 'normal');
+
+      expect(await readFilteredCount(query), 51);
+      expect(repository.filteredCountRequests, [query]);
+    });
+
+    test('devuelve cero cuando no existen coincidencias', () async {
+      const query = CatalogQuery(type: 'fire');
+
+      expect(await readFilteredCount(query), 0);
+      expect(repository.filteredCountRequests, [query]);
+    });
+
+    test('el conteo no depende del tamaño de página', () async {
+      const query = CatalogQuery(search: 'pokemon1');
+
+      const request = CatalogPageRequest(page: 0, pageSize: 3, query: query);
+
+      final page = await readFilteredPage(request);
+      final count = await readFilteredCount(query);
+
+      expect(page, hasLength(3));
+      expect(count, 11);
+    });
+
+    test('el conteo no solicita revalidaciones ni sincronizaciones', () async {
+      await readFilteredCount(const CatalogQuery());
+
+      expect(repository.revalidationRequests, isEmpty);
+      expect(repository.syncRequests, 0);
+      expect(repository.filteredPageRequests, isEmpty);
+    });
+  });
+
+  group('identidad y ciclo de vida de los providers filtrados', () {
+    test('solicitudes equivalentes reutilizan la misma página', () async {
+      const first = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(search: '25'),
+      );
+
+      final second = CatalogPageRequest(
+        page: first.page,
+        pageSize: first.pageSize,
+        query: first.query.copyWith(),
+      );
+
+      expect(identical(first, second), isFalse);
+
+      final firstResult = await readFilteredPage(first);
+      final secondResult = await readFilteredPage(second);
+
+      expect(idsOf(firstResult), [25]);
+      expect(idsOf(secondResult), [25]);
+
+      expect(repository.filteredPageRequests, hasLength(1));
+    });
+
+    test('consultas equivalentes reutilizan el mismo conteo', () async {
+      const first = CatalogQuery(search: 'pokemon1');
+      final second = first.copyWith();
+
+      expect(identical(first, second), isFalse);
+
+      expect(await readFilteredCount(first), 11);
+      expect(await readFilteredCount(second), 11);
+
+      expect(repository.filteredCountRequests, hasLength(1));
+    });
+
+    test('búsquedas diferentes mantienen páginas independientes', () async {
+      const first = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(search: '25'),
+      );
+
+      const second = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(search: '26'),
+      );
+
+      expect(idsOf(await readFilteredPage(first)), [25]);
+      expect(idsOf(await readFilteredPage(second)), [26]);
+
+      expect(repository.filteredPageRequests, [first, second]);
+    });
+
+    test(
+      'números de página diferentes mantienen estados independientes',
+      () async {
+        const first = CatalogPageRequest(
+          page: 0,
+          pageSize: 50,
+          query: CatalogQuery(),
+        );
+
+        const second = CatalogPageRequest(
+          page: 1,
+          pageSize: 50,
+          query: CatalogQuery(),
+        );
+
+        expect(await readFilteredPage(first), hasLength(50));
+        expect(idsOf(await readFilteredPage(second)), [51]);
+
+        expect(repository.filteredPageRequests, [first, second]);
+      },
+    );
+
+    test('tipos diferentes mantienen conteos independientes', () async {
+      const first = CatalogQuery(type: 'normal');
+      const second = CatalogQuery(type: 'electric');
+
+      expect(await readFilteredCount(first), 51);
+      expect(await readFilteredCount(second), 0);
+
+      expect(repository.filteredCountRequests, [first, second]);
+    });
+
+    test('ordenamientos diferentes mantienen páginas independientes', () async {
+      const first = CatalogPageRequest(
+        page: 0,
+        pageSize: 3,
+        query: CatalogQuery(sort: CatalogSort.numberAscending),
+      );
+
+      const second = CatalogPageRequest(
+        page: 0,
+        pageSize: 3,
+        query: CatalogQuery(sort: CatalogSort.numberDescending),
+      );
+
+      expect(idsOf(await readFilteredPage(first)), [1, 2, 3]);
+      expect(idsOf(await readFilteredPage(second)), [51, 50, 49]);
+
+      expect(repository.filteredPageRequests, [first, second]);
+    });
+
+    test('libera la página filtrada cuando deja de utilizarse', () async {
+      const request = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(search: '25'),
+      );
+
+      final provider = filteredCatalogPageProvider(request);
+
+      final subscription = container.listen(provider, (_, _) {});
+
+      await container.read(provider.future);
+
+      expect(repository.filteredPageRequests, hasLength(1));
+
+      subscription.close();
+      await container.pump();
+
+      container.listen(provider, (_, _) {});
+
+      await container.read(provider.future);
+
+      expect(repository.filteredPageRequests, hasLength(2));
+    });
+
+    test('libera el conteo filtrado cuando deja de utilizarse', () async {
+      const query = CatalogQuery(type: 'normal');
+      final provider = filteredCatalogCountProvider(query);
+
+      final subscription = container.listen(provider, (_, _) {});
+
+      await container.read(provider.future);
+
+      expect(repository.filteredCountRequests, hasLength(1));
+
+      subscription.close();
+      await container.pump();
+
+      container.listen(provider, (_, _) {});
+
+      await container.read(provider.future);
+
+      expect(repository.filteredCountRequests, hasLength(2));
+    });
+  });
+
+  group('estados reactivos de los providers filtrados', () {
+    late ControlledFilteredCatalogRepository controlledRepository;
+    late ProviderContainer controlledContainer;
+
+    const request = CatalogPageRequest(
+      page: 0,
+      pageSize: 50,
+      query: CatalogQuery(type: 'electric'),
+    );
+
+    const pikachu = Pokemon(
+      id: 25,
+      name: 'pikachu',
+      imageUrl: 'https://example.com/25.png',
+      typeNames: ['electric'],
+    );
+
+    const raichu = Pokemon(
+      id: 26,
+      name: 'raichu',
+      imageUrl: 'https://example.com/26.png',
+      typeNames: ['electric'],
+    );
+
+    setUp(() {
+      controlledRepository = ControlledFilteredCatalogRepository();
+
+      controlledContainer = ProviderContainer(
+        overrides: [
+          catalogRepositoryProvider.overrideWithValue(controlledRepository),
+        ],
+      );
+
+      addTearDown(() async {
+        controlledContainer.dispose();
+        await controlledRepository.dispose();
+      });
+    });
+
+    test('la página comienza en estado de carga', () {
+      final provider = filteredCatalogPageProvider(request);
+
+      controlledContainer.listen(provider, (_, _) {});
+
+      expect(
+        controlledContainer.read(provider),
+        isA<AsyncLoading<List<Pokemon>>>(),
+      );
+    });
+
+    test('la página cambia a AsyncData cuando recibe resultados', () async {
+      final provider = filteredCatalogPageProvider(request);
+
+      controlledContainer.listen(provider, (_, _) {});
+
+      controlledRepository.filteredPageUpdates.add(const [pikachu]);
+
+      await pumpEventQueue();
+
+      final state = controlledContainer.read(provider);
+
+      expect(state, isA<AsyncData<List<Pokemon>>>());
+      expect(idsOf(state.asData!.value), [25]);
+    });
+
+    test('la página propaga actualizaciones posteriores', () async {
+      final provider = filteredCatalogPageProvider(request);
+
+      controlledContainer.listen(provider, (_, _) {});
+
+      controlledRepository.filteredPageUpdates.add(const [pikachu]);
+
+      await pumpEventQueue();
+
+      expect(idsOf(controlledContainer.read(provider).asData!.value), [25]);
+
+      controlledRepository.filteredPageUpdates.add(const [pikachu, raichu]);
+
+      await pumpEventQueue();
+
+      expect(idsOf(controlledContainer.read(provider).asData!.value), [25, 26]);
+    });
+
+    test('una página vacía es un resultado válido', () async {
+      final provider = filteredCatalogPageProvider(request);
+
+      controlledContainer.listen(provider, (_, _) {});
+
+      controlledRepository.filteredPageUpdates.add(const []);
+
+      await pumpEventQueue();
+
+      final state = controlledContainer.read(provider);
+
+      expect(state, isA<AsyncData<List<Pokemon>>>());
+      expect(state.asData!.value, isEmpty);
+    });
+
+    test('la página propaga los errores del repositorio', () async {
+      final provider = filteredCatalogPageProvider(request);
+      final error = StateError('Error de consulta');
+
+      controlledContainer.listen(provider, (_, _) {});
+
+      controlledRepository.filteredPageUpdates.addError(error);
+
+      await pumpEventQueue();
+
+      final state = controlledContainer.read(provider);
+
+      expect(state, isA<AsyncError<List<Pokemon>>>());
+      expect(state.asError!.error, same(error));
+    });
+
+    test('el conteo comienza en estado de carga', () {
+      final provider = filteredCatalogCountProvider(request.query);
+
+      controlledContainer.listen(provider, (_, _) {});
+
+      expect(controlledContainer.read(provider), isA<AsyncLoading<int>>());
+    });
+
+    test('el conteo cambia a AsyncData al recibir resultados', () async {
+      final provider = filteredCatalogCountProvider(request.query);
+
+      controlledContainer.listen(provider, (_, _) {});
+
+      controlledRepository.filteredCountUpdates.add(2);
+
+      await pumpEventQueue();
+
+      final state = controlledContainer.read(provider);
+
+      expect(state, isA<AsyncData<int>>());
+      expect(state.asData!.value, 2);
+    });
+
+    test('el conteo propaga actualizaciones posteriores', () async {
+      final provider = filteredCatalogCountProvider(request.query);
+
+      controlledContainer.listen(provider, (_, _) {});
+
+      controlledRepository.filteredCountUpdates.add(2);
+
+      await pumpEventQueue();
+
+      expect(controlledContainer.read(provider).asData!.value, 2);
+
+      controlledRepository.filteredCountUpdates.add(1);
+
+      await pumpEventQueue();
+
+      expect(controlledContainer.read(provider).asData!.value, 1);
+    });
+
+    test('un conteo de cero es un resultado válido', () async {
+      final provider = filteredCatalogCountProvider(request.query);
+
+      controlledContainer.listen(provider, (_, _) {});
+
+      controlledRepository.filteredCountUpdates.add(0);
+
+      await pumpEventQueue();
+
+      final state = controlledContainer.read(provider);
+
+      expect(state, isA<AsyncData<int>>());
+      expect(state.asData!.value, 0);
+    });
+
+    test('el conteo propaga los errores del repositorio', () async {
+      final provider = filteredCatalogCountProvider(request.query);
+      final error = StateError('Error de conteo');
+
+      controlledContainer.listen(provider, (_, _) {});
+
+      controlledRepository.filteredCountUpdates.addError(error);
+
+      await pumpEventQueue();
+
+      final state = controlledContainer.read(provider);
+
+      expect(state, isA<AsyncError<int>>());
+      expect(state.asError!.error, same(error));
+    });
+  });
+
+  group('revalidación de páginas filtradas', () {
+    test('revalida únicamente los Pokémon de la página filtrada', () async {
+      const request = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(search: '25'),
+      );
+
+      await readFilteredPage(request);
+      await pumpEventQueue();
+
+      expect(requestedIds(), [
+        [25],
+      ]);
+
+      expect(repository.revalidationRequests.single.force, isFalse);
+    });
+
+    test('revalida únicamente los Pokémon de la página solicitada', () async {
+      const request = CatalogPageRequest(
+        page: 1,
+        pageSize: 3,
+        query: CatalogQuery(sort: CatalogSort.numberDescending),
+      );
+
+      await readFilteredPage(request);
+      await pumpEventQueue();
+
+      expect(requestedIds(), [
+        [48, 47, 46],
+      ]);
+    });
+
+    test('no solicita revalidaciones cuando no hay resultados', () async {
+      const request = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(type: 'electric'),
+      );
+
+      await readFilteredPage(request);
+      await pumpEventQueue();
+
+      expect(repository.revalidationRequests, isEmpty);
+    });
+
+    test('consultas equivalentes no duplican la revalidación', () async {
+      const first = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(search: '25'),
+      );
+
+      final second = CatalogPageRequest(
+        page: first.page,
+        pageSize: first.pageSize,
+        query: first.query.copyWith(),
+      );
+
+      await readFilteredPage(first);
+      await readFilteredPage(second);
+      await pumpEventQueue();
+
+      expect(requestedIds(), [
+        [25],
+      ]);
+    });
+
+    test('una consulta diferente revalida sus propios resultados', () async {
+      const first = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(search: '25'),
+      );
+
+      const second = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(search: '26'),
+      );
+
+      await readFilteredPage(first);
+      await readFilteredPage(second);
+      await pumpEventQueue();
+
+      expect(requestedIds(), [
+        [25],
+        [26],
+      ]);
+    });
+
+    test('vuelve a revalidar cuando se abre una consulta liberada', () async {
+      const request = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(search: '25'),
+      );
+
+      final provider = filteredCatalogPageProvider(request);
+
+      final subscription = container.listen(provider, (_, _) {});
+
+      await container.read(provider.future);
+
+      subscription.close();
+      await container.pump();
+
+      container.listen(provider, (_, _) {});
+
+      await container.read(provider.future);
+      await pumpEventQueue();
+
+      expect(requestedIds(), [
+        [25],
+        [25],
+      ]);
+    });
+
+    test('no repite la revalidación ante emisiones consecutivas', () async {
+      final controlledRepository = ControlledFilteredCatalogRepository();
+
+      final controlledContainer = ProviderContainer(
+        overrides: [
+          catalogRepositoryProvider.overrideWithValue(controlledRepository),
+        ],
+      );
+
+      addTearDown(() async {
+        controlledContainer.dispose();
+        await controlledRepository.dispose();
+      });
+
+      const request = CatalogPageRequest(
+        page: 0,
+        pageSize: 50,
+        query: CatalogQuery(type: 'electric'),
+      );
+
+      const pikachu = Pokemon(
+        id: 25,
+        name: 'pikachu',
+        imageUrl: 'https://example.com/25.png',
+        typeNames: ['electric'],
+      );
+
+      controlledContainer.listen(
+        filteredCatalogPageProvider(request),
+        (_, _) {},
+      );
+
+      controlledRepository.filteredPageUpdates
+        ..add(const [])
+        ..add(const [pikachu])
+        ..add(const [pikachu]);
+
+      await pumpEventQueue();
+
+      expect(controlledRepository.revalidationRequests, hasLength(1));
+
+      expect(controlledRepository.revalidationRequests.single.ids, [25]);
+    });
+
+    test(
+      'revalida cuando una página vacía vuelve a tener resultados',
+      () async {
+        final controlledRepository = ControlledFilteredCatalogRepository();
+
+        final controlledContainer = ProviderContainer(
+          overrides: [
+            catalogRepositoryProvider.overrideWithValue(controlledRepository),
+          ],
+        );
+
+        addTearDown(() async {
+          controlledContainer.dispose();
+          await controlledRepository.dispose();
+        });
+
+        const request = CatalogPageRequest(
+          page: 0,
+          pageSize: 50,
+          query: CatalogQuery(type: 'electric'),
+        );
+
+        const pikachu = Pokemon(
+          id: 25,
+          name: 'pikachu',
+          imageUrl: 'https://example.com/25.png',
+          typeNames: ['electric'],
+        );
+
+        const raichu = Pokemon(
+          id: 26,
+          name: 'raichu',
+          imageUrl: 'https://example.com/26.png',
+          typeNames: ['electric'],
+        );
+
+        controlledContainer.listen(
+          filteredCatalogPageProvider(request),
+          (_, _) {},
+        );
+
+        controlledRepository.filteredPageUpdates
+          ..add(const [pikachu])
+          ..add(const [])
+          ..add(const [raichu]);
+
+        await pumpEventQueue();
+
+        expect(
+          [
+            for (final request in controlledRepository.revalidationRequests)
+              request.ids,
+          ],
+          [
+            [25],
+            [26],
+          ],
+        );
       },
     );
   });

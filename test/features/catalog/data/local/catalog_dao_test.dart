@@ -7,6 +7,7 @@ import 'package:pokedex_flutter/core/sync/domain/sync_failure.dart';
 import 'package:pokedex_flutter/features/catalog/data/catalog_fingerprint.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query.dart';
 
 const bulbasaur = CatalogEntry(
   id: 1,
@@ -39,6 +40,53 @@ const squirtle = CatalogEntry(
   imageUrl: 'https://example.com/7.png',
   typeNames: ['water'],
   baseStats: {'hp': 44, 'speed': 43},
+);
+
+const ivysaur = CatalogEntry(
+  id: 2,
+  name: 'ivysaur',
+  imageUrl: 'https://example.com/2.png',
+  typeNames: ['grass', 'poison'],
+  baseStats: {
+    'hp': 60,
+    'attack': 62,
+    'defense': 63,
+    'special-attack': 80,
+    'special-defense': 80,
+    'speed': 60,
+  },
+);
+
+const pikachu = CatalogEntry(
+  id: 25,
+  name: 'pikachu',
+  imageUrl: 'https://example.com/25.png',
+  typeNames: ['electric'],
+);
+
+const raichu = CatalogEntry(
+  id: 26,
+  name: 'raichu',
+  imageUrl: 'https://example.com/26.png',
+  typeNames: ['electric'],
+  speciesId: 26,
+  baseStats: {
+    'hp': 60,
+    'attack': 90,
+    'defense': 55,
+    'special-attack': 90,
+    'special-defense': 80,
+    'speed': 110,
+  },
+);
+
+const alolanRaichu = CatalogEntry(
+  id: 10100,
+  name: 'raichu-alola',
+  imageUrl: 'https://example.com/10100.png',
+  typeNames: ['electric', 'psychic'],
+  speciesId: 26,
+  isDefault: false,
 );
 
 void main() {
@@ -88,6 +136,16 @@ void main() {
   List<int> idsOf(List<CatalogEntry> entries) => [
     for (final entry in entries) entry.id,
   ];
+
+  Future<List<CatalogEntry>> filteredPage({
+    CatalogQuery query = const CatalogQuery(),
+    int limit = 50,
+    int offset = 0,
+  }) {
+    return catalogDao
+        .watchFilteredCatalogPage(limit: limit, offset: offset, query: query)
+        .first;
+  }
 
   test('guardar el mismo lote tres veces no duplica Pokémon, tipos ni estadísticas', () async {
     await savePage([bulbasaur, charmander, squirtle]);
@@ -628,6 +686,695 @@ void main() {
       await savePage([squirtle], nextOffset: 3, isComplete: true);
 
       expect(await progressUpdates.next, (savedCount: 3, totalCount: 3));
+    });
+  });
+
+  group('búsqueda, filtrado y ordenamiento del catálogo', () {
+    setUp(() async {
+      await savePage([
+        raichu,
+        squirtle,
+        pikachu,
+        charmander,
+        ivysaur,
+        bulbasaur,
+        alolanRaichu,
+      ]);
+    });
+
+    test('una consulta vacía devuelve todos los Pokémon por defecto', () async {
+      final entries = await filteredPage();
+
+      expect(idsOf(entries), [1, 2, 4, 7, 25, 26]);
+
+      expect(
+        await catalogDao.watchFilteredCatalogCount(const CatalogQuery()).first,
+        6,
+      );
+    });
+
+    group('búsqueda', () {
+      test('encuentra un Pokémon por su nombre completo', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: 'pikachu'),
+        );
+
+        expect(idsOf(entries), [25]);
+      });
+
+      test('encuentra Pokémon por una parte de su nombre', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: 'saur'),
+        );
+
+        expect(idsOf(entries), [1, 2]);
+      });
+
+      test('la búsqueda no distingue mayúsculas y minúsculas', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: 'PiKaChU'),
+        );
+
+        expect(idsOf(entries), [25]);
+      });
+
+      test('ignora los espacios al inicio y al final', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: '  pikachu  '),
+        );
+
+        expect(idsOf(entries), [25]);
+      });
+
+      test('una búsqueda con solo espacios devuelve el catálogo', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: '   '),
+        );
+
+        expect(idsOf(entries), [1, 2, 4, 7, 25, 26]);
+      });
+
+      test('encuentra un Pokémon por su número exacto', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: '25'),
+        );
+
+        expect(idsOf(entries), [25]);
+      });
+
+      test('acepta números con ceros a la izquierda', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: '0025'),
+        );
+
+        expect(idsOf(entries), [25]);
+      });
+
+      test('la búsqueda numérica no utiliza coincidencias parciales', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: '2'),
+        );
+
+        expect(idsOf(entries), [2]);
+      });
+
+      test('devuelve una lista vacía si el nombre no existe', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: 'inexistente'),
+        );
+
+        expect(entries, isEmpty);
+      });
+
+      test('devuelve una lista vacía si el número no existe', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: '99999'),
+        );
+
+        expect(entries, isEmpty);
+      });
+
+      test('interpreta el porcentaje como un carácter literal', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: '%'),
+        );
+
+        expect(entries, isEmpty);
+      });
+
+      test('interpreta el guion bajo como un carácter literal', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: '_'),
+        );
+
+        expect(entries, isEmpty);
+      });
+
+      test('interpreta la barra invertida como un carácter literal', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: r'\'),
+        );
+
+        expect(entries, isEmpty);
+      });
+    });
+
+    group('filtrado por tipo', () {
+      const expectedIdsByType = <String, List<int>>{
+        'normal': [],
+        'fire': [4],
+        'water': [7],
+        'electric': [25, 26],
+        'grass': [1, 2],
+        'ice': [],
+        'fighting': [],
+        'poison': [1, 2],
+        'ground': [],
+        'flying': [],
+        'psychic': [],
+        'bug': [],
+        'rock': [],
+        'ghost': [],
+        'dragon': [],
+        'dark': [],
+        'steel': [],
+        'fairy': [],
+      };
+
+      for (final entry in expectedIdsByType.entries) {
+        test('filtra correctamente por el tipo ${entry.key}', () async {
+          final query = CatalogQuery(type: entry.key);
+
+          final entries = await filteredPage(query: query);
+
+          final count = await catalogDao.watchFilteredCatalogCount(query).first;
+
+          expect(idsOf(entries), entry.value);
+          expect(count, entry.value.length);
+        });
+      }
+
+      test('encuentra Pokémon por su segundo tipo', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(type: 'poison'),
+        );
+
+        expect(idsOf(entries), [1, 2]);
+        expect(entries.first.typeNames, ['grass', 'poison']);
+        expect(entries.last.typeNames, ['grass', 'poison']);
+      });
+
+      test('no duplica Pokémon que tienen varios tipos', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(type: 'grass'),
+        );
+
+        expect(entries.length, 2);
+        expect(idsOf(entries), [1, 2]);
+      });
+
+      test('un tipo vacío no restringe el catálogo', () async {
+        final entries = await filteredPage(query: const CatalogQuery(type: ''));
+
+        expect(idsOf(entries), [1, 2, 4, 7, 25, 26]);
+      });
+    });
+
+    group('ordenamiento', () {
+      test('ordena por número ascendente', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(sort: CatalogSort.numberAscending),
+        );
+
+        expect(idsOf(entries), [1, 2, 4, 7, 25, 26]);
+      });
+
+      test('ordena por número descendente', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(sort: CatalogSort.numberDescending),
+        );
+
+        expect(idsOf(entries), [26, 25, 7, 4, 2, 1]);
+      });
+
+      test('ordena por nombre ascendente', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(sort: CatalogSort.nameAscending),
+        );
+
+        expect(idsOf(entries), [1, 4, 2, 25, 26, 7]);
+      });
+
+      test('ordena por nombre descendente', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(sort: CatalogSort.nameDescending),
+        );
+
+        expect(idsOf(entries), [7, 26, 25, 2, 4, 1]);
+      });
+
+      test('ordena por nombre sin distinguir mayúsculas', () async {
+        await savePage(const [
+          CatalogEntry(
+            id: 150,
+            name: 'Abra',
+            imageUrl: '',
+            typeNames: ['psychic'],
+          ),
+          CatalogEntry(
+            id: 151,
+            name: 'Zubat',
+            imageUrl: '',
+            typeNames: ['poison', 'flying'],
+          ),
+        ]);
+
+        final entries = await filteredPage(
+          query: const CatalogQuery(sort: CatalogSort.nameAscending),
+        );
+
+        expect(idsOf(entries), [150, 1, 4, 2, 25, 26, 7, 151]);
+      });
+
+      test('ordena por estadísticas base totales ascendentes', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(sort: CatalogSort.baseStatTotalAscending),
+        );
+
+        expect(idsOf(entries), [7, 4, 1, 2, 26, 25]);
+      });
+
+      test('ordena por estadísticas base totales descendentes', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(sort: CatalogSort.baseStatTotalDescending),
+        );
+
+        expect(idsOf(entries), [26, 2, 1, 4, 7, 25]);
+      });
+
+      test('los Pokémon sin estadísticas quedan al final', () async {
+        final row = await savedPokemonRow(25);
+
+        expect(row.baseStatTotal, isNull);
+
+        final ascending = await filteredPage(
+          query: const CatalogQuery(sort: CatalogSort.baseStatTotalAscending),
+        );
+
+        final descending = await filteredPage(
+          query: const CatalogQuery(sort: CatalogSort.baseStatTotalDescending),
+        );
+
+        expect(ascending.last.id, 25);
+        expect(descending.last.id, 25);
+      });
+
+      test('desempata estadísticas iguales por número ascendente', () async {
+        await savePage(const [
+          CatalogEntry(
+            id: 10,
+            name: 'pokemon-a',
+            imageUrl: '',
+            typeNames: ['bug'],
+            baseStats: {'hp': 100},
+          ),
+          CatalogEntry(
+            id: 11,
+            name: 'pokemon-b',
+            imageUrl: '',
+            typeNames: ['bug'],
+            baseStats: {'hp': 100},
+          ),
+        ]);
+
+        final ascending = await filteredPage(
+          query: const CatalogQuery(
+            type: 'bug',
+            sort: CatalogSort.baseStatTotalAscending,
+          ),
+        );
+
+        final descending = await filteredPage(
+          query: const CatalogQuery(
+            type: 'bug',
+            sort: CatalogSort.baseStatTotalDescending,
+          ),
+        );
+
+        expect(idsOf(ascending), [10, 11]);
+        expect(idsOf(descending), [10, 11]);
+      });
+
+      test('desempata estadísticas nulas por número ascendente', () async {
+        await savePage(const [
+          CatalogEntry(
+            id: 100,
+            name: 'pokemon-sin-estadisticas',
+            imageUrl: '',
+            typeNames: ['electric'],
+          ),
+        ]);
+
+        final entries = await filteredPage(
+          query: const CatalogQuery(
+            type: 'electric',
+            sort: CatalogSort.baseStatTotalDescending,
+          ),
+        );
+
+        expect(idsOf(entries), [26, 25, 100]);
+      });
+    });
+
+    group('combinación de criterios', () {
+      test('combina búsqueda por nombre y tipo', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: 'saur', type: 'grass'),
+        );
+
+        expect(idsOf(entries), [1, 2]);
+      });
+
+      test('combina búsqueda, tipo y ordenamiento', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(
+            search: 'saur',
+            type: 'poison',
+            sort: CatalogSort.numberDescending,
+          ),
+        );
+
+        expect(idsOf(entries), [2, 1]);
+      });
+
+      test('combina búsqueda numérica y tipo', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: '25', type: 'electric'),
+        );
+
+        expect(idsOf(entries), [25]);
+      });
+
+      test('devuelve una lista vacía si los criterios no coinciden', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: 'pikachu', type: 'water'),
+        );
+
+        expect(entries, isEmpty);
+      });
+
+      test('excluye las formas alternativas al buscar por nombre', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: 'raichu'),
+        );
+
+        expect(idsOf(entries), [26]);
+      });
+
+      test('excluye las formas alternativas al buscar por número', () async {
+        final entries = await filteredPage(
+          query: const CatalogQuery(search: '10100'),
+        );
+
+        expect(entries, isEmpty);
+      });
+    });
+
+    group('paginación filtrada', () {
+      test('aplica el filtro antes de paginar', () async {
+        const query = CatalogQuery(type: 'electric');
+
+        final firstPage = await filteredPage(query: query, limit: 1, offset: 0);
+
+        final secondPage = await filteredPage(
+          query: query,
+          limit: 1,
+          offset: 1,
+        );
+
+        expect(idsOf(firstPage), [25]);
+        expect(idsOf(secondPage), [26]);
+      });
+
+      test('aplica el ordenamiento antes de paginar', () async {
+        const query = CatalogQuery(sort: CatalogSort.nameAscending);
+
+        final firstPage = await filteredPage(query: query, limit: 2, offset: 0);
+
+        final secondPage = await filteredPage(
+          query: query,
+          limit: 2,
+          offset: 2,
+        );
+
+        final thirdPage = await filteredPage(query: query, limit: 2, offset: 4);
+
+        expect(idsOf(firstPage), [1, 4]);
+        expect(idsOf(secondPage), [2, 25]);
+        expect(idsOf(thirdPage), [26, 7]);
+      });
+
+      test('pagina correctamente el ranking descendente', () async {
+        const query = CatalogQuery(sort: CatalogSort.baseStatTotalDescending);
+
+        final firstPage = await filteredPage(query: query, limit: 2, offset: 0);
+
+        final secondPage = await filteredPage(
+          query: query,
+          limit: 2,
+          offset: 2,
+        );
+
+        final thirdPage = await filteredPage(query: query, limit: 2, offset: 4);
+
+        expect(idsOf(firstPage), [26, 2]);
+        expect(idsOf(secondPage), [1, 4]);
+        expect(idsOf(thirdPage), [7, 25]);
+      });
+
+      test(
+        'la última página devuelve únicamente los resultados restantes',
+        () async {
+          final entries = await filteredPage(limit: 4, offset: 4);
+
+          expect(idsOf(entries), [25, 26]);
+        },
+      );
+
+      test(
+        'devuelve una página vacía si el offset supera los resultados',
+        () async {
+          final entries = await filteredPage(
+            query: const CatalogQuery(type: 'grass'),
+            limit: 2,
+            offset: 2,
+          );
+
+          expect(entries, isEmpty);
+        },
+      );
+
+      test(
+        'un Pokémon con dos tipos ocupa un solo lugar en la página',
+        () async {
+          final entries = await filteredPage(
+            query: const CatalogQuery(type: 'grass'),
+            limit: 1,
+          );
+
+          expect(idsOf(entries), [1]);
+          expect(entries.single.typeNames, ['grass', 'poison']);
+        },
+      );
+    });
+
+    group('conteo filtrado', () {
+      test('cuenta únicamente los resultados de la búsqueda', () async {
+        final count = await catalogDao
+            .watchFilteredCatalogCount(const CatalogQuery(search: 'saur'))
+            .first;
+
+        expect(count, 2);
+      });
+
+      test('cuenta correctamente una búsqueda numérica', () async {
+        final count = await catalogDao
+            .watchFilteredCatalogCount(const CatalogQuery(search: '25'))
+            .first;
+
+        expect(count, 1);
+      });
+
+      test('combina búsqueda y tipo en el conteo', () async {
+        final count = await catalogDao
+            .watchFilteredCatalogCount(
+              const CatalogQuery(search: 'saur', type: 'poison'),
+            )
+            .first;
+
+        expect(count, 2);
+      });
+
+      test('devuelve cero cuando no existen coincidencias', () async {
+        final count = await catalogDao
+            .watchFilteredCatalogCount(
+              const CatalogQuery(search: 'pikachu', type: 'fire'),
+            )
+            .first;
+
+        expect(count, 0);
+      });
+
+      test('el ordenamiento no modifica el conteo', () async {
+        for (final sort in CatalogSort.values) {
+          final count = await catalogDao
+              .watchFilteredCatalogCount(
+                CatalogQuery(type: 'electric', sort: sort),
+              )
+              .first;
+
+          expect(count, 2);
+        }
+      });
+
+      test('el conteo no está limitado al tamaño de la página', () async {
+        const query = CatalogQuery(type: 'grass');
+
+        final entries = await filteredPage(query: query, limit: 1);
+
+        final count = await catalogDao.watchFilteredCatalogCount(query).first;
+
+        expect(entries.length, 1);
+        expect(count, 2);
+      });
+    });
+
+    group('actualizaciones reactivas', () {
+      test(
+        'la búsqueda vuelve a emitir cuando aparece una coincidencia',
+        () async {
+          const query = CatalogQuery(search: 'char');
+
+          final updates = StreamQueue(
+            catalogDao
+                .watchFilteredCatalogPage(limit: 50, offset: 0, query: query)
+                .map(idsOf)
+                .distinct(
+                  (previous, next) =>
+                      previous.length == next.length &&
+                      previous.asMap().entries.every(
+                        (entry) => entry.value == next[entry.key],
+                      ),
+                ),
+          );
+
+          addTearDown(updates.cancel);
+
+          expect(await updates.next, [4]);
+
+          await savePage(const [
+            CatalogEntry(
+              id: 6,
+              name: 'charizard',
+              imageUrl: '',
+              typeNames: ['fire', 'flying'],
+            ),
+          ]);
+
+          expect(await updates.next, [4, 6]);
+        },
+      );
+
+      test(
+        'el filtro vuelve a emitir cuando cambia el tipo de un Pokémon',
+        () async {
+          const query = CatalogQuery(type: 'fire');
+
+          final updates = StreamQueue(
+            catalogDao
+                .watchFilteredCatalogPage(limit: 50, offset: 0, query: query)
+                .map(idsOf),
+          );
+
+          addTearDown(updates.cancel);
+
+          expect(await updates.next, [4]);
+
+          await catalogDao.saveRevalidated(const [
+            CatalogEntry(
+              id: 25,
+              name: 'pikachu',
+              imageUrl: '',
+              typeNames: ['fire'],
+            ),
+          ], savedAt: savedAt.add(const Duration(minutes: 1)));
+
+          expect(await updates.next, [4, 25]);
+        },
+      );
+
+      test('el conteo se actualiza al guardar nuevas coincidencias', () async {
+        final updates = StreamQueue(
+          catalogDao
+              .watchFilteredCatalogCount(const CatalogQuery(type: 'fire'))
+              .distinct(),
+        );
+
+        addTearDown(updates.cancel);
+
+        expect(await updates.next, 1);
+
+        await savePage(const [
+          CatalogEntry(
+            id: 6,
+            name: 'charizard',
+            imageUrl: '',
+            typeNames: ['fire', 'flying'],
+          ),
+        ]);
+
+        expect(await updates.next, 2);
+      });
+
+      test('el conteo disminuye cuando un Pokémon deja de coincidir', () async {
+        final updates = StreamQueue(
+          catalogDao
+              .watchFilteredCatalogCount(const CatalogQuery(type: 'grass'))
+              .distinct(),
+        );
+
+        addTearDown(updates.cancel);
+
+        expect(await updates.next, 2);
+
+        await catalogDao.saveRevalidated(const [
+          CatalogEntry(
+            id: 1,
+            name: 'bulbasaur',
+            imageUrl: '',
+            typeNames: ['poison'],
+          ),
+        ], savedAt: savedAt.add(const Duration(minutes: 1)));
+
+        expect(await updates.next, 1);
+      });
+
+      test('el ranking se actualiza cuando cambian las estadísticas', () async {
+        final updates = StreamQueue(
+          catalogDao
+              .watchFilteredCatalogPage(
+                limit: 50,
+                offset: 0,
+                query: const CatalogQuery(
+                  sort: CatalogSort.baseStatTotalDescending,
+                ),
+              )
+              .map(idsOf),
+        );
+
+        addTearDown(updates.cancel);
+
+        expect(await updates.next, [26, 2, 1, 4, 7, 25]);
+
+        await catalogDao.saveRevalidated(const [
+          CatalogEntry(
+            id: 25,
+            name: 'pikachu',
+            imageUrl: '',
+            typeNames: ['electric'],
+            baseStats: {
+              'hp': 100,
+              'attack': 100,
+              'defense': 100,
+              'special-attack': 100,
+              'special-defense': 100,
+              'speed': 100,
+            },
+          ),
+        ], savedAt: savedAt.add(const Duration(minutes: 1)));
+
+        expect(await updates.next, [25, 26, 2, 1, 4, 7]);
+      });
     });
   });
 
