@@ -24,6 +24,7 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progres
 
 import '../../fakes/fake_catalog_query_repository.dart';
 import '../../../favorites/fakes/fake_favorites_repository.dart';
+import '../../fakes/fake_sync_catalog.dart';
 
 void main() {
   const pikachu = Pokemon(
@@ -177,11 +178,15 @@ void main() {
     List<CatalogPageRequest>? pageRequests,
     List<CatalogQuery>? countRequests,
     FakeCatalogQueryRepository? queryRepository,
+    FakeSyncCatalog? syncCatalog,
+    Stream<List<Pokemon>>? pokemonUpdates,
   }) {
     return [
       catalogQueryRepositoryProvider.overrideWithValue(
         queryRepository ?? FakeCatalogQueryRepository(),
       ),
+
+      syncCatalogProvider.overrideWithValue(syncCatalog ?? FakeSyncCatalog()),
 
       catalogProgressProvider.overrideWith(
         (ref) =>
@@ -198,12 +203,18 @@ void main() {
       filteredCatalogPageProvider.overrideWith((ref, request) {
         pageRequests?.add(request);
 
-        final filtered = applyQuery(pokemon, request.query);
-        final offset = request.page * request.pageSize;
+        List<Pokemon> pageOf(List<Pokemon> items) {
+          final filtered = applyQuery(items, request.query);
+          final offset = request.page * request.pageSize;
 
-        return Stream.value(
-          filtered.skip(offset).take(request.pageSize).toList(),
-        );
+          return filtered.skip(offset).take(request.pageSize).toList();
+        }
+
+        if (pokemonUpdates != null) {
+          return pokemonUpdates.map(pageOf);
+        }
+
+        return Stream.value(pageOf(pokemon));
       }),
 
       filteredCatalogCountProvider.overrideWith((ref, query) {
@@ -229,16 +240,23 @@ void main() {
     List<CatalogPageRequest>? pageRequests,
     List<CatalogQuery>? countRequests,
     FakeCatalogQueryRepository? queryRepository,
+    FakeSyncCatalog? syncCatalog,
+    Stream<SyncStatus>? syncStatuses,
+    Stream<List<Pokemon>>? pokemonUpdates,
+    Stream<int>? counts,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: catalogOverrides(
           pokemon,
-          syncStatuses: Stream.value(syncStatus),
+          syncStatuses: syncStatuses ?? Stream.value(syncStatus),
           progressUpdates: progressUpdates,
           pageRequests: pageRequests,
           countRequests: countRequests,
           queryRepository: queryRepository,
+          syncCatalog: syncCatalog,
+          pokemonUpdates: pokemonUpdates,
+          counts: counts,
         ),
         child: MaterialApp(
           locale: locale,
@@ -378,6 +396,37 @@ void main() {
         .widgetList<PokemonListItem>(find.byType(PokemonListItem))
         .map((item) => item.pokemon.id)
         .toList();
+  }
+
+  Finder refreshIndicator() {
+    return find.byKey(const ValueKey('catalog-refresh-indicator'));
+  }
+
+  Finder refreshProgressIndicator() {
+    return find.descendant(
+      of: refreshIndicator(),
+      matching: find.byType(RefreshProgressIndicator),
+    );
+  }
+
+  Finder catalogList() {
+    return find.byKey(const ValueKey('catalog-pokemon-list'));
+  }
+
+  Finder catalogScrollableState() {
+    return find.byKey(const ValueKey('catalog-scrollable-state'));
+  }
+
+  Future<void> pullToRefresh(WidgetTester tester, {Finder? target}) async {
+    final scrollTarget = target ?? catalogList();
+
+    expect(scrollTarget, findsOneWidget);
+
+    await tester.drag(scrollTarget, const Offset(0, 500));
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
   }
 
   testWidgets('muestra el número, nombre y tipo de un Pokémon', (tester) async {
@@ -2716,6 +2765,1287 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+  });
+  group('pull-to-refresh: disponibilidad', () {
+    testWidgets('existe una unica instancia de RefreshIndicator', (
+      tester,
+    ) async {
+      await pumpCatalog(tester, pokemon: testCatalog);
+
+      expect(find.byType(RefreshIndicator), findsOneWidget);
+
+      expect(refreshIndicator(), findsOneWidget);
+
+      expect(
+        find.descendant(of: refreshIndicator(), matching: catalogList()),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('el listado siempre permite desplazamiento', (tester) async {
+      await pumpCatalog(tester, pokemon: [pikachu]);
+
+      final list = tester.widget<ListView>(catalogList());
+
+      expect(list.physics, isA<AlwaysScrollableScrollPhysics>());
+    });
+
+    testWidgets('permite actualizar un listado largo', (tester) async {
+      final sync = FakeSyncCatalog();
+
+      final pokemon = List.generate(
+        50,
+        (index) => Pokemon(
+          id: index + 1,
+          name: 'pokemon${index + 1}',
+          imageUrl: '',
+          typeNames: const ['normal'],
+        ),
+      );
+
+      await pumpCatalog(tester, pokemon: pokemon, syncCatalog: sync);
+
+      expect(sync.calls, 0);
+
+      await pullToRefresh(tester);
+      await tester.pumpAndSettle();
+
+      expect(sync.calls, 1);
+      expect(sync.requests, [true]);
+
+      expect(find.text('#0001'), findsOneWidget);
+    });
+
+    testWidgets('permite actualizar cuando solo hay un Pokemon', (
+      tester,
+    ) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(tester, pokemon: [pikachu], syncCatalog: sync);
+
+      expect(find.byType(PokemonListItem), findsOneWidget);
+
+      await pullToRefresh(tester);
+      await tester.pumpAndSettle();
+
+      expect(sync.requests, [true]);
+
+      expect(find.text('Pikachu'), findsOneWidget);
+    });
+
+    testWidgets('permite actualizar el catalogo vacio', (tester) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(tester, pokemon: [], syncCatalog: sync);
+
+      final l10n = catalogL10n(tester);
+
+      expect(find.text(l10n.catalogEmpty), findsOneWidget);
+
+      expect(catalogScrollableState(), findsOneWidget);
+
+      await pullToRefresh(tester, target: catalogScrollableState());
+
+      await tester.pumpAndSettle();
+
+      expect(sync.requests, [true]);
+
+      expect(find.text(l10n.catalogEmpty), findsOneWidget);
+    });
+
+    testWidgets('permite actualizar desde el estado de error', (tester) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(
+        tester,
+        pokemon: [],
+        syncStatus: const SyncFailed(NoConnection()),
+        syncCatalog: sync,
+      );
+
+      final l10n = catalogL10n(tester);
+
+      expect(find.text(l10n.catalogLoadError), findsOneWidget);
+
+      await pullToRefresh(tester, target: catalogScrollableState());
+
+      await tester.pumpAndSettle();
+
+      expect(sync.requests, [true]);
+
+      expect(find.text(l10n.retry), findsOneWidget);
+    });
+
+    testWidgets('permite actualizar una busqueda sin resultados', (
+      tester,
+    ) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+      await showFilters(tester);
+      await searchFor(tester, 'inexistente');
+
+      final l10n = catalogL10n(tester);
+
+      expect(find.text(l10n.catalogNoResults), findsOneWidget);
+
+      await pullToRefresh(tester, target: catalogScrollableState());
+
+      await tester.pumpAndSettle();
+
+      expect(sync.requests, [true]);
+
+      expect(find.text(l10n.catalogNoResults), findsOneWidget);
+
+      final searchField = tester.widget<TextField>(find.byType(TextField));
+
+      expect(searchField.controller?.text, 'inexistente');
+    });
+
+    testWidgets('permite actualizar con filtros sin coincidencias', (
+      tester,
+    ) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+      await showFilters(tester);
+
+      await selectMultiple<String>(
+        tester,
+        selector: typeDropdown(),
+        values: {'dragon'},
+      );
+
+      final l10n = catalogL10n(tester);
+
+      expect(find.text(l10n.catalogNoResults), findsOneWidget);
+
+      await pullToRefresh(tester, target: catalogScrollableState());
+
+      await tester.pumpAndSettle();
+
+      expect(sync.requests, [true]);
+
+      expect(find.text(l10n.catalogNoResults), findsOneWidget);
+
+      final filterBar = tester.widget<CatalogFilterBar>(
+        find.byType(CatalogFilterBar),
+      );
+
+      expect(filterBar.selectedTypes, {'dragon'});
+    });
+
+    testWidgets('no inicia otra actualizacion durante la carga inicial', (
+      tester,
+    ) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(
+        tester,
+        pokemon: [],
+        syncStatus: const SyncFullPassInProgress(),
+        syncCatalog: sync,
+      );
+
+      final l10n = catalogL10n(tester);
+
+      expect(find.text(l10n.catalogLoading), findsOneWidget);
+
+      expect(catalogList(), findsNothing);
+
+      expect(catalogScrollableState(), findsNothing);
+
+      await tester.drag(refreshIndicator(), const Offset(0, 500));
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(sync.calls, 0);
+
+      expect(refreshProgressIndicator(), findsNothing);
+
+      expect(find.text(l10n.catalogLoading), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
+  group('pull-to-refresh: ejecucion', () {
+    testWidgets('el gesto ejecuta el caso de uso de sincronizacion', (
+      tester,
+    ) async {
+      var executed = false;
+
+      final sync = FakeSyncCatalog(
+        onSync: (_) async {
+          executed = true;
+        },
+      );
+
+      await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+      expect(executed, isFalse);
+      expect(sync.calls, 0);
+
+      await pullToRefresh(tester);
+      await tester.pumpAndSettle();
+
+      expect(executed, isTrue);
+      expect(sync.calls, 1);
+    });
+
+    testWidgets('la actualizacion manual utiliza force true', (tester) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+      await pullToRefresh(tester);
+      await tester.pumpAndSettle();
+
+      expect(sync.requests, [true]);
+    });
+
+    testWidgets(
+      'el indicador permanece activo mientras la sincronizacion esta pendiente',
+      (tester) async {
+        final pendingSync = Completer<void>();
+
+        final sync = FakeSyncCatalog(onSync: (_) => pendingSync.future);
+
+        await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+        expect(refreshProgressIndicator(), findsNothing);
+
+        await pullToRefresh(tester);
+
+        expect(sync.calls, 1);
+        expect(pendingSync.isCompleted, isFalse);
+
+        expect(refreshProgressIndicator(), findsOneWidget);
+
+        await tester.pump(const Duration(seconds: 3));
+
+        expect(refreshProgressIndicator(), findsOneWidget);
+
+        expect(pendingSync.isCompleted, isFalse);
+
+        pendingSync.complete();
+
+        await tester.pumpAndSettle();
+
+        expect(refreshProgressIndicator(), findsNothing);
+      },
+    );
+
+    testWidgets('el indicador desaparece cuando finaliza la sincronizacion', (
+      tester,
+    ) async {
+      final pendingSync = Completer<void>();
+
+      final sync = FakeSyncCatalog(onSync: (_) => pendingSync.future);
+
+      await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+      await pullToRefresh(tester);
+
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      pendingSync.complete();
+
+      await tester.pumpAndSettle();
+
+      expect(pendingSync.isCompleted, isTrue);
+
+      expect(refreshProgressIndicator(), findsNothing);
+
+      expect(refreshIndicator(), findsOneWidget);
+
+      expect(sync.calls, 1);
+    });
+
+    testWidgets('conserva los Pokemon visibles durante la actualizacion', (
+      tester,
+    ) async {
+      final pendingSync = Completer<void>();
+
+      final sync = FakeSyncCatalog(onSync: (_) => pendingSync.future);
+
+      await pumpCatalog(
+        tester,
+        pokemon: [bulbasaur, pikachu, raichu],
+        syncCatalog: sync,
+      );
+
+      final initialIds = visiblePokemonIds(tester);
+
+      expect(initialIds, [1, 25, 26]);
+
+      await pullToRefresh(tester);
+
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      expect(visiblePokemonIds(tester), initialIds);
+
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(visiblePokemonIds(tester), initialIds);
+
+      expect(catalogList(), findsOneWidget);
+
+      pendingSync.complete();
+
+      await tester.pumpAndSettle();
+
+      expect(visiblePokemonIds(tester), initialIds);
+    });
+
+    testWidgets(
+      'un segundo gesto no inicia otra solicitud mientras se actualiza',
+      (tester) async {
+        final pendingSync = Completer<void>();
+
+        final sync = FakeSyncCatalog(onSync: (_) => pendingSync.future);
+
+        await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+        await pullToRefresh(tester);
+
+        expect(sync.calls, 1);
+
+        expect(refreshProgressIndicator(), findsOneWidget);
+
+        await pullToRefresh(tester);
+
+        expect(sync.calls, 1);
+        expect(sync.requests, [true]);
+
+        expect(refreshProgressIndicator(), findsOneWidget);
+
+        pendingSync.complete();
+
+        await tester.pumpAndSettle();
+
+        expect(sync.calls, 1);
+
+        expect(refreshProgressIndicator(), findsNothing);
+      },
+    );
+
+    testWidgets('permite volver a actualizar despues de finalizar', (
+      tester,
+    ) async {
+      final pendingSyncs = <Completer<void>>[];
+
+      final sync = FakeSyncCatalog(
+        onSync: (_) {
+          final pending = Completer<void>();
+
+          pendingSyncs.add(pending);
+
+          return pending.future;
+        },
+      );
+
+      await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+      // Primera actualizacion.
+      await pullToRefresh(tester);
+
+      expect(sync.calls, 1);
+      expect(pendingSyncs, hasLength(1));
+
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      pendingSyncs.first.complete();
+
+      await tester.pumpAndSettle();
+
+      expect(refreshProgressIndicator(), findsNothing);
+
+      // Segunda actualizacion.
+      await pullToRefresh(tester);
+
+      expect(sync.calls, 2);
+      expect(pendingSyncs, hasLength(2));
+      expect(sync.requests, [true, true]);
+
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      pendingSyncs.last.complete();
+
+      await tester.pumpAndSettle();
+
+      expect(refreshProgressIndicator(), findsNothing);
+
+      expect(sync.calls, 2);
+    });
+  });
+  group('pull-to-refresh: errores', () {
+    testWidgets('una excepcion no deja el indicador activo', (tester) async {
+      final pending = Completer<void>();
+
+      final sync = FakeSyncCatalog(onSync: (_) => pending.future);
+
+      await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+      await pullToRefresh(tester);
+
+      expect(sync.requests, [true]);
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      pending.completeError(StateError('Error inesperado'));
+
+      await tester.pumpAndSettle();
+
+      expect(refreshProgressIndicator(), findsNothing);
+      expect(catalogList(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('un fallo por falta de conexion conserva el listado local', (
+      tester,
+    ) async {
+      final statuses = StreamController<SyncStatus>.broadcast();
+      addTearDown(statuses.close);
+
+      final pending = Completer<void>();
+
+      final sync = FakeSyncCatalog(
+        onSync: (_) {
+          statuses.add(const SyncFullPassInProgress());
+          return pending.future;
+        },
+      );
+
+      await pumpCatalog(
+        tester,
+        pokemon: [pikachu, raichu],
+        syncCatalog: sync,
+        syncStatuses: statuses.stream,
+      );
+
+      statuses.add(const SyncIdle());
+      await tester.pump();
+      await tester.pump();
+
+      await pullToRefresh(tester);
+
+      expect(visiblePokemonIds(tester), [25, 26]);
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      statuses.add(const SyncFailed(NoConnection()));
+      pending.complete();
+
+      await tester.pumpAndSettle();
+
+      expect(refreshProgressIndicator(), findsNothing);
+      expect(visiblePokemonIds(tester), [25, 26]);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('un fallo de sincronizacion muestra un SnackBar', (
+      tester,
+    ) async {
+      final statuses = StreamController<SyncStatus>.broadcast();
+      addTearDown(statuses.close);
+
+      final pending = Completer<void>();
+
+      final sync = FakeSyncCatalog(
+        onSync: (_) {
+          statuses.add(const SyncFullPassInProgress());
+          return pending.future;
+        },
+      );
+
+      await pumpCatalog(
+        tester,
+        pokemon: [pikachu],
+        syncCatalog: sync,
+        syncStatuses: statuses.stream,
+      );
+
+      statuses.add(const SyncIdle());
+      await tester.pump();
+      await tester.pump();
+
+      await pullToRefresh(tester);
+
+      statuses.add(const SyncFailed(NoConnection()));
+      pending.complete();
+
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.text('Pikachu'), findsOneWidget);
+      expect(refreshProgressIndicator(), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('el indicador desaparece al programarse un reintento', (
+      tester,
+    ) async {
+      final statuses = StreamController<SyncStatus>.broadcast();
+      addTearDown(statuses.close);
+
+      final pending = Completer<void>();
+
+      final sync = FakeSyncCatalog(
+        onSync: (_) {
+          statuses.add(const SyncFullPassInProgress());
+          return pending.future;
+        },
+      );
+
+      await pumpCatalog(
+        tester,
+        pokemon: [pikachu],
+        syncCatalog: sync,
+        syncStatuses: statuses.stream,
+      );
+
+      statuses.add(const SyncIdle());
+      await tester.pump();
+      await tester.pump();
+
+      await pullToRefresh(tester);
+
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      statuses.add(
+        SyncWaitingRetry(
+          attempt: 1,
+          maxAttempts: 5,
+          retryAt: DateTime(2026, 11, 25, 10, 0, 2),
+          failure: const ServerError(503),
+        ),
+      );
+
+      pending.complete();
+
+      await tester.pumpAndSettle();
+
+      expect(refreshProgressIndicator(), findsNothing);
+      expect(find.text('Pikachu'), findsOneWidget);
+      expect(sync.calls, 1);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('el indicador desaparece cuando se agota el presupuesto', (
+      tester,
+    ) async {
+      final statuses = StreamController<SyncStatus>.broadcast();
+      addTearDown(statuses.close);
+
+      final pending = Completer<void>();
+
+      final sync = FakeSyncCatalog(
+        onSync: (_) {
+          statuses.add(const SyncFullPassInProgress());
+          return pending.future;
+        },
+      );
+
+      await pumpCatalog(
+        tester,
+        pokemon: [pikachu],
+        syncCatalog: sync,
+        syncStatuses: statuses.stream,
+      );
+
+      statuses.add(const SyncIdle());
+      await tester.pump();
+      await tester.pump();
+
+      await pullToRefresh(tester);
+
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      statuses.add(SyncPaused(DateTime(2026, 11, 25, 10, 10)));
+
+      pending.complete();
+
+      await tester.pumpAndSettle();
+
+      expect(refreshProgressIndicator(), findsNothing);
+      expect(find.text('Pikachu'), findsOneWidget);
+      expect(sync.calls, 1);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('permite volver a actualizar despues de una excepcion', (
+      tester,
+    ) async {
+      final attempts = <Completer<void>>[];
+
+      final sync = FakeSyncCatalog(
+        onSync: (_) {
+          final pending = Completer<void>();
+          attempts.add(pending);
+          return pending.future;
+        },
+      );
+
+      await pumpCatalog(tester, pokemon: [pikachu], syncCatalog: sync);
+
+      await pullToRefresh(tester);
+
+      expect(sync.calls, 1);
+
+      attempts.first.completeError(StateError('Primer intento fallido'));
+
+      await tester.pumpAndSettle();
+
+      expect(refreshProgressIndicator(), findsNothing);
+
+      await pullToRefresh(tester);
+
+      expect(sync.calls, 2);
+      expect(sync.requests, [true, true]);
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      attempts.last.complete();
+
+      await tester.pumpAndSettle();
+
+      expect(refreshProgressIndicator(), findsNothing);
+      expect(find.text('Pikachu'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+  group('pull-to-refresh: conservacion de la consulta', () {
+    testWidgets('conserva el texto de busqueda', (tester) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+      await showFilters(tester);
+      await searchFor(tester, 'pikachu');
+
+      expect(visiblePokemonIds(tester), [25]);
+
+      await pullToRefresh(tester);
+      await tester.pumpAndSettle();
+
+      final searchField = tester.widget<TextField>(find.byType(TextField));
+
+      expect(searchField.controller?.text, 'pikachu');
+      expect(visiblePokemonIds(tester), [25]);
+      expect(sync.requests, [true]);
+    });
+
+    testWidgets('conserva los tipos seleccionados', (tester) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+      await showFilters(tester);
+
+      await selectMultiple<String>(
+        tester,
+        selector: typeDropdown(),
+        values: {'electric', 'water'},
+      );
+
+      expect(visiblePokemonIds(tester), [7, 25, 26]);
+
+      await pullToRefresh(tester);
+      await tester.pumpAndSettle();
+
+      final filterBar = tester.widget<CatalogFilterBar>(
+        find.byType(CatalogFilterBar),
+      );
+
+      expect(filterBar.selectedTypes, {'electric', 'water'});
+
+      expect(visiblePokemonIds(tester), [7, 25, 26]);
+      expect(sync.requests, [true]);
+    });
+
+    testWidgets('conserva las generaciones seleccionadas', (tester) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(
+        tester,
+        pokemon: multiGenerationCatalog,
+        syncCatalog: sync,
+      );
+
+      await showFilters(tester);
+
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {2, 3},
+      );
+
+      expect(visiblePokemonIds(tester), [155, 158, 255]);
+
+      await pullToRefresh(tester);
+      await tester.pumpAndSettle();
+
+      final filterBar = tester.widget<CatalogFilterBar>(
+        find.byType(CatalogFilterBar),
+      );
+
+      expect(filterBar.selectedGenerations, {2, 3});
+      expect(visiblePokemonIds(tester), [155, 158, 255]);
+      expect(sync.requests, [true]);
+    });
+
+    testWidgets('conserva el criterio de ordenamiento', (tester) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(
+        tester,
+        pokemon: [bulbasaur, pikachu, raichu],
+        syncCatalog: sync,
+      );
+
+      await showFilters(tester);
+
+      await selectSort(tester, catalogL10n(tester).catalogSortNumberDesc);
+
+      expect(visiblePokemonIds(tester), [26, 25, 1]);
+
+      await pullToRefresh(tester);
+      await tester.pumpAndSettle();
+
+      final filterBar = tester.widget<CatalogFilterBar>(
+        find.byType(CatalogFilterBar),
+      );
+
+      expect(filterBar.selectedSort, CatalogSort.numberDescending);
+
+      expect(visiblePokemonIds(tester), [26, 25, 1]);
+      expect(sync.requests, [true]);
+    });
+
+    testWidgets('conserva la pagina actual cuando sigue siendo valida', (
+      tester,
+    ) async {
+      final sync = FakeSyncCatalog();
+      final queryRepository = FakeCatalogQueryRepository();
+      final pageRequests = <CatalogPageRequest>[];
+
+      final pokemon = List.generate(
+        51,
+        (index) => Pokemon(
+          id: index + 1,
+          name: 'pokemon${index + 1}',
+          imageUrl: '',
+          typeNames: const ['normal'],
+        ),
+      );
+
+      await pumpCatalog(
+        tester,
+        pokemon: pokemon,
+        syncCatalog: sync,
+        queryRepository: queryRepository,
+        pageRequests: pageRequests,
+      );
+
+      await scrollToPagination(tester);
+
+      await tester.tap(find.byTooltip(catalogL10n(tester).nextPage));
+
+      await tester.pumpAndSettle();
+
+      expect(visiblePokemonIds(tester), [51]);
+      expect(pageRequests.last.page, 1);
+      expect(queryRepository.storedState?.page, 1);
+
+      await pullToRefresh(tester);
+      await tester.pumpAndSettle();
+
+      expect(visiblePokemonIds(tester), [51]);
+      expect(pageRequests.last.page, 1);
+      expect(queryRepository.storedState?.page, 1);
+      expect(sync.requests, [true]);
+    });
+
+    testWidgets(
+      'actualizar no genera escrituras innecesarias en preferencias',
+      (tester) async {
+        final sync = FakeSyncCatalog();
+        final queryRepository = FakeCatalogQueryRepository();
+
+        final pageRequests = <CatalogPageRequest>[];
+        final countRequests = <CatalogQuery>[];
+
+        await pumpCatalog(
+          tester,
+          pokemon: testCatalog,
+          syncCatalog: sync,
+          queryRepository: queryRepository,
+          pageRequests: pageRequests,
+          countRequests: countRequests,
+        );
+
+        await showFilters(tester);
+        await searchFor(tester, 'pikachu');
+
+        await selectMultiple<String>(
+          tester,
+          selector: typeDropdown(),
+          values: {'electric'},
+        );
+
+        await selectMultiple<int>(
+          tester,
+          selector: generationSelector(),
+          values: {1},
+        );
+
+        await selectSort(tester, catalogL10n(tester).catalogSortNumberDesc);
+
+        await tester.pumpAndSettle();
+
+        final savedState = queryRepository.storedState;
+        final saveCallsBefore = queryRepository.saveCalls;
+        final loadCallsBefore = queryRepository.loadCalls;
+        final clearCallsBefore = queryRepository.clearCalls;
+
+        final pagesBefore = List<CatalogPageRequest>.of(pageRequests);
+
+        final countsBefore = List<CatalogQuery>.of(countRequests);
+
+        expect(savedState, isNotNull);
+        expect(visiblePokemonIds(tester), [25]);
+
+        await pullToRefresh(tester);
+        await tester.pumpAndSettle();
+
+        expect(queryRepository.storedState, savedState);
+        expect(queryRepository.saveCalls, saveCallsBefore);
+        expect(queryRepository.loadCalls, loadCallsBefore);
+        expect(queryRepository.clearCalls, clearCallsBefore);
+
+        expect(pageRequests, pagesBefore);
+        expect(countRequests, countsBefore);
+
+        expect(visiblePokemonIds(tester), [25]);
+        expect(sync.requests, [true]);
+      },
+    );
+  });
+  group('pull-to-refresh: integracion reactiva', () {
+    const noticeKey = ValueKey('catalog-partial-notice');
+
+    testWidgets('los nuevos Pokemon aparecen durante la actualizacion', (
+      tester,
+    ) async {
+      final updates = StreamController<List<Pokemon>>.broadcast();
+
+      addTearDown(updates.close);
+
+      final pending = Completer<void>();
+
+      final sync = FakeSyncCatalog(onSync: (_) => pending.future);
+
+      await pumpCatalog(
+        tester,
+        pokemon: [pikachu],
+        syncCatalog: sync,
+        pokemonUpdates: updates.stream,
+      );
+
+      updates.add([pikachu]);
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(visiblePokemonIds(tester), [25]);
+
+      await pullToRefresh(tester);
+
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      updates.add([pikachu, raichu]);
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(visiblePokemonIds(tester), [25, 26]);
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      pending.complete();
+
+      await tester.pumpAndSettle();
+
+      expect(visiblePokemonIds(tester), [25, 26]);
+      expect(refreshProgressIndicator(), findsNothing);
+      expect(sync.requests, [true]);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets(
+      'el catalogo pasa de vacio a contener Pokemon durante la actualizacion',
+      (tester) async {
+        final updates = StreamController<List<Pokemon>>.broadcast();
+
+        final counts = StreamController<int>.broadcast();
+
+        final statuses = StreamController<SyncStatus>.broadcast();
+
+        addTearDown(updates.close);
+        addTearDown(counts.close);
+        addTearDown(statuses.close);
+
+        final pending = Completer<void>();
+
+        final sync = FakeSyncCatalog(
+          onSync: (_) {
+            statuses.add(const SyncFullPassInProgress());
+            return pending.future;
+          },
+        );
+
+        await pumpCatalog(
+          tester,
+          pokemon: [],
+          syncCatalog: sync,
+          pokemonUpdates: updates.stream,
+          counts: counts.stream,
+          syncStatuses: statuses.stream,
+        );
+
+        updates.add([]);
+        counts.add(0);
+        statuses.add(const SyncIdle());
+
+        await tester.pump();
+        await tester.pump();
+
+        expect(catalogScrollableState(), findsOneWidget);
+        expect(catalogList(), findsNothing);
+
+        final indicatorBefore = tester.state<RefreshIndicatorState>(
+          refreshIndicator(),
+        );
+
+        await pullToRefresh(tester, target: catalogScrollableState());
+
+        expect(sync.calls, 1);
+        expect(refreshProgressIndicator(), findsOneWidget);
+
+        updates.add([pikachu]);
+        counts.add(1);
+
+        await tester.pump();
+        await tester.pump();
+
+        expect(catalogList(), findsOneWidget);
+        expect(find.text('Pikachu'), findsOneWidget);
+        expect(refreshProgressIndicator(), findsOneWidget);
+
+        final indicatorAfter = tester.state<RefreshIndicatorState>(
+          refreshIndicator(),
+        );
+
+        expect(identical(indicatorBefore, indicatorAfter), isTrue);
+
+        statuses.add(SyncRevalidated(DateTime(2026, 11, 25, 10)));
+
+        pending.complete();
+
+        await tester.pumpAndSettle();
+
+        expect(refreshProgressIndicator(), findsNothing);
+        expect(find.text('Pikachu'), findsOneWidget);
+        expect(catalogScrollableState(), findsNothing);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets('el aviso de catalogo parcial actualiza sus cantidades', (
+      tester,
+    ) async {
+      final progress = StreamController<CatalogProgress>.broadcast();
+
+      addTearDown(progress.close);
+
+      final pending = Completer<void>();
+
+      final sync = FakeSyncCatalog(onSync: (_) => pending.future);
+
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        syncCatalog: sync,
+        progressUpdates: progress.stream,
+      );
+
+      progress.add(
+        const CatalogProgress(
+          savedCount: 6,
+          totalCount: 1025,
+          isComplete: false,
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      final l10n = catalogL10n(tester);
+
+      expect(find.byKey(noticeKey), findsOneWidget);
+
+      expect(find.text(l10n.catalogPartialNotice(6, 1025)), findsOneWidget);
+
+      await pullToRefresh(tester);
+
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      progress.add(
+        const CatalogProgress(
+          savedCount: 100,
+          totalCount: 1025,
+          isComplete: false,
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text(l10n.catalogPartialNotice(6, 1025)), findsNothing);
+
+      expect(find.text(l10n.catalogPartialNotice(100, 1025)), findsOneWidget);
+
+      expect(refreshProgressIndicator(), findsOneWidget);
+
+      pending.complete();
+
+      await tester.pumpAndSettle();
+
+      expect(refreshProgressIndicator(), findsNothing);
+
+      expect(find.text(l10n.catalogPartialNotice(100, 1025)), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('el aviso desaparece cuando se completa el catalogo', (
+      tester,
+    ) async {
+      final progress = StreamController<CatalogProgress>.broadcast();
+
+      addTearDown(progress.close);
+
+      final pending = Completer<void>();
+
+      final sync = FakeSyncCatalog(onSync: (_) => pending.future);
+
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        syncCatalog: sync,
+        progressUpdates: progress.stream,
+      );
+
+      progress.add(
+        const CatalogProgress(
+          savedCount: 6,
+          totalCount: 1025,
+          isComplete: false,
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(noticeKey), findsOneWidget);
+
+      await pullToRefresh(tester);
+
+      progress.add(
+        const CatalogProgress(
+          savedCount: 1025,
+          totalCount: 1025,
+          isComplete: true,
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(noticeKey), findsNothing);
+      expect(refreshProgressIndicator(), findsOneWidget);
+      expect(catalogList(), findsOneWidget);
+
+      pending.complete();
+
+      await tester.pumpAndSettle();
+
+      expect(refreshProgressIndicator(), findsNothing);
+      expect(find.byKey(noticeKey), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets(
+      'el aviso y los filtros permanecen fuera del area de actualizacion',
+      (tester) async {
+        final pending = Completer<void>();
+
+        final sync = FakeSyncCatalog(onSync: (_) => pending.future);
+
+        await pumpCatalog(
+          tester,
+          pokemon: testCatalog,
+          syncCatalog: sync,
+          progressUpdates: Stream.value(
+            const CatalogProgress(
+              savedCount: 6,
+              totalCount: 1025,
+              isComplete: false,
+            ),
+          ),
+        );
+
+        await showFilters(tester);
+
+        final notice = find.byKey(noticeKey);
+        final filters = find.byType(CatalogFilterBar);
+
+        expect(notice, findsOneWidget);
+        expect(filters, findsOneWidget);
+
+        expect(
+          find.descendant(of: refreshIndicator(), matching: notice),
+          findsNothing,
+        );
+
+        expect(
+          find.descendant(of: refreshIndicator(), matching: filters),
+          findsNothing,
+        );
+
+        final noticeBefore = tester.getRect(notice);
+        final filtersBefore = tester.getRect(filters);
+
+        await pullToRefresh(tester);
+
+        expect(refreshProgressIndicator(), findsOneWidget);
+
+        expect(tester.getRect(notice), noticeBefore);
+        expect(tester.getRect(filters), filtersBefore);
+
+        pending.complete();
+
+        await tester.pumpAndSettle();
+
+        expect(tester.getRect(notice), noticeBefore);
+        expect(tester.getRect(filters), filtersBefore);
+        expect(refreshProgressIndicator(), findsNothing);
+      },
+    );
+
+    testWidgets('el boton de sincronizacion del AppBar sigue funcionando', (
+      tester,
+    ) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(tester, pokemon: testCatalog, syncCatalog: sync);
+
+      final l10n = catalogL10n(tester);
+
+      expect(sync.calls, 0);
+
+      await tester.tap(find.byTooltip(l10n.syncCatalog));
+
+      await tester.pumpAndSettle();
+
+      expect(sync.requests, [true]);
+      expect(catalogList(), findsOneWidget);
+
+      await pullToRefresh(tester);
+      await tester.pumpAndSettle();
+
+      expect(sync.requests, [true, true]);
+      expect(refreshProgressIndicator(), findsNothing);
+    });
+
+    testWidgets('el boton de reintentar sigue funcionando en el estado vacio', (
+      tester,
+    ) async {
+      final sync = FakeSyncCatalog();
+
+      await pumpCatalog(tester, pokemon: [], syncCatalog: sync);
+
+      final l10n = catalogL10n(tester);
+
+      expect(find.text(l10n.retry), findsOneWidget);
+
+      await tester.tap(find.text(l10n.retry));
+      await tester.pumpAndSettle();
+
+      expect(sync.requests, [true]);
+
+      await pullToRefresh(tester, target: catalogScrollableState());
+
+      await tester.pumpAndSettle();
+
+      expect(sync.requests, [true, true]);
+      expect(refreshProgressIndicator(), findsNothing);
+      expect(find.text(l10n.retry), findsOneWidget);
+    });
+
+    testWidgets('limpiar filtros sigue funcionando despues de actualizar', (
+      tester,
+    ) async {
+      final sync = FakeSyncCatalog();
+      final queryRepository = FakeCatalogQueryRepository();
+
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        syncCatalog: sync,
+        queryRepository: queryRepository,
+      );
+
+      await showFilters(tester);
+      await searchFor(tester, 'inexistente');
+
+      final l10n = catalogL10n(tester);
+
+      expect(find.text(l10n.catalogNoResults), findsOneWidget);
+
+      await pullToRefresh(tester, target: catalogScrollableState());
+
+      await tester.pumpAndSettle();
+
+      expect(sync.requests, [true]);
+
+      expect(find.text(l10n.catalogNoResults), findsOneWidget);
+
+      await tester.tap(find.text(l10n.catalogClearFilters));
+
+      await tester.pumpAndSettle();
+
+      expect(find.text(l10n.catalogNoResults), findsNothing);
+
+      expect(catalogList(), findsOneWidget);
+      expect(find.byType(PokemonListItem), findsWidgets);
+
+      final searchField = tester.widget<TextField>(find.byType(TextField));
+
+      expect(searchField.controller?.text, isEmpty);
+
+      expect(queryRepository.storedState, CatalogQueryState.initial());
+
+      expect(sync.calls, 1);
+      expect(refreshProgressIndicator(), findsNothing);
     });
   });
 }
