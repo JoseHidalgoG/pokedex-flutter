@@ -16,6 +16,7 @@ class FakePokemonDetailRepository implements PokemonDetailRepository {
 
   final revalidations = <({int id, bool force})>[];
   final stoppedIds = <int>[];
+  final idsSavedForOffline = <int>[];
 
   void emitDetail(int pokemonId, PokemonDetail? detail) {
     _details[pokemonId] = detail;
@@ -73,6 +74,11 @@ class FakePokemonDetailRepository implements PokemonDetailRepository {
   @override
   void stopRevalidatingPokemonDetail(int pokemonId) {
     stoppedIds.add(pokemonId);
+  }
+
+  @override
+  Future<void> saveDetailForOffline(int pokemonId) async {
+    idsSavedForOffline.add(pokemonId);
   }
 
   Future<void> dispose() async {

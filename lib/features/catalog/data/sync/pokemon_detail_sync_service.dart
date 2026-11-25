@@ -47,6 +47,10 @@ class PokemonDetailSyncService {
     );
   }
 
+  Future<bool> isDetailMissing(int pokemonId) async {
+    return await _detailDao.readDetailSyncedAt(pokemonId) == null;
+  }
+
   Future<bool> needsDetailDownload(int pokemonId) async {
     final stored = await _catalogDao.readStoredEntry(pokemonId);
     return _isAltered(stored) || !await _isDetailFresh(pokemonId);
