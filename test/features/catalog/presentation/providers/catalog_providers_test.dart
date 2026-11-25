@@ -121,7 +121,11 @@ class InMemoryCatalogRepository implements CatalogRepository {
   @override
   Stream<CatalogProgress> watchCatalogProgress() {
     return Stream.value(
-      CatalogProgress(savedCount: _pokemon.length, totalCount: _pokemon.length),
+      CatalogProgress(
+        savedCount: _pokemon.length,
+        totalCount: _pokemon.length,
+        isComplete: true,
+      ),
     );
   }
 
@@ -195,6 +199,28 @@ class ControlledFilteredCatalogRepository extends InMemoryCatalogRepository {
       filteredCountUpdates.close(),
     ]);
   }
+}
+
+class ControlledCatalogProgressRepository extends InMemoryCatalogRepository {
+  final _progressController = StreamController<CatalogProgress>.broadcast();
+
+  int progressRequests = 0;
+
+  @override
+  Stream<CatalogProgress> watchCatalogProgress() {
+    progressRequests++;
+    return _progressController.stream;
+  }
+
+  void emitProgress(CatalogProgress progress) {
+    _progressController.add(progress);
+  }
+
+  void emitProgressError(Object error) {
+    _progressController.addError(error);
+  }
+
+  Future<void> dispose() => _progressController.close();
 }
 
 void main() {
@@ -1492,6 +1518,229 @@ void main() {
       expect(repository.revalidationRequests, isEmpty);
       expect(repository.syncRequests, 0);
       expect(repository.filteredPageRequests, isEmpty);
+    });
+  });
+  group('catalogProgressProvider', () {
+    late ControlledCatalogProgressRepository progressRepository;
+    late ProviderContainer progressContainer;
+    late ProviderSubscription<AsyncValue<CatalogProgress>> progressSubscription;
+
+    setUp(() async {
+      progressRepository = ControlledCatalogProgressRepository();
+
+      progressContainer = ProviderContainer(
+        retry: (_, _) => null,
+        overrides: [
+          catalogRepositoryProvider.overrideWithValue(progressRepository),
+        ],
+      );
+
+      progressSubscription = progressContainer.listen(
+        catalogProgressProvider,
+        (_, _) {},
+      );
+
+      await progressContainer.pump();
+    });
+
+    tearDown(() async {
+      progressSubscription.close();
+      progressContainer.dispose();
+      await progressRepository.dispose();
+    });
+
+    test('comienza en estado de carga', () {
+      final state = progressContainer.read(catalogProgressProvider);
+
+      expect(state.isLoading, isTrue);
+    });
+
+    test('entrega un catálogo parcial', () async {
+      const progress = CatalogProgress(
+        savedCount: 412,
+        totalCount: 1025,
+        isComplete: false,
+      );
+
+      final future = progressContainer.read(catalogProgressProvider.future);
+
+      progressRepository.emitProgress(progress);
+
+      expect(await future, progress);
+    });
+
+    test('entrega un catálogo completo', () async {
+      const progress = CatalogProgress(
+        savedCount: 1025,
+        totalCount: 1025,
+        isComplete: true,
+      );
+
+      final future = progressContainer.read(catalogProgressProvider.future);
+
+      progressRepository.emitProgress(progress);
+
+      expect(await future, progress);
+    });
+
+    test('entrega progreso con total desconocido', () async {
+      const progress = CatalogProgress(savedCount: 200, isComplete: false);
+
+      final future = progressContainer.read(catalogProgressProvider.future);
+
+      progressRepository.emitProgress(progress);
+
+      final result = await future;
+
+      expect(result.savedCount, 200);
+      expect(result.totalCount, isNull);
+      expect(result.isComplete, isFalse);
+    });
+
+    test('recibe actualizaciones durante la sincronización', () async {
+      final received = <CatalogProgress>[];
+
+      final subscription = progressContainer.listen(catalogProgressProvider, (
+        _,
+        next,
+      ) {
+        final progress = next.asData?.value;
+
+        if (progress != null) {
+          received.add(progress);
+        }
+      });
+
+      addTearDown(subscription.close);
+
+      const first = CatalogProgress(
+        savedCount: 200,
+        totalCount: 1025,
+        isComplete: false,
+      );
+
+      const second = CatalogProgress(
+        savedCount: 500,
+        totalCount: 1025,
+        isComplete: false,
+      );
+
+      final future = progressContainer.read(catalogProgressProvider.future);
+
+      progressRepository.emitProgress(first);
+
+      await future;
+      await progressContainer.pump();
+
+      progressRepository.emitProgress(second);
+
+      await progressContainer.pump();
+
+      expect(received, [first, second]);
+    });
+
+    test('recibe el cambio de completitud sin cambiar cantidades', () async {
+      final received = <CatalogProgress>[];
+
+      final subscription = progressContainer.listen(catalogProgressProvider, (
+        _,
+        next,
+      ) {
+        final progress = next.asData?.value;
+
+        if (progress != null) {
+          received.add(progress);
+        }
+      });
+
+      addTearDown(subscription.close);
+
+      const incomplete = CatalogProgress(
+        savedCount: 1025,
+        totalCount: 1025,
+        isComplete: false,
+      );
+
+      const complete = CatalogProgress(
+        savedCount: 1025,
+        totalCount: 1025,
+        isComplete: true,
+      );
+
+      final future = progressContainer.read(catalogProgressProvider.future);
+
+      progressRepository.emitProgress(incomplete);
+
+      await future;
+      await progressContainer.pump();
+
+      progressRepository.emitProgress(complete);
+
+      await progressContainer.pump();
+
+      expect(received, [incomplete, complete]);
+    });
+
+    test('comparte la consulta entre múltiples consumidores', () async {
+      final first = progressContainer.listen(
+        catalogProgressProvider,
+        (_, _) {},
+      );
+
+      final second = progressContainer.listen(
+        catalogProgressProvider,
+        (_, _) {},
+      );
+
+      addTearDown(first.close);
+      addTearDown(second.close);
+
+      final future = progressContainer.read(catalogProgressProvider.future);
+
+      progressRepository.emitProgress(
+        const CatalogProgress(
+          savedCount: 200,
+          totalCount: 1025,
+          isComplete: false,
+        ),
+      );
+
+      await future;
+
+      expect(progressRepository.progressRequests, 1);
+    });
+
+    test('observar el progreso no inicia sincronizaciones', () async {
+      final future = progressContainer.read(catalogProgressProvider.future);
+
+      progressRepository.emitProgress(
+        const CatalogProgress(
+          savedCount: 200,
+          totalCount: 1025,
+          isComplete: false,
+        ),
+      );
+
+      await future;
+
+      expect(progressRepository.syncRequests, 0);
+      expect(progressRepository.revalidationRequests, isEmpty);
+      expect(progressRepository.filteredPageRequests, isEmpty);
+      expect(progressRepository.filteredCountRequests, isEmpty);
+    });
+
+    test('expone errores del stream de progreso', () async {
+      final future = progressContainer.read(catalogProgressProvider.future);
+
+      final error = StateError('Error leyendo el progreso');
+
+      final expectation = expectLater(future, throwsA(same(error)));
+
+      progressRepository.emitProgressError(error);
+
+      await expectation;
+
+      expect(progressContainer.read(catalogProgressProvider).hasError, isTrue);
     });
   });
 }

@@ -17,6 +17,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_li
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query_state.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_query_controller_provider.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/widgets/catalog_partial_notice.dart';
 import 'package:flutter/foundation.dart' show setEquals;
 
 const _maxVisiblePageButtons = 5;
@@ -219,42 +220,62 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   Widget _buildEmptyState({required bool hasError}) {
     final l10n = AppLocalizations.of(context)!;
 
-    return CatalogEmptyState(
-      icon: hasError ? Icons.cloud_off : Icons.catching_pokemon,
-      title: hasError ? l10n.catalogLoadError : l10n.catalogEmpty,
-      message: hasError
-          ? l10n.catalogConnectionError
-          : l10n.catalogEmptyMessage,
-      actionLabel: l10n.retry,
-      onAction: _retrySync,
+    return _buildScrollableState(
+      CatalogEmptyState(
+        icon: hasError ? Icons.cloud_off : Icons.catching_pokemon,
+        title: hasError ? l10n.catalogLoadError : l10n.catalogEmpty,
+        message: hasError
+            ? l10n.catalogConnectionError
+            : l10n.catalogEmptyMessage,
+        actionLabel: l10n.retry,
+        onAction: _retrySync,
+      ),
     );
   }
 
   Widget _buildNoResults() {
     final l10n = AppLocalizations.of(context)!;
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.search_off, size: 56),
-            const SizedBox(height: 16),
-            Text(
-              l10n.catalogNoResults,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(l10n.catalogNoResultsMessage, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: _clearFilters,
-              child: Text(l10n.catalogClearFilters),
-            ),
-          ],
+    return _buildScrollableState(
+      Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.search_off, size: 56),
+              const SizedBox(height: 16),
+              Text(
+                l10n.catalogNoResults,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(l10n.catalogNoResultsMessage, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              OutlinedButton(
+                onPressed: _clearFilters,
+                child: Text(l10n.catalogClearFilters),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRefreshableContent(Widget child) {
+    return RefreshIndicator(
+      key: const ValueKey('catalog-refresh-indicator'),
+      onRefresh: _retrySync,
+      child: child,
+    );
+  }
+
+  Widget _buildScrollableState(Widget child) {
+    return CustomScrollView(
+      key: const ValueKey('catalog-scrollable-state'),
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [SliverFillRemaining(hasScrollBody: false, child: child)],
     );
   }
 
@@ -275,6 +296,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     return ListView.builder(
       key: const ValueKey('catalog-pokemon-list'),
       controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: pokemonList.length + extraItemCount,
       itemBuilder: (context, index) {
         if (index == pokemonList.length) {
@@ -443,6 +465,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       ),
       body: Column(
         children: [
+          const CatalogPartialNotice(),
           if (_showFilters)
             CatalogFilterBar(
               searchController: _searchController,
@@ -455,48 +478,50 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               onSortChanged: _onSortChanged,
             ),
           Expanded(
-            child: catalogAsync.when(
-              data: (pokemonList) {
-                if (pokemonList.isNotEmpty) {
-                  return _buildPokemonList(pokemonList, countAsync);
-                }
+            child: _buildRefreshableContent(
+              catalogAsync.when(
+                data: (pokemonList) {
+                  if (pokemonList.isNotEmpty) {
+                    return _buildPokemonList(pokemonList, countAsync);
+                  }
 
-                final hasActiveFilters =
-                    _search.isNotEmpty ||
-                    _selectedTypes.isNotEmpty ||
-                    _selectedGenerations.isNotEmpty;
+                  final hasActiveFilters =
+                      _search.isNotEmpty ||
+                      _selectedTypes.isNotEmpty ||
+                      _selectedGenerations.isNotEmpty;
 
-                if (hasActiveFilters) {
-                  if (countAsync.isLoading && countAsync.asData == null) {
+                  if (hasActiveFilters) {
+                    if (countAsync.isLoading && countAsync.asData == null) {
+                      return _buildLoading();
+                    }
+
+                    if (countAsync.asData?.value == 0) {
+                      return _buildNoResults();
+                    }
+
+                    if (countAsync.hasError) {
+                      return _buildEmptyState(hasError: true);
+                    }
+
                     return _buildLoading();
                   }
 
-                  if (countAsync.asData?.value == 0) {
-                    return _buildNoResults();
+                  if (syncStatus is SyncFullPassInProgress ||
+                      syncStatus is SyncWaitingRetry) {
+                    return _buildLoading();
                   }
 
-                  if (countAsync.hasError) {
+                  if (syncStatus is SyncFailed) {
                     return _buildEmptyState(hasError: true);
                   }
 
-                  return _buildLoading();
-                }
-
-                if (syncStatus is SyncFullPassInProgress ||
-                    syncStatus is SyncWaitingRetry) {
-                  return _buildLoading();
-                }
-
-                if (syncStatus is SyncFailed) {
+                  return _buildEmptyState(hasError: false);
+                },
+                loading: () => _buildLoading(),
+                error: (error, stackTrace) {
                   return _buildEmptyState(hasError: true);
-                }
-
-                return _buildEmptyState(hasError: false);
-              },
-              loading: () => _buildLoading(),
-              error: (error, stackTrace) {
-                return _buildEmptyState(hasError: true);
-              },
+                },
+              ),
             ),
           ),
         ],

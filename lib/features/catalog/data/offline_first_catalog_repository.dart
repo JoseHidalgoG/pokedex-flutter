@@ -67,6 +67,7 @@ class OfflineFirstCatalogRepository implements CatalogRepository {
       (progress) => CatalogProgress(
         savedCount: progress.savedCount,
         totalCount: progress.totalCount,
+        isComplete: progress.isComplete,
       ),
     );
   }

@@ -619,4 +619,14 @@ class AppLocalizationsEs extends AppLocalizations {
   String catalogGenerationLabel(String number) {
     return 'Generación $number';
   }
+
+  @override
+  String catalogPartialNotice(int savedCount, int totalCount) {
+    return 'Catálogo local: $savedCount de $totalCount Pokémon; los resultados pueden estar incompletos.';
+  }
+
+  @override
+  String catalogPartialNoticeUnknownTotal(int savedCount) {
+    return 'Catálogo local: $savedCount Pokémon guardados; los resultados pueden estar incompletos.';
+  }
 }

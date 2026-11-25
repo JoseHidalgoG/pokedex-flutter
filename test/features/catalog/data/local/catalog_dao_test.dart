@@ -656,13 +656,18 @@ void main() {
     test('empieza sin Pokémon guardados ni total conocido', () async {
       final progress = await catalogDao.watchCatalogProgress().first;
 
-      expect(progress, (savedCount: 0, totalCount: null));
+      expect(progress, (savedCount: 0, totalCount: null, isComplete: false));
     });
 
     test(
       'cuenta los Pokémon por defecto guardados y el total de PokeAPI',
       () async {
-        await savePage([bulbasaur, charmander], totalCount: 3);
+        await savePage(
+          [bulbasaur, charmander],
+          totalCount: 3,
+          isComplete: false,
+        );
+
         await catalogDao.saveRevalidated([
           const CatalogEntry(
             id: 10001,
@@ -675,21 +680,207 @@ void main() {
 
         final progress = await catalogDao.watchCatalogProgress().first;
 
-        expect(progress, (savedCount: 2, totalCount: 3));
+        expect(progress, (savedCount: 2, totalCount: 3, isComplete: false));
       },
     );
 
     test('solo vuelve a emitir cuando el progreso cambia', () async {
-      await savePage([bulbasaur, charmander], totalCount: 3);
+      await savePage([bulbasaur, charmander], totalCount: 3, isComplete: false);
+
       final progressUpdates = StreamQueue(catalogDao.watchCatalogProgress());
+
       addTearDown(progressUpdates.cancel);
 
-      expect(await progressUpdates.next, (savedCount: 2, totalCount: 3));
+      expect(await progressUpdates.next, (
+        savedCount: 2,
+        totalCount: 3,
+        isComplete: false,
+      ));
 
       await catalogDao.recordFingerprintsVerified(at: savedAt);
+
       await savePage([squirtle], nextOffset: 3, isComplete: true);
 
-      expect(await progressUpdates.next, (savedCount: 3, totalCount: 3));
+      expect(await progressUpdates.next, (
+        savedCount: 3,
+        totalCount: 3,
+        isComplete: true,
+      ));
+    });
+
+    test('permanece incompleto aunque alcance el total esperado', () async {
+      await savePage(
+        [bulbasaur, charmander],
+        totalCount: 2,
+        nextOffset: 2,
+        isComplete: false,
+      );
+
+      final progress = await catalogDao.watchCatalogProgress().first;
+
+      expect(progress, (savedCount: 2, totalCount: 2, isComplete: false));
+    });
+
+    test('refleja el estado completo de los metadatos', () async {
+      await savePage(
+        [bulbasaur, charmander],
+        totalCount: 2,
+        nextOffset: 2,
+        isComplete: true,
+      );
+
+      final progress = await catalogDao.watchCatalogProgress().first;
+
+      expect(progress, (savedCount: 2, totalCount: 2, isComplete: true));
+    });
+
+    test('maneja Pokémon guardados con total desconocido', () async {
+      await savePage([bulbasaur], isComplete: false);
+
+      final progress = await catalogDao.watchCatalogProgress().first;
+
+      expect(progress, (savedCount: 1, totalCount: null, isComplete: false));
+    });
+
+    test('emite cuando cambia únicamente isComplete', () async {
+      await savePage(
+        [bulbasaur, charmander],
+        totalCount: 2,
+        nextOffset: 2,
+        isComplete: false,
+      );
+
+      final updates = StreamQueue(catalogDao.watchCatalogProgress());
+
+      addTearDown(updates.cancel);
+
+      expect(await updates.next, (
+        savedCount: 2,
+        totalCount: 2,
+        isComplete: false,
+      ));
+
+      await savePage(
+        [bulbasaur, charmander],
+        totalCount: 2,
+        nextOffset: 2,
+        isComplete: true,
+      );
+
+      expect(await updates.next, (
+        savedCount: 2,
+        totalCount: 2,
+        isComplete: true,
+      ));
+    });
+
+    test('emite cuando cambia únicamente el total esperado', () async {
+      await savePage([bulbasaur], totalCount: 3, isComplete: false);
+
+      final updates = StreamQueue(catalogDao.watchCatalogProgress());
+
+      addTearDown(updates.cancel);
+
+      expect(await updates.next, (
+        savedCount: 1,
+        totalCount: 3,
+        isComplete: false,
+      ));
+
+      await savePage([bulbasaur], totalCount: 4, isComplete: false);
+
+      expect(await updates.next, (
+        savedCount: 1,
+        totalCount: 4,
+        isComplete: false,
+      ));
+    });
+
+    test('actualiza la cantidad guardada durante la descarga', () async {
+      final updates = StreamQueue(catalogDao.watchCatalogProgress());
+
+      addTearDown(updates.cancel);
+
+      expect(await updates.next, (
+        savedCount: 0,
+        totalCount: null,
+        isComplete: false,
+      ));
+
+      await savePage(
+        [bulbasaur],
+        totalCount: 3,
+        nextOffset: 1,
+        isComplete: false,
+      );
+
+      expect(await updates.next, (
+        savedCount: 1,
+        totalCount: 3,
+        isComplete: false,
+      ));
+
+      await savePage(
+        [charmander],
+        totalCount: 3,
+        nextOffset: 2,
+        isComplete: false,
+      );
+
+      expect(await updates.next, (
+        savedCount: 2,
+        totalCount: 3,
+        isComplete: false,
+      ));
+
+      await savePage(
+        [squirtle],
+        totalCount: 3,
+        nextOffset: 3,
+        isComplete: true,
+      );
+
+      expect(await updates.next, (
+        savedCount: 3,
+        totalCount: 3,
+        isComplete: true,
+      ));
+    });
+
+    test('el progreso es independiente de los filtros activos', () async {
+      await savePage(
+        [bulbasaur, charmander, squirtle],
+        totalCount: 10,
+        isComplete: false,
+      );
+
+      final filteredCount = await catalogDao
+          .watchFilteredCatalogCount(CatalogQuery(types: {'fire'}))
+          .first;
+
+      final progress = await catalogDao.watchCatalogProgress().first;
+
+      expect(filteredCount, 1);
+
+      expect(progress, (savedCount: 3, totalCount: 10, isComplete: false));
+    });
+
+    test('el progreso es independiente de la paginación', () async {
+      await savePage(
+        [bulbasaur, charmander, squirtle],
+        totalCount: 10,
+        isComplete: false,
+      );
+
+      final page = await catalogDao
+          .watchFilteredCatalogPage(limit: 1, offset: 1, query: CatalogQuery())
+          .first;
+
+      final progress = await catalogDao.watchCatalogProgress().first;
+
+      expect(page.length, 1);
+
+      expect(progress, (savedCount: 3, totalCount: 10, isComplete: false));
     });
   });
 

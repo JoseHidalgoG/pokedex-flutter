@@ -1219,6 +1219,18 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Generación {number}'**
   String catalogGenerationLabel(String number);
+
+  /// Aviso de catálogo parcial con total conocido
+  ///
+  /// In es, this message translates to:
+  /// **'Catálogo local: {savedCount} de {totalCount} Pokémon; los resultados pueden estar incompletos.'**
+  String catalogPartialNotice(int savedCount, int totalCount);
+
+  /// Aviso de catálogo parcial con total desconocido
+  ///
+  /// In es, this message translates to:
+  /// **'Catálogo local: {savedCount} Pokémon guardados; los resultados pueden estar incompletos.'**
+  String catalogPartialNoticeUnknownTotal(int savedCount);
 }
 
 class _AppLocalizationsDelegate

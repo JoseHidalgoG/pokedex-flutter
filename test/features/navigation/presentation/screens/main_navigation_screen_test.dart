@@ -13,6 +13,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/screens/catalog_sc
 import 'package:flutter_riverpod/misc.dart' show Override;
 
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_query_providers.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progress.dart';
 
 import '../../../catalog/fakes/fake_catalog_query_repository.dart';
 import '../../../favorites/fakes/fake_favorites_repository.dart';
@@ -34,6 +35,17 @@ void main() {
       catalogQueryRepositoryProvider.overrideWithValue(
         FakeCatalogQueryRepository(),
       ),
+
+      catalogProgressProvider.overrideWith(
+        (ref) => Stream.value(
+          CatalogProgress(
+            savedCount: pokemon.length,
+            totalCount: pokemon.length,
+            isComplete: true,
+          ),
+        ),
+      ),
+
       filteredCatalogPageProvider.overrideWith((ref, request) {
         final offset = request.page * request.pageSize;
 
@@ -41,16 +53,21 @@ void main() {
           pokemon.skip(offset).take(request.pageSize).toList(),
         );
       }),
+
       filteredCatalogCountProvider.overrideWith(
         (ref, query) => Stream.value(pokemon.length),
       ),
+
       catalogSyncStatusProvider.overrideWith(
         (ref) => Stream.value(const SyncIdle()),
       ),
+
       favoritesRepositoryProvider.overrideWith(
         (ref) => FakeFavoritesRepository(),
       ),
+
       languageProvider.overrideWith((ref) => Stream.value(locale.languageCode)),
+
       themeProvider.overrideWith((ref) => Stream.value('system')),
       settingsRepositoryProvider.overrideWith(
         (ref) => FakeSettingsRepository(),
