@@ -1045,6 +1045,36 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'No se pudieron borrar las imágenes'**
   String get imagesDeleteFailed;
+
+  /// No description provided for @demoToolsTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Herramientas de demostración'**
+  String get demoToolsTitle;
+
+  /// No description provided for @demoToolsDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo en compilaciones debug y profile'**
+  String get demoToolsDescription;
+
+  /// No description provided for @simulateApiOutage.
+  ///
+  /// In es, this message translates to:
+  /// **'Simular caída de PokeAPI'**
+  String get simulateApiOutage;
+
+  /// No description provided for @simulateApiOutageDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Responde HTTP 503 sin salir a la red'**
+  String get simulateApiOutageDescription;
+
+  /// No description provided for @simulateApiOutageSaveError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo guardar el ajuste; durará hasta cerrar la app'**
+  String get simulateApiOutageSaveError;
 }
 
 class _AppLocalizationsDelegate

@@ -197,6 +197,11 @@
   "imagesDeleteQuestion": "Delete saved images?",
   "imagesDeleteExplanation": "They will download again when viewed online.",
   "imagesDeleteConfirm": "Delete",
-  "imagesDeleteFailed": "Images could not be deleted"
+  "imagesDeleteFailed": "Images could not be deleted",
+  "demoToolsTitle": "Demo tools",
+  "demoToolsDescription": "Only in debug and profile builds",
+  "simulateApiOutage": "Simulate PokeAPI outage",
+  "simulateApiOutageDescription": "Answers HTTP 503 without using the network",
+  "simulateApiOutageSaveError": "The setting could not be saved; it lasts until the app closes"
 
 }

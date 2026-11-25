@@ -11,6 +11,7 @@ import 'package:pokedex_flutter/features/settings/presentation/providers/setting
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 import '../../../favorites/fakes/fake_favorites_repository.dart';
+import '../../../settings/fakes/fake_settings_repository.dart';
 
 void main() {
   const pikachu = Pokemon(
@@ -39,6 +40,9 @@ void main() {
             (ref) => Stream.value(locale.languageCode),
           ),
           themeProvider.overrideWith((ref) => Stream.value('system')),
+          settingsRepositoryProvider.overrideWith(
+            (ref) => FakeSettingsRepository(),
+          ),
         ],
         child: MaterialApp(
           locale: locale,
@@ -146,6 +150,9 @@ void main() {
           ),
           languageProvider.overrideWith((ref) => Stream.value('es')),
           themeProvider.overrideWith((ref) => Stream.value('system')),
+          settingsRepositoryProvider.overrideWith(
+            (ref) => FakeSettingsRepository(),
+          ),
         ],
 
         child: const MaterialApp(

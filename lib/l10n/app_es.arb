@@ -290,6 +290,11 @@
   "imagesDeleteQuestion": "¿Borrar las imágenes guardadas?",
   "imagesDeleteExplanation": "Se volverán a descargar al verlas con conexión.",
   "imagesDeleteConfirm": "Borrar",
-  "imagesDeleteFailed": "No se pudieron borrar las imágenes"
+  "imagesDeleteFailed": "No se pudieron borrar las imágenes",
+  "demoToolsTitle": "Herramientas de demostración",
+  "demoToolsDescription": "Solo en compilaciones debug y profile",
+  "simulateApiOutage": "Simular caída de PokeAPI",
+  "simulateApiOutageDescription": "Responde HTTP 503 sin salir a la red",
+  "simulateApiOutageSaveError": "No se pudo guardar el ajuste; durará hasta cerrar la app"
 
 }
