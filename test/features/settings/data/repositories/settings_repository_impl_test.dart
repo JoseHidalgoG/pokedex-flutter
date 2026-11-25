@@ -78,4 +78,21 @@ void main() {
 
     expect(await nextValue, 'dark');
   });
+
+  test('la simulación de caída de PokeAPI está apagada por omisión', () async {
+    expect(await repository.isApiOutageSimulated(), isFalse);
+  });
+
+  test('guarda la simulación de caída como true o false', () async {
+    await repository.setApiOutageSimulated(true);
+    final savedOn = await dao.getPreference('simulate_api_outage');
+    final readOn = await repository.isApiOutageSimulated();
+
+    await repository.setApiOutageSimulated(false);
+    final savedOff = await dao.getPreference('simulate_api_outage');
+    final readOff = await repository.isApiOutageSimulated();
+
+    expect((savedOn, readOn), ('true', true));
+    expect((savedOff, readOff), ('false', false));
+  });
 }
