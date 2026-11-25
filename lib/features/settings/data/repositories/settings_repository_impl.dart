@@ -8,6 +8,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
 
   static const languageKey = 'language';
   static const themeKey = 'theme';
+  static const apiOutageSimulatedKey = 'simulate_api_outage';
 
   static const supportedLanguages = {'system', 'es', 'en'};
   static const supportedThemes = {'system', 'light', 'dark'};
@@ -56,5 +57,15 @@ class SettingsRepositoryImpl implements SettingsRepository {
     }
 
     await _dao.setPreference(themeKey, theme);
+  }
+
+  @override
+  Future<bool> isApiOutageSimulated() async {
+    return await _dao.getPreference(apiOutageSimulatedKey) == 'true';
+  }
+
+  @override
+  Future<void> setApiOutageSimulated(bool isSimulated) async {
+    await _dao.setPreference(apiOutageSimulatedKey, '$isSimulated');
   }
 }

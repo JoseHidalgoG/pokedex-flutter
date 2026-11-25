@@ -10,4 +10,8 @@ abstract class SettingsRepository {
   Future<void> setLanguage(String language);
 
   Future<void> setTheme(String theme);
+
+  Future<bool> isApiOutageSimulated();
+
+  Future<void> setApiOutageSimulated(bool isSimulated);
 }
