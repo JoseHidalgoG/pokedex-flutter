@@ -102,11 +102,13 @@ void main() {
   late AppDatabase database;
   late CatalogDao catalogDao;
   late DateTime now;
+  late List<String> logs;
 
   setUp(() {
     database = AppDatabase(NativeDatabase.memory());
     catalogDao = database.catalogDao;
     now = DateTime(2026, 11, 9, 10);
+    logs = [];
   });
 
   tearDown(() => database.close());
@@ -116,6 +118,7 @@ void main() {
       remoteDataSource: remoteCatalog,
       catalogDao: catalogDao,
       now: () => now,
+      write: logs.add,
     );
   }
 
@@ -268,6 +271,54 @@ void main() {
         (offset: 100, withTotal: true),
         (offset: 200, withTotal: false),
       ]);
+    });
+
+    test('escribe en la consola desde dónde se reanuda', () async {
+      final remoteCatalog = FakePokeApiCatalog(pokemonCount: 1025);
+      await saveAlreadyDownloaded(
+        remoteCatalog,
+        count: 400,
+        isComplete: false,
+        savedAt: now.subtract(const Duration(minutes: 5)),
+        totalCount: 1025,
+      );
+
+      await syncServiceOver(remoteCatalog).syncCatalog();
+
+      expect(logs, contains('catalog: se reanuda desde 400 de 1025'));
+      expect(remoteCatalog.requestedOffsets, [
+        for (var offset = 400; offset <= 1000; offset += 100) offset,
+      ]);
+    });
+
+    test('sin total guardado la consola muestra solo el offset', () async {
+      final remoteCatalog = FakePokeApiCatalog(pokemonCount: 250);
+      await saveAlreadyDownloaded(
+        remoteCatalog,
+        count: 100,
+        isComplete: false,
+        savedAt: now.subtract(const Duration(minutes: 5)),
+      );
+
+      await syncServiceOver(remoteCatalog).syncCatalog();
+
+      expect(logs, contains('catalog: se reanuda desde 100'));
+    });
+
+    test('una pasada que empieza desde 0 no dice que se reanuda', () async {
+      final remoteCatalog = FakePokeApiCatalog(pokemonCount: 120);
+      await saveAlreadyDownloaded(
+        remoteCatalog,
+        count: 120,
+        isComplete: true,
+        savedAt: now.subtract(const Duration(minutes: 61)),
+        totalCount: 120,
+      );
+
+      await syncServiceOver(remoteCatalog).syncCatalog();
+
+      expect(remoteCatalog.requestedOffsets, [0, 100]);
+      expect(logs, isNot(contains(contains('se reanuda'))));
     });
 
     test('termina cuando un lote llega incompleto aunque el total guardado sea mayor', () async {

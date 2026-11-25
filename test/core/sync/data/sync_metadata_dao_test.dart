@@ -131,4 +131,75 @@ void main() {
     expect(row.isComplete, isFalse);
     expect(pokemon, hasLength(1));
   });
+
+  group('sincronizaciones interrumpidas', () {
+    Future<Map<String, String>> statusesByKey() async {
+      final rows = await database.select(database.syncMetadataTable).get();
+      return {for (final row in rows) row.key: row.status};
+    }
+
+    test('devuelve las claves que quedaron in_progress ordenadas y las deja pending', () async {
+      await syncMetadataDao.recordStarted('detail:25');
+      await syncMetadataDao.recordStarted(key);
+      await syncMetadataDao.recordSucceeded('catalog:restore');
+      await syncMetadataDao.recordFailed(
+        'type_efficacy',
+        attempt: 5,
+        failure: const ServerError(503),
+      );
+
+      final interrupted = await syncMetadataDao.takeInterruptedSyncs();
+
+      expect(
+        [for (final row in interrupted) row.key],
+        ['catalog', 'detail:25'],
+      );
+      expect(
+        [for (final row in interrupted) row.status],
+        ['in_progress', 'in_progress'],
+      );
+      expect(await statusesByKey(), {
+        'catalog': 'pending',
+        'detail:25': 'pending',
+        'catalog:restore': 'idle',
+        'type_efficacy': 'failed',
+      });
+    });
+
+    test('conserva el progreso del catálogo y el último error', () async {
+      await database.catalogDao.saveCatalogPage(
+        entries: const [],
+        nextOffset: 400,
+        isComplete: false,
+        savedAt: DateTime(2026, 11, 26, 9),
+        totalCount: 1025,
+      );
+      await syncMetadataDao.recordWaitingRetry(
+        key,
+        attempt: 1,
+        retryAt: retryAt,
+        failure: const RequestTimeout(),
+      );
+      await syncMetadataDao.recordStarted(key);
+
+      final interrupted = (await syncMetadataDao.takeInterruptedSyncs()).single;
+      final row = await savedRow();
+
+      expect(interrupted.nextOffset, 400);
+      expect(interrupted.totalCount, 1025);
+      expect(interrupted.isComplete, isFalse);
+      expect(row.status, 'pending');
+      expect(row.nextOffset, 400);
+      expect(row.totalCount, 1025);
+      expect(row.lastErrorKind, 'request_timeout');
+    });
+
+    test('una segunda lectura ya no encuentra ninguna', () async {
+      await syncMetadataDao.recordStarted(key);
+
+      await syncMetadataDao.takeInterruptedSyncs();
+
+      expect(await syncMetadataDao.takeInterruptedSyncs(), isEmpty);
+    });
+  });
 }

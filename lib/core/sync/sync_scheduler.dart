@@ -252,7 +252,7 @@ class SyncScheduler {
         error: error,
         stackTrace: stackTrace,
       );
-      _emit(job.key, SyncFailed(QueryError('$error')));
+      await _fail(job, QueryError('$error'), attempt: retriesSoFar);
     }
   }
 
