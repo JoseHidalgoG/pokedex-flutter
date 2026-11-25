@@ -20,6 +20,7 @@ final syncSchedulerProvider = Provider<SyncScheduler>((ref) {
     if (next.asData?.value case final status?) {
       scheduler.connectivityChanged(
         isOnline: status == ConnectivityStatus.online,
+        hasNetwork: status != ConnectivityStatus.offline,
       );
     }
   }, fireImmediately: true);
