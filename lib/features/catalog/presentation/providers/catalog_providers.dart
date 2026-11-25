@@ -12,6 +12,10 @@ import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog_p
 import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog_count.dart';
 import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_pokemon_by_ids.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_pagination.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_page_request.dart';
+import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_filtered_catalog_page.dart';
+import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_filtered_catalog_count.dart';
 
 final catalogRepositoryProvider = Provider<CatalogRepository>(
   (ref) => throw UnimplementedError(
@@ -53,6 +57,14 @@ final watchCatalogCountProvider = Provider<WatchCatalogCount>(
   (ref) => WatchCatalogCount(ref.watch(catalogRepositoryProvider)),
 );
 
+final watchFilteredCatalogPageProvider = Provider<WatchFilteredCatalogPage>(
+  (ref) => WatchFilteredCatalogPage(ref.watch(catalogRepositoryProvider)),
+);
+
+final watchFilteredCatalogCountProvider = Provider<WatchFilteredCatalogCount>(
+  (ref) => WatchFilteredCatalogCount(ref.watch(catalogRepositoryProvider)),
+);
+
 final revalidatePokemonProvider = Provider<RevalidatePokemon>(
   (ref) => RevalidatePokemon(ref.watch(catalogRepositoryProvider)),
 );
@@ -91,3 +103,40 @@ final catalogCountProvider = StreamProvider<int>(
 final watchPokemonByIdsProvider = Provider<WatchPokemonByIds>(
   (ref) => WatchPokemonByIds(ref.watch(catalogRepositoryProvider)),
 );
+
+final filteredCatalogPageProvider = StreamProvider.autoDispose
+    .family<List<Pokemon>, CatalogPageRequest>((ref, request) {
+      final revalidatePokemon = ref.watch(revalidatePokemonProvider);
+      var shownIds = const <int>[];
+
+      void revalidateShownPokemon() {
+        if (shownIds.isNotEmpty) {
+          unawaited(revalidatePokemon(shownIds));
+        }
+      }
+
+      ref.onResume(revalidateShownPokemon);
+
+      return ref
+          .watch(watchFilteredCatalogPageProvider)(
+            page: request.page,
+            pageSize: request.pageSize,
+            query: request.query,
+          )
+          .map((pagePokemon) {
+            final isFirstShown = shownIds.isEmpty && pagePokemon.isNotEmpty;
+
+            shownIds = [for (final pokemon in pagePokemon) pokemon.id];
+
+            if (isFirstShown) {
+              revalidateShownPokemon();
+            }
+
+            return pagePokemon;
+          });
+    });
+
+final filteredCatalogCountProvider = StreamProvider.autoDispose
+    .family<int, CatalogQuery>(
+      (ref, query) => ref.watch(watchFilteredCatalogCountProvider)(query),
+    );

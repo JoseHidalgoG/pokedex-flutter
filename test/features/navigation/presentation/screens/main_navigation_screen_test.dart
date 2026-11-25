@@ -9,7 +9,12 @@ import 'package:pokedex_flutter/features/navigation/presentation/screens/main_na
 import 'package:pokedex_flutter/features/favorites/presentation/providers/favorites_providers.dart';
 import 'package:pokedex_flutter/features/settings/presentation/providers/settings_providers.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/screens/catalog_screen.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 
+import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_query_providers.dart';
+
+import '../../../catalog/fakes/fake_catalog_query_repository.dart';
 import '../../../favorites/fakes/fake_favorites_repository.dart';
 import '../../../settings/fakes/fake_settings_repository.dart';
 
@@ -21,29 +26,45 @@ void main() {
     typeNames: ['electric'],
   );
 
+  List<Override> navigationOverrides(
+    List<Pokemon> pokemon, {
+    required Locale locale,
+  }) {
+    return [
+      catalogQueryRepositoryProvider.overrideWithValue(
+        FakeCatalogQueryRepository(),
+      ),
+      filteredCatalogPageProvider.overrideWith((ref, request) {
+        final offset = request.page * request.pageSize;
+
+        return Stream.value(
+          pokemon.skip(offset).take(request.pageSize).toList(),
+        );
+      }),
+      filteredCatalogCountProvider.overrideWith(
+        (ref, query) => Stream.value(pokemon.length),
+      ),
+      catalogSyncStatusProvider.overrideWith(
+        (ref) => Stream.value(const SyncIdle()),
+      ),
+      favoritesRepositoryProvider.overrideWith(
+        (ref) => FakeFavoritesRepository(),
+      ),
+      languageProvider.overrideWith((ref) => Stream.value(locale.languageCode)),
+      themeProvider.overrideWith((ref) => Stream.value('system')),
+      settingsRepositoryProvider.overrideWith(
+        (ref) => FakeSettingsRepository(),
+      ),
+    ];
+  }
+
   Future<void> pumpNavigation(
     WidgetTester tester, {
     Locale locale = const Locale('es'),
   }) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          catalogPageProvider(0).overrideWith((ref) => Stream.value([pikachu])),
-          catalogCountProvider.overrideWith((ref) => Stream.value(1)),
-          catalogSyncStatusProvider.overrideWith(
-            (ref) => Stream.value(const SyncIdle()),
-          ),
-          favoritesRepositoryProvider.overrideWith(
-            (ref) => FakeFavoritesRepository(),
-          ),
-          languageProvider.overrideWith(
-            (ref) => Stream.value(locale.languageCode),
-          ),
-          themeProvider.overrideWith((ref) => Stream.value('system')),
-          settingsRepositoryProvider.overrideWith(
-            (ref) => FakeSettingsRepository(),
-          ),
-        ],
+        overrides: navigationOverrides([pikachu], locale: locale),
         child: MaterialApp(
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -53,6 +74,7 @@ void main() {
       ),
     );
 
+    await tester.pump();
     await tester.pump();
     await tester.pump();
   }
@@ -136,25 +158,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          catalogPageProvider(0)
-              .overrideWith((ref) => Stream.value(pokemon.take(50).toList())),
-          catalogPageProvider(1)
-              .overrideWith((ref) => Stream.value(pokemon.skip(50).toList())),
-          catalogCountProvider.overrideWith((ref) => Stream.value(51)),
-          catalogSyncStatusProvider.overrideWith(
-            (ref) => Stream.value(const SyncIdle()),
-          ),
-          favoritesRepositoryProvider.overrideWith(
-            (ref) => FakeFavoritesRepository(),
-          ),
-          languageProvider.overrideWith((ref) => Stream.value('es')),
-          themeProvider.overrideWith((ref) => Stream.value('system')),
-          settingsRepositoryProvider.overrideWith(
-            (ref) => FakeSettingsRepository(),
-          ),
-        ],
-
+        overrides: navigationOverrides(pokemon, locale: const Locale('es')),
         child: const MaterialApp(
           locale: Locale('es'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -166,10 +170,29 @@ void main() {
 
     await tester.pump();
     await tester.pump();
+    await tester.pump();
 
     expect(find.text('#0001'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Página siguiente'));
+    final catalogScrollable = find.descendant(
+      of: find.byType(CatalogScreen),
+      matching: find.byType(Scrollable),
+    );
+
+    final nextPageFinder = find.byTooltip('Página siguiente');
+
+    await tester.scrollUntilVisible(
+      nextPageFinder,
+      400,
+      scrollable: catalogScrollable,
+      maxScrolls: 100,
+    );
+
+    await tester.ensureVisible(nextPageFinder);
+    await tester.pumpAndSettle();
+
+    await tester.tap(nextPageFinder);
+    await tester.pump();
     await tester.pump();
     await tester.pump();
 
@@ -189,6 +212,12 @@ void main() {
 
     expect(find.text('#0051'), findsOneWidget);
     expect(find.text('#0001'), findsNothing);
+
+    final updatedNavigationBar = tester.widget<NavigationBar>(
+      find.byType(NavigationBar),
+    );
+
+    expect(updatedNavigationBar.selectedIndex, 0);
   });
 
   testWidgets('el botón Atrás regresa a Catálogo desde Trivia', (tester) async {

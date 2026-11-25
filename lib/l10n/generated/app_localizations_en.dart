@@ -536,4 +536,81 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get simulateApiOutageSaveError =>
       'The setting could not be saved; it lasts until the app closes';
+
+  @override
+  String get catalogSearchHint => 'Search by name or number';
+
+  @override
+  String get catalogTypeFilter => 'Types';
+
+  @override
+  String get catalogAllTypes => 'All types';
+
+  @override
+  String get catalogSortBy => 'Sort by';
+
+  @override
+  String get catalogSortNumberAsc => 'Number (ascending)';
+
+  @override
+  String get catalogSortNumberDesc => 'Number (descending)';
+
+  @override
+  String get catalogSortNameAsc => 'Name (A-Z)';
+
+  @override
+  String get catalogSortNameDesc => 'Name (Z-A)';
+
+  @override
+  String get catalogSortStatsAsc => 'Base stats (low to high)';
+
+  @override
+  String get catalogSortStatsDesc => 'Base stats (high to low)';
+
+  @override
+  String get catalogNoResults => 'No Pokémon found';
+
+  @override
+  String get catalogNoResultsMessage =>
+      'Try another search or change the filters.';
+
+  @override
+  String get catalogClearFilters => 'Clear filters';
+
+  @override
+  String get catalogShowSearch => 'Show search';
+
+  @override
+  String get catalogHideSearch => 'Hide search';
+
+  @override
+  String get catalogGenerationFilter => 'Generations';
+
+  @override
+  String get catalogAllGenerations => 'All generations';
+
+  @override
+  String get catalogSelectTypes => 'Select types';
+
+  @override
+  String get catalogSelectGenerations => 'Select generations';
+
+  @override
+  String get catalogApplySelection => 'Apply';
+
+  @override
+  String get catalogCancelSelection => 'Cancel';
+
+  @override
+  String get catalogClearSelection => 'Clear selection';
+
+  @override
+  String catalogSelectedCount(int count) {
+    return 'Selected: $count';
+  }
+
+  @override
+  String catalogGenerationLabel(String number) {
+    return 'Generation $number';
+  }
 }
