@@ -6,19 +6,24 @@ const pokemonImageCacheCapacity = 2500;
 const pokemonImageMaxIdle = Duration(days: 180);
 
 class PokemonImageCache implements ImageFileCache {
-  PokemonImageCache({Config? config})
-    : this._(
-        config ??
-            Config(
-              pokemonImageCacheKey,
-              maxNrOfCacheObjects: pokemonImageCacheCapacity,
-              stalePeriod: pokemonImageMaxIdle,
-            ),
-      );
+  PokemonImageCache({
+    Config? config,
+    BaseCacheManager Function() packageDefaultCache = DefaultCacheManager.new,
+  }) : this._(
+         config ??
+             Config(
+               pokemonImageCacheKey,
+               maxNrOfCacheObjects: pokemonImageCacheCapacity,
+               stalePeriod: pokemonImageMaxIdle,
+             ),
+         packageDefaultCache,
+       );
 
-  PokemonImageCache._(this._config) : manager = CacheManager(_config);
+  PokemonImageCache._(this._config, this._packageDefaultCache)
+    : manager = CacheManager(_config);
 
   final Config _config;
+  final BaseCacheManager Function() _packageDefaultCache;
   final CacheManager manager;
 
   late final Future<void> _index = _config.repo.open();
@@ -49,7 +54,10 @@ class PokemonImageCache implements ImageFileCache {
   }
 
   @override
-  Future<void> deleteAll() => manager.emptyCache();
+  Future<void> deleteAll() async {
+    await manager.emptyCache();
+    await _packageDefaultCache().emptyCache();
+  }
 
   Future<List<({String url, int bytes})>> _savedFilesWhere(
     bool Function(String url) isWanted,

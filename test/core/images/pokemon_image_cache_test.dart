@@ -13,30 +13,57 @@ const imagesOnGitHub = {
   eeveeUrl: [4, 5, 6, 7, 8],
 };
 
-Future<PokemonImageCache> imageCacheInMemory() async {
-  final index = JsonCacheInfoRepository.withFile(
-    await MemoryCacheSystem().createFile('pokemonImages.json'),
+final gitHub = MockClient((request) async {
+  final bytes = imagesOnGitHub[request.url.toString()];
+  if (bytes == null) {
+    return http.Response('Not Found', 404);
+  }
+  return http.Response.bytes(
+    bytes,
+    200,
+    headers: {'content-type': 'image/png', 'cache-control': 'max-age=300'},
   );
-  final gitHub = MockClient((request) async {
-    final bytes = imagesOnGitHub[request.url.toString()];
-    if (bytes == null) {
-      return http.Response('Not Found', 404);
-    }
-    return http.Response.bytes(
-      bytes,
-      200,
-      headers: {'content-type': 'image/png', 'cache-control': 'max-age=300'},
-    );
-  });
-  return PokemonImageCache(
-    config: Config(
-      pokemonImageCacheKey,
-      maxNrOfCacheObjects: pokemonImageCacheCapacity,
-      stalePeriod: pokemonImageMaxIdle,
-      repo: index,
-      fileSystem: MemoryCacheSystem(),
-      fileService: HttpFileService(httpClient: gitHub),
+});
+
+Future<Config> configInMemory(String cacheKey) async {
+  return Config(
+    cacheKey,
+    maxNrOfCacheObjects: pokemonImageCacheCapacity,
+    stalePeriod: pokemonImageMaxIdle,
+    repo: JsonCacheInfoRepository.withFile(
+      await MemoryCacheSystem().createFile('$cacheKey.json'),
     ),
+    fileSystem: MemoryCacheSystem(),
+    fileService: HttpFileService(httpClient: gitHub),
+  );
+}
+
+class PackageDefaultCacheInMemory {
+  PackageDefaultCacheInMemory(this.manager);
+
+  final CacheManager manager;
+  var creations = 0;
+
+  BaseCacheManager create() {
+    creations++;
+    return manager;
+  }
+}
+
+Future<PackageDefaultCacheInMemory> packageDefaultCacheInMemory() async {
+  return PackageDefaultCacheInMemory(
+    CacheManager(await configInMemory('libCachedImageData')),
+  );
+}
+
+Future<PokemonImageCache> imageCacheInMemory({
+  PackageDefaultCacheInMemory? packageDefaultCache,
+}) async {
+  final defaultCache =
+      packageDefaultCache ?? await packageDefaultCacheInMemory();
+  return PokemonImageCache(
+    config: await configInMemory(pokemonImageCacheKey),
+    packageDefaultCache: defaultCache.create,
   );
 }
 
@@ -108,5 +135,51 @@ void main() {
 
     expect(await images.savedUrlsAmong({pikachuUrl, eeveeUrl}), isEmpty);
     expect(await images.savedBytes(), 0);
+  });
+
+  test('borrar también vacía la caché por defecto que usaban las versiones anteriores', () async {
+    final packageDefaultCache = await packageDefaultCacheInMemory();
+    await packageDefaultCache.manager.downloadFile(eeveeUrl);
+    final images = await imageCacheInMemory(
+      packageDefaultCache: packageDefaultCache,
+    );
+
+    await images.deleteAll();
+
+    expect(
+      await packageDefaultCache.manager.getFileFromCache(eeveeUrl),
+      isNull,
+    );
+  });
+
+  test('solo crea la caché por defecto del paquete al borrar', () async {
+    final packageDefaultCache = await packageDefaultCacheInMemory();
+    final images = await imageCacheInMemory(
+      packageDefaultCache: packageDefaultCache,
+    );
+
+    await images.save(pikachuUrl);
+    await images.isSaved(pikachuUrl);
+    await images.savedUrlsAmong({pikachuUrl});
+    await images.savedBytes();
+    expect(packageDefaultCache.creations, 0);
+
+    await images.deleteAll();
+    expect(packageDefaultCache.creations, 1);
+  });
+
+  test('las imágenes guardadas no pasan por la caché por defecto', () async {
+    final packageDefaultCache = await packageDefaultCacheInMemory();
+    final images = await imageCacheInMemory(
+      packageDefaultCache: packageDefaultCache,
+    );
+
+    await images.save(pikachuUrl);
+
+    expect(
+      await packageDefaultCache.manager.getFileFromCache(pikachuUrl),
+      isNull,
+    );
+    expect(await images.isSaved(pikachuUrl), isTrue);
   });
 }
