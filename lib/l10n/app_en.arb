@@ -197,7 +197,7 @@
   "imagesDeleteQuestion": "Delete saved images?",
   "imagesDeleteExplanation": "They will download again when viewed online.",
   "imagesDeleteConfirm": "Delete",
-  "imagesDeleteFailed": "Images could not be deleted"
+  "imagesDeleteFailed": "Images could not be deleted",
 
   "catalogSearchHint": "Search by name or number",
   "catalogTypeFilter": "Types",

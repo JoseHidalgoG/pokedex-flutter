@@ -290,7 +290,7 @@
   "imagesDeleteQuestion": "¿Borrar las imágenes guardadas?",
   "imagesDeleteExplanation": "Se volverán a descargar al verlas con conexión.",
   "imagesDeleteConfirm": "Borrar",
-  "imagesDeleteFailed": "No se pudieron borrar las imágenes"
+  "imagesDeleteFailed": "No se pudieron borrar las imágenes",
 
   "catalogSearchHint": "Buscar por nombre o número",
   "catalogTypeFilter": "Tipos",
