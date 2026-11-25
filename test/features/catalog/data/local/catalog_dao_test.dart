@@ -631,6 +631,36 @@ void main() {
     });
   });
 
+  group('URL de las imágenes', () {
+    const alolanRaichu = CatalogEntry(
+      id: 10100,
+      name: 'raichu-alola',
+      imageUrl: 'https://example.com/10100.png',
+      typeNames: ['electric', 'psychic'],
+      speciesId: 26,
+      isDefault: false,
+    );
+
+    test('lee las de los Pokémon por defecto en orden de número', () async {
+      await savePage([squirtle, alolanRaichu, bulbasaur, charmander]);
+
+      final artworkUrls = await catalogDao.readArtworkUrls();
+
+      expect(artworkUrls.keys, [1, 4, 7]);
+      expect(artworkUrls[4], 'https://example.com/4.png');
+    });
+
+    test('lee la de cualquier Pokémon guardado, también una forma', () async {
+      await savePage([bulbasaur, alolanRaichu]);
+
+      expect(
+        await catalogDao.readImageUrlOf(10100),
+        'https://example.com/10100.png',
+      );
+      expect(await catalogDao.readImageUrlOf(25), isNull);
+    });
+  });
+
   test('el esquema crea los índices de búsqueda, filtros y ranking', () async {
     final indexes = await database
         .customSelect(

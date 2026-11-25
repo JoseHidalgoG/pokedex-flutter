@@ -162,6 +162,28 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     return [for (final (:entry, storedFingerprint: _) in stored) entry];
   }
 
+  Future<Map<int, String>> readArtworkUrls() async {
+    final rows =
+        await (selectOnly(pokemonTable)
+              ..addColumns([pokemonTable.id, pokemonTable.imageUrl])
+              ..where(_isDefaultPokemon)
+              ..orderBy([OrderingTerm.asc(pokemonTable.id)]))
+            .get();
+    return {
+      for (final row in rows)
+        row.read(pokemonTable.id)!: row.read(pokemonTable.imageUrl)!,
+    };
+  }
+
+  Future<String?> readImageUrlOf(int pokemonId) {
+    final imageUrl = selectOnly(pokemonTable)
+      ..addColumns([pokemonTable.imageUrl])
+      ..where(pokemonTable.id.equals(pokemonId));
+    return imageUrl
+        .map((row) => row.read(pokemonTable.imageUrl))
+        .getSingleOrNull();
+  }
+
   Future<Map<int, String?>> storedFingerprintsOf(List<int> ids) async {
     final rows =
         await (selectOnly(pokemonTable)
