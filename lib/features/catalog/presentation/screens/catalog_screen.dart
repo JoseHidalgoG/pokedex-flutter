@@ -15,6 +15,9 @@ import 'package:pokedex_flutter/features/catalog/presentation/widgets/catalog_em
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/catalog_filter_bar.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_list_item.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query_state.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_query_controller_provider.dart';
+import 'package:flutter/foundation.dart' show setEquals;
 
 const _maxVisiblePageButtons = 5;
 const _pageButtonSpacing = 6.0;
@@ -27,7 +30,6 @@ class CatalogScreen extends ConsumerStatefulWidget {
 }
 
 class _CatalogScreenState extends ConsumerState<CatalogScreen> {
-  int _currentPage = 0;
   bool _syncFailureReported = false;
   bool _showFilters = false;
 
@@ -37,12 +39,22 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   );
 
   Timer? _searchDebounce;
-  String _search = '';
-  String? _selectedType;
-  CatalogSort _selectedSort = CatalogSort.numberAscending;
+  bool _searchControllerInitialized = false;
 
-  CatalogQuery get _query =>
-      CatalogQuery(search: _search, type: _selectedType, sort: _selectedSort);
+  CatalogQueryState get _queryState =>
+      ref.read(catalogQueryControllerProvider).requireValue;
+
+  CatalogQuery get _query => _queryState.query;
+
+  int get _currentPage => _queryState.page;
+
+  String get _search => _query.search;
+
+  Set<String> get _selectedTypes => _query.types;
+
+  Set<int> get _selectedGenerations => _query.generations;
+
+  CatalogSort get _selectedSort => _query.sort;
 
   CatalogPageRequest get _pageRequest => CatalogPageRequest(
     page: _currentPage,
@@ -102,13 +114,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 
   void _changePage(int page) {
-    if (page == _currentPage) return;
+    if (page == _currentPage || page < 0) return;
 
     _scrollToTop();
 
-    setState(() {
-      _currentPage = page;
-    });
+    unawaited(ref.read(catalogQueryControllerProvider.notifier).setPage(page));
   }
 
   Widget _buildPagination(int totalItems) {
@@ -263,6 +273,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     final extraItemCount = showPagination || showCountLoading ? 1 : 0;
 
     return ListView.builder(
+      key: const ValueKey('catalog-pokemon-list'),
       controller: _scrollController,
       itemCount: pokemonList.length + extraItemCount,
       itemBuilder: (context, index) {
@@ -296,54 +307,84 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
 
-    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) return;
 
-      setState(() {
-        _search = value.trim();
-        _currentPage = 0;
-      });
+      final search = value.trim();
+
+      if (search == _search) return;
 
       _scrollToTop();
+
+      unawaited(
+        ref.read(catalogQueryControllerProvider.notifier).setSearch(search),
+      );
     });
   }
 
-  void _onTypeChanged(String? type) {
-    setState(() {
-      _selectedType = type;
-      _currentPage = 0;
-    });
+  void _onTypesChanged(Set<String> types) {
+    if (setEquals(_selectedTypes, types)) return;
 
     _scrollToTop();
+
+    unawaited(
+      ref.read(catalogQueryControllerProvider.notifier).setTypes(types),
+    );
+  }
+
+  void _onGenerationsChanged(Set<int> generations) {
+    if (setEquals(_selectedGenerations, generations)) return;
+
+    _scrollToTop();
+
+    unawaited(
+      ref
+          .read(catalogQueryControllerProvider.notifier)
+          .setGenerations(generations),
+    );
   }
 
   void _onSortChanged(CatalogSort sort) {
-    setState(() {
-      _selectedSort = sort;
-      _currentPage = 0;
-    });
+    if (_selectedSort == sort) return;
 
     _scrollToTop();
+
+    unawaited(ref.read(catalogQueryControllerProvider.notifier).setSort(sort));
   }
 
   void _clearFilters() {
     _searchDebounce?.cancel();
     _searchController.clear();
 
-    setState(() {
-      _search = '';
-      _selectedType = null;
-      _selectedSort = CatalogSort.numberAscending;
-      _currentPage = 0;
-    });
-
     _scrollToTop();
+
+    unawaited(ref.read(catalogQueryControllerProvider.notifier).clearFilters());
   }
 
   @override
   Widget build(BuildContext context) {
-    final query = _query;
-    final pageRequest = _pageRequest;
+    final queryStateAsync = ref.watch(catalogQueryControllerProvider);
+
+    final queryState = queryStateAsync.asData?.value;
+
+    if (queryState == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Pokédex'), centerTitle: true),
+        body: _buildLoading(),
+      );
+    }
+
+    if (!_searchControllerInitialized) {
+      _searchController.text = queryState.query.search;
+      _searchControllerInitialized = true;
+    }
+
+    final query = queryState.query;
+    final pageRequest = CatalogPageRequest(
+      page: queryState.page,
+      pageSize: catalogPageSize,
+      query: query,
+    );
 
     ref.listen<AsyncValue<SyncStatus>>(
       catalogSyncStatusProvider,
@@ -405,10 +446,12 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           if (_showFilters)
             CatalogFilterBar(
               searchController: _searchController,
-              selectedType: _selectedType,
+              selectedTypes: _selectedTypes,
+              selectedGenerations: _selectedGenerations,
               selectedSort: _selectedSort,
               onSearchChanged: _onSearchChanged,
-              onTypeChanged: _onTypeChanged,
+              onTypesChanged: _onTypesChanged,
+              onGenerationsChanged: _onGenerationsChanged,
               onSortChanged: _onSortChanged,
             ),
           Expanded(
@@ -419,7 +462,9 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                 }
 
                 final hasActiveFilters =
-                    _search.isNotEmpty || _selectedType != null;
+                    _search.isNotEmpty ||
+                    _selectedTypes.isNotEmpty ||
+                    _selectedGenerations.isNotEmpty;
 
                 if (hasActiveFilters) {
                   if (countAsync.isLoading && countAsync.asData == null) {
@@ -463,19 +508,24 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     final totalPages = (totalItems / catalogPageSize).ceil();
     final lastValidPage = totalPages > 0 ? totalPages - 1 : 0;
 
-    if (_currentPage > lastValidPage) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
+    final checkedState = _queryState;
 
-        if (_currentPage > lastValidPage) {
-          setState(() {
-            _currentPage = lastValidPage;
-          });
+    if (checkedState.page <= lastValidPage) return;
 
-          _scrollToTop();
-        }
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final currentState = ref
+          .read(catalogQueryControllerProvider)
+          .asData
+          ?.value;
+
+      if (currentState == null || currentState != checkedState) {
+        return;
+      }
+
+      _changePage(lastValidPage);
+    });
   }
 
   @override

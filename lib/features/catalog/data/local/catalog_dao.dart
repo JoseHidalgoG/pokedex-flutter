@@ -358,14 +358,20 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
       }
     }
 
-    final type = query.type;
+    final types = query.types;
 
-    if (type != null && type.isNotEmpty) {
+    if (types.isNotEmpty) {
       final matchingTypes = selectOnly(pokemonTypesTable)
         ..addColumns([pokemonTypesTable.pokemonId])
-        ..where(pokemonTypesTable.typeName.equals(type));
+        ..where(pokemonTypesTable.typeName.isIn(types));
 
       condition = condition & pokemonTable.id.isInQuery(matchingTypes);
+    }
+
+    final generations = query.generations;
+
+    if (generations.isNotEmpty) {
+      condition = condition & pokemonTable.generationId.isIn(generations);
     }
 
     return condition;

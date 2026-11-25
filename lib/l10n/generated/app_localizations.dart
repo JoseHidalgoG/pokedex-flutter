@@ -533,7 +533,7 @@ abstract class AppLocalizations {
   /// No description provided for @catalogTypeFilter.
   ///
   /// In es, this message translates to:
-  /// **'Tipo'**
+  /// **'Tipos'**
   String get catalogTypeFilter;
 
   /// No description provided for @catalogAllTypes.
@@ -613,6 +613,60 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Ocultar búsqueda'**
   String get catalogHideSearch;
+
+  /// No description provided for @catalogGenerationFilter.
+  ///
+  /// In es, this message translates to:
+  /// **'Generaciones'**
+  String get catalogGenerationFilter;
+
+  /// No description provided for @catalogAllGenerations.
+  ///
+  /// In es, this message translates to:
+  /// **'Todas las generaciones'**
+  String get catalogAllGenerations;
+
+  /// No description provided for @catalogSelectTypes.
+  ///
+  /// In es, this message translates to:
+  /// **'Seleccionar tipos'**
+  String get catalogSelectTypes;
+
+  /// No description provided for @catalogSelectGenerations.
+  ///
+  /// In es, this message translates to:
+  /// **'Seleccionar generaciones'**
+  String get catalogSelectGenerations;
+
+  /// No description provided for @catalogApplySelection.
+  ///
+  /// In es, this message translates to:
+  /// **'Aplicar'**
+  String get catalogApplySelection;
+
+  /// No description provided for @catalogCancelSelection.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar'**
+  String get catalogCancelSelection;
+
+  /// No description provided for @catalogClearSelection.
+  ///
+  /// In es, this message translates to:
+  /// **'Limpiar selección'**
+  String get catalogClearSelection;
+
+  /// No description provided for @catalogSelectedCount.
+  ///
+  /// In es, this message translates to:
+  /// **'Seleccionados: {count}'**
+  String catalogSelectedCount(int count);
+
+  /// No description provided for @catalogGenerationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Generación {number}'**
+  String catalogGenerationLabel(String number);
 }
 
 class _AppLocalizationsDelegate

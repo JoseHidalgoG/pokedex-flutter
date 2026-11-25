@@ -8,27 +8,36 @@ enum CatalogSort {
 }
 
 class CatalogQuery {
-  const CatalogQuery({
+  CatalogQuery({
     this.search = '',
-    this.type,
+    Set<String> types = const {},
+    Set<int> generations = const {},
     this.sort = CatalogSort.numberAscending,
-  });
+  }) : types = Set<String>.unmodifiable(types),
+        generations = Set<int>.unmodifiable(generations);
 
   final String search;
-  final String? type;
+  final Set<String> types;
+  final Set<int> generations;
   final CatalogSort sort;
 
   CatalogQuery copyWith({
     String? search,
-    String? type,
-    bool clearType = false,
+    Set<String>? types,
+    Set<int>? generations,
     CatalogSort? sort,
   }) {
     return CatalogQuery(
       search: search ?? this.search,
-      type: clearType ? null : (type ?? this.type),
+      types: types ?? this.types,
+      generations: generations ?? this.generations,
       sort: sort ?? this.sort,
     );
+  }
+
+  static bool _sameSet<T>(Set<T> first, Set<T> second) {
+    return first.length == second.length &&
+        first.containsAll(second);
   }
 
   @override
@@ -36,10 +45,16 @@ class CatalogQuery {
     return identical(this, other) ||
         other is CatalogQuery &&
             other.search == search &&
-            other.type == type &&
+            _sameSet(other.types, types) &&
+            _sameSet(other.generations, generations) &&
             other.sort == sort;
   }
 
   @override
-  int get hashCode => Object.hash(search, type, sort);
+  int get hashCode => Object.hash(
+    search,
+    Object.hashAllUnordered(types),
+    Object.hashAllUnordered(generations),
+    sort,
+  );
 }

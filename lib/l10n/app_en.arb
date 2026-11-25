@@ -106,7 +106,7 @@
   "triviaComingSoon": "Coming soon",
 
   "catalogSearchHint": "Search by name or number",
-  "catalogTypeFilter": "Type",
+  "catalogTypeFilter": "Types",
   "catalogAllTypes": "All types",
   "catalogSortBy": "Sort by",
   "catalogSortNumberAsc": "Number (ascending)",
@@ -120,5 +120,29 @@
   "catalogClearFilters": "Clear filters",
 
   "catalogShowSearch": "Show search",
-  "catalogHideSearch": "Hide search"
+  "catalogHideSearch": "Hide search",
+
+  "catalogGenerationFilter": "Generations",
+  "catalogAllGenerations": "All generations",
+  "catalogSelectTypes": "Select types",
+  "catalogSelectGenerations": "Select generations",
+  "catalogApplySelection": "Apply",
+  "catalogCancelSelection": "Cancel",
+  "catalogClearSelection": "Clear selection",
+  "catalogSelectedCount": "Selected: {count}",
+  "@catalogSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "catalogGenerationLabel": "Generation {number}",
+  "@catalogGenerationLabel": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  }
 }

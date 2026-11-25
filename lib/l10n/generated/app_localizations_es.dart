@@ -242,7 +242,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get catalogSearchHint => 'Buscar por nombre o número';
 
   @override
-  String get catalogTypeFilter => 'Tipo';
+  String get catalogTypeFilter => 'Tipos';
 
   @override
   String get catalogAllTypes => 'Todos los tipos';
@@ -283,4 +283,35 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get catalogHideSearch => 'Ocultar búsqueda';
+
+  @override
+  String get catalogGenerationFilter => 'Generaciones';
+
+  @override
+  String get catalogAllGenerations => 'Todas las generaciones';
+
+  @override
+  String get catalogSelectTypes => 'Seleccionar tipos';
+
+  @override
+  String get catalogSelectGenerations => 'Seleccionar generaciones';
+
+  @override
+  String get catalogApplySelection => 'Aplicar';
+
+  @override
+  String get catalogCancelSelection => 'Cancelar';
+
+  @override
+  String get catalogClearSelection => 'Limpiar selección';
+
+  @override
+  String catalogSelectedCount(int count) {
+    return 'Seleccionados: $count';
+  }
+
+  @override
+  String catalogGenerationLabel(String number) {
+    return 'Generación $number';
+  }
 }

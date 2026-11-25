@@ -12,6 +12,9 @@ import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/screens/catalog_screen.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 
+import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_query_providers.dart';
+
+import '../../../catalog/fakes/fake_catalog_query_repository.dart';
 import '../../../favorites/fakes/fake_favorites_repository.dart';
 
 void main() {
@@ -27,6 +30,9 @@ void main() {
     required Locale locale,
   }) {
     return [
+      catalogQueryRepositoryProvider.overrideWithValue(
+        FakeCatalogQueryRepository(),
+      ),
       filteredCatalogPageProvider.overrideWith((ref, request) {
         final offset = request.page * request.pageSize;
 
@@ -64,6 +70,7 @@ void main() {
       ),
     );
 
+    await tester.pump();
     await tester.pump();
     await tester.pump();
   }
@@ -159,6 +166,7 @@ void main() {
 
     await tester.pump();
     await tester.pump();
+    await tester.pump();
 
     expect(find.text('#0001'), findsOneWidget);
 
@@ -180,6 +188,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(nextPageFinder);
+    await tester.pump();
     await tester.pump();
     await tester.pump();
 

@@ -1,23 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/widgets/catalog_multi_select_dialog.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 class CatalogFilterBar extends StatelessWidget {
   const CatalogFilterBar({
     super.key,
     required this.searchController,
-    required this.selectedType,
+    required this.selectedTypes,
+    required this.selectedGenerations,
     required this.selectedSort,
     required this.onSearchChanged,
-    required this.onTypeChanged,
+    required this.onTypesChanged,
+    required this.onGenerationsChanged,
     required this.onSortChanged,
   });
 
   final TextEditingController searchController;
-  final String? selectedType;
+  final Set<String> selectedTypes;
+  final Set<int> selectedGenerations;
   final CatalogSort selectedSort;
+
   final ValueChanged<String> onSearchChanged;
-  final ValueChanged<String?> onTypeChanged;
+  final ValueChanged<Set<String>> onTypesChanged;
+  final ValueChanged<Set<int>> onGenerationsChanged;
   final ValueChanged<CatalogSort> onSortChanged;
 
   static const types = [
@@ -39,6 +45,20 @@ class CatalogFilterBar extends StatelessWidget {
     'dark',
     'steel',
     'fairy',
+  ];
+
+  static const generations = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+  static const _romanNumerals = [
+    'I',
+    'II',
+    'III',
+    'IV',
+    'V',
+    'VI',
+    'VII',
+    'VIII',
+    'IX',
   ];
 
   String _typeLabel(AppLocalizations l10n, String type) {
@@ -65,6 +85,10 @@ class CatalogFilterBar extends StatelessWidget {
     };
   }
 
+  String _generationLabel(AppLocalizations l10n, int generation) {
+    return l10n.catalogGenerationLabel(_romanNumerals[generation - 1]);
+  }
+
   String _sortLabel(AppLocalizations l10n, CatalogSort sort) {
     return switch (sort) {
       CatalogSort.numberAscending => l10n.catalogSortNumberAsc,
@@ -74,6 +98,69 @@ class CatalogFilterBar extends StatelessWidget {
       CatalogSort.baseStatTotalAscending => l10n.catalogSortStatsAsc,
       CatalogSort.baseStatTotalDescending => l10n.catalogSortStatsDesc,
     };
+  }
+
+  Future<void> _selectTypes(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+
+    final selection = await showDialog<Set<String>>(
+      context: context,
+      builder: (_) => CatalogMultiSelectDialog<String>(
+        title: l10n.catalogSelectTypes,
+        options: types,
+        selectedValues: selectedTypes,
+        labelOf: (type) => _typeLabel(l10n, type),
+      ),
+    );
+
+    if (!context.mounted || selection == null) return;
+
+    onTypesChanged(selection);
+  }
+
+  Future<void> _selectGenerations(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+
+    final selection = await showDialog<Set<int>>(
+      context: context,
+      builder: (_) => CatalogMultiSelectDialog<int>(
+        title: l10n.catalogSelectGenerations,
+        options: generations,
+        selectedValues: selectedGenerations,
+        labelOf: (generation) => _generationLabel(l10n, generation),
+      ),
+    );
+
+    if (!context.mounted || selection == null) return;
+
+    onGenerationsChanged(selection);
+  }
+
+  Widget _buildSelector({
+    required Key key,
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      key: key,
+      borderRadius: BorderRadius.circular(4),
+      onTap: onTap,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -98,67 +185,91 @@ class CatalogFilterBar extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey(selectedType),
-                  initialValue: selectedType ?? '',
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    labelText: l10n.catalogTypeFilter,
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: [
-                    DropdownMenuItem(
-                      value: '',
-                      child: Text(
-                        l10n.catalogAllTypes,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    for (final type in types)
-                      DropdownMenuItem(
-                        value: type,
-                        child: Text(
-                          _typeLabel(l10n, type),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    onTypeChanged(
-                      value == null || value.isEmpty ? null : value,
-                    );
-                  },
+                child: _buildSelector(
+                  key: const ValueKey('catalog-types-selector'),
+                  label: l10n.catalogTypeFilter,
+                  value: selectedTypes.isEmpty
+                      ? l10n.catalogAllTypes
+                      : l10n.catalogSelectedCount(selectedTypes.length),
+                  onTap: () => _selectTypes(context),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: DropdownButtonFormField<CatalogSort>(
-                  key: ValueKey(selectedSort),
-                  initialValue: selectedSort,
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    labelText: l10n.catalogSortBy,
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: [
-                    for (final sort in CatalogSort.values)
-                      DropdownMenuItem(
-                        value: sort,
-                        child: Text(
-                          _sortLabel(l10n, sort),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      onSortChanged(value);
-                    }
-                  },
+                child: _buildSelector(
+                  key: const ValueKey('catalog-generations-selector'),
+                  label: l10n.catalogGenerationFilter,
+                  value: selectedGenerations.isEmpty
+                      ? l10n.catalogAllGenerations
+                      : l10n.catalogSelectedCount(selectedGenerations.length),
+                  onTap: () => _selectGenerations(context),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<CatalogSort>(
+            key: ValueKey(selectedSort),
+            initialValue: selectedSort,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: l10n.catalogSortBy,
+              border: const OutlineInputBorder(),
+            ),
+            items: [
+              for (final sort in CatalogSort.values)
+                DropdownMenuItem(
+                  value: sort,
+                  child: Text(
+                    _sortLabel(l10n, sort),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                onSortChanged(value);
+              }
+            },
+          ),
+          if (selectedTypes.isNotEmpty || selectedGenerations.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 44,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  for (final type in types)
+                    if (selectedTypes.contains(type))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: InputChip(
+                          label: Text(_typeLabel(l10n, type)),
+                          onDeleted: () {
+                            onTypesChanged(
+                              Set<String>.of(selectedTypes)..remove(type),
+                            );
+                          },
+                        ),
+                      ),
+                  for (final generation in generations)
+                    if (selectedGenerations.contains(generation))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: InputChip(
+                          label: Text(_generationLabel(l10n, generation)),
+                          onDeleted: () {
+                            onGenerationsChanged(
+                              Set<int>.of(selectedGenerations)
+                                ..remove(generation),
+                            );
+                          },
+                        ),
+                      ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

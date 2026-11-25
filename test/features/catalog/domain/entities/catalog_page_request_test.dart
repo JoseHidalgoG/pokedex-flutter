@@ -4,14 +4,14 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query.d
 
 void main() {
   group('CatalogPageRequest', () {
-    const query = CatalogQuery(
+    final query = CatalogQuery(
       search: 'saur',
-      type: 'grass',
+      types: {'grass'},
       sort: CatalogSort.nameAscending,
     );
 
     test('conserva los parámetros de la solicitud', () {
-      const request = CatalogPageRequest(page: 2, pageSize: 50, query: query);
+      final request = CatalogPageRequest(page: 2, pageSize: 50, query: query);
 
       expect(request.page, 2);
       expect(request.pageSize, 50);
@@ -19,13 +19,13 @@ void main() {
     });
 
     test('una solicitud es igual a sí misma', () {
-      const request = CatalogPageRequest(page: 0, pageSize: 50, query: query);
+      final request = CatalogPageRequest(page: 0, pageSize: 50, query: query);
 
       expect(request == request, isTrue);
     });
 
     test('solicitudes distintas con los mismos valores son iguales', () {
-      const first = CatalogPageRequest(page: 0, pageSize: 50, query: query);
+      final first = CatalogPageRequest(page: 0, pageSize: 50, query: query);
 
       final second = CatalogPageRequest(
         page: first.page,
@@ -39,10 +39,10 @@ void main() {
     });
 
     test('consultas equivalentes producen solicitudes equivalentes', () {
-      const first = CatalogPageRequest(
+      final first = CatalogPageRequest(
         page: 0,
         pageSize: 50,
-        query: CatalogQuery(search: 'pikachu', type: 'electric'),
+        query: CatalogQuery(search: 'pikachu', types: {'electric'}),
       );
 
       final second = CatalogPageRequest(
@@ -50,7 +50,7 @@ void main() {
         pageSize: first.pageSize,
         query: CatalogQuery(
           search: first.query.search,
-          type: first.query.type,
+          types: first.query.types,
           sort: first.query.sort,
         ),
       );
@@ -62,29 +62,29 @@ void main() {
     });
 
     test('páginas diferentes producen solicitudes diferentes', () {
-      const first = CatalogPageRequest(page: 0, pageSize: 50, query: query);
+      final first = CatalogPageRequest(page: 0, pageSize: 50, query: query);
 
-      const second = CatalogPageRequest(page: 1, pageSize: 50, query: query);
+      final second = CatalogPageRequest(page: 1, pageSize: 50, query: query);
 
       expect(first, isNot(second));
     });
 
     test('tamaños de página diferentes producen solicitudes diferentes', () {
-      const first = CatalogPageRequest(page: 0, pageSize: 50, query: query);
+      final first = CatalogPageRequest(page: 0, pageSize: 50, query: query);
 
-      const second = CatalogPageRequest(page: 0, pageSize: 25, query: query);
+      final second = CatalogPageRequest(page: 0, pageSize: 25, query: query);
 
       expect(first, isNot(second));
     });
 
     test('búsquedas diferentes producen solicitudes diferentes', () {
-      const first = CatalogPageRequest(
+      final first = CatalogPageRequest(
         page: 0,
         pageSize: 50,
         query: CatalogQuery(search: 'pikachu'),
       );
 
-      const second = CatalogPageRequest(
+      final second = CatalogPageRequest(
         page: 0,
         pageSize: 50,
         query: CatalogQuery(search: 'raichu'),
@@ -94,29 +94,29 @@ void main() {
     });
 
     test('tipos diferentes producen solicitudes diferentes', () {
-      const first = CatalogPageRequest(
+      final first = CatalogPageRequest(
         page: 0,
         pageSize: 50,
-        query: CatalogQuery(type: 'fire'),
+        query: CatalogQuery(types: {'fire'}),
       );
 
-      const second = CatalogPageRequest(
+      final second = CatalogPageRequest(
         page: 0,
         pageSize: 50,
-        query: CatalogQuery(type: 'water'),
+        query: CatalogQuery(types: {'water'}),
       );
 
       expect(first, isNot(second));
     });
 
     test('ordenamientos diferentes producen solicitudes diferentes', () {
-      const first = CatalogPageRequest(
+      final first = CatalogPageRequest(
         page: 0,
         pageSize: 50,
         query: CatalogQuery(sort: CatalogSort.nameAscending),
       );
 
-      const second = CatalogPageRequest(
+      final second = CatalogPageRequest(
         page: 0,
         pageSize: 50,
         query: CatalogQuery(sort: CatalogSort.nameDescending),
@@ -126,13 +126,13 @@ void main() {
     });
 
     test('no es igual a un objeto de otro tipo', () {
-      const request = CatalogPageRequest(page: 0, pageSize: 50, query: query);
+      final request = CatalogPageRequest(page: 0, pageSize: 50, query: query);
 
       expect(request, isNot(query));
     });
 
     test('un Set no duplica solicitudes equivalentes', () {
-      const first = CatalogPageRequest(page: 0, pageSize: 50, query: query);
+      final first = CatalogPageRequest(page: 0, pageSize: 50, query: query);
 
       final second = CatalogPageRequest(
         page: first.page,
@@ -140,7 +140,7 @@ void main() {
         query: first.query,
       );
 
-      const third = CatalogPageRequest(page: 1, pageSize: 50, query: query);
+      final third = CatalogPageRequest(page: 1, pageSize: 50, query: query);
 
       final requests = <CatalogPageRequest>{first, second, third};
 
@@ -150,11 +150,11 @@ void main() {
 
     test('puede utilizarse como clave de un Map', () {
       final pages = <CatalogPageRequest, List<int>>{
-        const CatalogPageRequest(page: 0, pageSize: 50, query: query): [1, 2],
-        const CatalogPageRequest(page: 1, pageSize: 50, query: query): [3, 4],
+        CatalogPageRequest(page: 0, pageSize: 50, query: query): [1, 2],
+        CatalogPageRequest(page: 1, pageSize: 50, query: query): [3, 4],
       };
 
-      const equivalentRequest = CatalogPageRequest(
+      final equivalentRequest = CatalogPageRequest(
         page: 0,
         pageSize: 50,
         query: query,
@@ -162,6 +162,114 @@ void main() {
 
       expect(pages[equivalentRequest], [1, 2]);
       expect(pages, hasLength(2));
+    });
+    group('solicitudes con filtros múltiples', () {
+      test('conserva los tipos y generaciones de la consulta', () {
+        final request = CatalogPageRequest(
+          page: 2,
+          pageSize: 50,
+          query: CatalogQuery(types: {'fire', 'water'}, generations: {1, 3}),
+        );
+
+        expect(request.query.types, {'fire', 'water'});
+        expect(request.query.generations, {1, 3});
+        expect(request.page, 2);
+        expect(request.pageSize, 50);
+      });
+
+      test('el orden de selección no afecta la igualdad', () {
+        final first = CatalogPageRequest(
+          page: 0,
+          pageSize: 50,
+          query: CatalogQuery(types: {'fire', 'water'}, generations: {1, 2}),
+        );
+
+        final second = CatalogPageRequest(
+          page: 0,
+          pageSize: 50,
+          query: CatalogQuery(types: {'water', 'fire'}, generations: {2, 1}),
+        );
+
+        expect(first, second);
+        expect(first.hashCode, second.hashCode);
+      });
+
+      test('diferentes conjuntos de tipos producen solicitudes diferentes', () {
+        final first = CatalogPageRequest(
+          page: 0,
+          pageSize: 50,
+          query: CatalogQuery(types: {'fire', 'water'}),
+        );
+
+        final second = CatalogPageRequest(
+          page: 0,
+          pageSize: 50,
+          query: CatalogQuery(types: {'fire', 'grass'}),
+        );
+
+        expect(first, isNot(second));
+      });
+
+      test('generaciones diferentes producen solicitudes diferentes', () {
+        final first = CatalogPageRequest(
+          page: 0,
+          pageSize: 50,
+          query: CatalogQuery(generations: {1, 2}),
+        );
+
+        final second = CatalogPageRequest(
+          page: 0,
+          pageSize: 50,
+          query: CatalogQuery(generations: {1, 3}),
+        );
+
+        expect(first, isNot(second));
+      });
+
+      test('una generación seleccionada distingue la solicitud', () {
+        final first = CatalogPageRequest(
+          page: 0,
+          pageSize: 50,
+          query: CatalogQuery(),
+        );
+
+        final second = CatalogPageRequest(
+          page: 0,
+          pageSize: 50,
+          query: CatalogQuery(generations: {1}),
+        );
+
+        expect(first, isNot(second));
+      });
+
+      test(
+        'permite recuperar páginas con filtros equivalentes desde un Map',
+        () {
+          final pages = <CatalogPageRequest, List<int>>{
+            CatalogPageRequest(
+              page: 0,
+              pageSize: 50,
+              query: CatalogQuery(
+                types: {'fire', 'water'},
+                generations: {1, 2},
+              ),
+            ): [
+              4,
+              7,
+              155,
+              158,
+            ],
+          };
+
+          final equivalent = CatalogPageRequest(
+            page: 0,
+            pageSize: 50,
+            query: CatalogQuery(types: {'water', 'fire'}, generations: {2, 1}),
+          );
+
+          expect(pages[equivalent], [4, 7, 155, 158]);
+        },
+      );
     });
   });
 }

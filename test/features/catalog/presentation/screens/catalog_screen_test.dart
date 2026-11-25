@@ -18,6 +18,10 @@ import 'package:pokedex_flutter/features/catalog/presentation/widgets/catalog_fi
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_list_item.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 
+import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_query_providers.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query_state.dart';
+
+import '../../fakes/fake_catalog_query_repository.dart';
 import '../../../favorites/fakes/fake_favorites_repository.dart';
 
 void main() {
@@ -72,6 +76,29 @@ void main() {
     vulpix,
   ];
 
+  const cyndaquil = Pokemon(
+    id: 155,
+    name: 'cyndaquil',
+    imageUrl: '',
+    typeNames: ['fire'],
+  );
+
+  const totodile = Pokemon(
+    id: 158,
+    name: 'totodile',
+    imageUrl: '',
+    typeNames: ['water'],
+  );
+
+  const torchic = Pokemon(
+    id: 255,
+    name: 'torchic',
+    imageUrl: '',
+    typeNames: ['fire'],
+  );
+
+  const multiGenerationCatalog = [...testCatalog, cyndaquil, totodile, torchic];
+
   const testBaseStats = <int, int>{
     1: 318,
     4: 309,
@@ -93,9 +120,25 @@ void main() {
               : item.name.toLowerCase().contains(search));
 
       final matchesType =
-          query.type == null || item.typeNames.contains(query.type);
+          query.types.isEmpty || item.typeNames.any(query.types.contains);
 
-      return matchesSearch && matchesType;
+      final generation = switch (item.id) {
+        <= 151 => 1,
+        <= 251 => 2,
+        <= 386 => 3,
+        <= 493 => 4,
+        <= 649 => 5,
+        <= 721 => 6,
+        <= 809 => 7,
+        <= 905 => 8,
+        <= 1025 => 9,
+        _ => 0,
+      };
+
+      final matchesGeneration =
+          query.generations.isEmpty || query.generations.contains(generation);
+
+      return matchesSearch && matchesType && matchesGeneration;
     }).toList();
 
     filtered.sort((a, b) {
@@ -131,8 +174,12 @@ void main() {
     Stream<int>? counts,
     List<CatalogPageRequest>? pageRequests,
     List<CatalogQuery>? countRequests,
+    FakeCatalogQueryRepository? queryRepository,
   }) {
     return [
+      catalogQueryRepositoryProvider.overrideWithValue(
+        queryRepository ?? FakeCatalogQueryRepository(),
+      ),
       filteredCatalogPageProvider.overrideWith((ref, request) {
         pageRequests?.add(request);
 
@@ -165,6 +212,7 @@ void main() {
     Locale locale = const Locale('es'),
     List<CatalogPageRequest>? pageRequests,
     List<CatalogQuery>? countRequests,
+    FakeCatalogQueryRepository? queryRepository,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -173,6 +221,7 @@ void main() {
           syncStatuses: Stream.value(syncStatus),
           pageRequests: pageRequests,
           countRequests: countRequests,
+          queryRepository: queryRepository,
         ),
         child: MaterialApp(
           locale: locale,
@@ -185,18 +234,27 @@ void main() {
 
     await tester.pump();
     await tester.pump();
+    await tester.pump();
+  }
+
+  AppLocalizations catalogL10n(WidgetTester tester) {
+    return AppLocalizations.of(tester.element(find.byType(CatalogScreen)))!;
   }
 
   Future<void> scrollToPagination(WidgetTester tester) async {
-    final paginationFinder = find.byTooltip('Página siguiente');
+    final paginationFinder = find.byTooltip(catalogL10n(tester).nextPage);
+
+    final catalogList = find.byKey(const ValueKey('catalog-pokemon-list'));
+
+    final catalogScrollable = find.descendant(
+      of: catalogList,
+      matching: find.byType(Scrollable),
+    );
 
     await tester.scrollUntilVisible(
       paginationFinder,
       400,
-      scrollable: find.descendant(
-        of: find.byType(ListView),
-        matching: find.byType(Scrollable),
-      ),
+      scrollable: catalogScrollable,
       maxScrolls: 100,
     );
 
@@ -204,12 +262,12 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  AppLocalizations catalogL10n(WidgetTester tester) {
-    return AppLocalizations.of(tester.element(find.byType(CatalogScreen)))!;
+  Finder typeDropdown() {
+    return find.byKey(const ValueKey('catalog-types-selector'));
   }
 
-  Finder typeDropdown() {
-    return find.byType(DropdownButtonFormField<String>);
+  Finder generationSelector() {
+    return find.byKey(const ValueKey('catalog-generations-selector'));
   }
 
   Finder sortDropdown() {
@@ -230,49 +288,63 @@ void main() {
 
   Future<void> searchFor(WidgetTester tester, String value) async {
     await tester.enterText(find.byType(TextField), value);
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
   }
 
   Future<void> selectType(WidgetTester tester, String label) async {
-    final dropdown = tester.widget<DropdownButton<String>>(
-      find.descendant(
-        of: typeDropdown(),
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
-
-    final items = dropdown.items!;
-
-    final targetIndex = items.indexWhere(
-      (item) => item.child is Text && (item.child as Text).data == label,
-    );
-
-    final currentIndex = items.indexWhere(
-      (item) => item.value == dropdown.value,
-    );
-
-    expect(targetIndex, greaterThanOrEqualTo(0));
+    final l10n = catalogL10n(tester);
 
     await tester.tap(typeDropdown());
     await tester.pumpAndSettle();
 
-    final menuScrollable = find.byType(Scrollable).last;
+    final clearButton = find.byKey(const ValueKey('catalog-selection-clear'));
 
-    final option = find.descendant(
-      of: menuScrollable,
-      matching: find.text(label),
-    );
+    final clearWidget = tester.widget<TextButton>(clearButton);
 
-    await tester.scrollUntilVisible(
-      option,
-      targetIndex < currentIndex ? -48 : 48,
-      scrollable: menuScrollable,
-      maxScrolls: 25,
-    );
+    if (clearWidget.onPressed != null) {
+      await tester.tap(clearButton);
+      await tester.pumpAndSettle();
+    }
 
-    await tester.ensureVisible(option);
-    await tester.tap(option);
+    if (label != l10n.catalogAllTypes) {
+      final option = find.widgetWithText(CheckboxListTile, label);
+
+      await tester.ensureVisible(option);
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+    }
+
+    await tester.tap(find.byKey(const ValueKey('catalog-selection-apply')));
+
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> selectMultiple<T>(
+    WidgetTester tester, {
+    required Finder selector,
+    required Set<T> values,
+  }) async {
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+
+    final clearButton = find.byKey(const ValueKey('catalog-selection-clear'));
+
+    if (tester.widget<TextButton>(clearButton).onPressed != null) {
+      await tester.tap(clearButton);
+      await tester.pumpAndSettle();
+    }
+
+    for (final value in values) {
+      final option = find.byKey(ValueKey('catalog-option-$value'));
+
+      await tester.ensureVisible(option);
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+    }
+
+    await tester.tap(find.byKey(const ValueKey('catalog-selection-apply')));
+
     await tester.pumpAndSettle();
   }
 
@@ -314,6 +386,7 @@ void main() {
       ),
     );
 
+    await tester.pump();
     await tester.pump();
     await tester.pump();
 
@@ -404,6 +477,7 @@ void main() {
     await tester.tap(find.byTooltip('Página siguiente'));
     await tester.pump();
     await tester.pump();
+    await tester.pump();
 
     expect(find.text('#0051'), findsOneWidget);
     expect(find.text('Pokemon51'), findsOneWidget);
@@ -417,6 +491,7 @@ void main() {
     expect(nextButton.onPressed, isNull);
 
     await tester.tap(find.byTooltip('Página anterior'));
+    await tester.pump();
     await tester.pump();
     await tester.pump();
 
@@ -516,6 +591,8 @@ void main() {
         ),
       );
 
+      await tester.pump();
+      await tester.pump();
       syncStatusController.add(SyncRevalidated(DateTime(2026, 11, 19, 10)));
       await tester.pump();
       await tester.pump();
@@ -569,8 +646,11 @@ void main() {
       ),
     );
 
+    await tester.pump();
+    await tester.pump();
     countController.add(51);
 
+    await tester.pump();
     await tester.pump();
     await tester.pump();
 
@@ -579,11 +659,13 @@ void main() {
     await tester.tap(find.byTooltip('Página siguiente'));
     await tester.pump();
     await tester.pump();
+    await tester.pump();
 
     expect(find.text('#0051'), findsOneWidget);
 
     countController.add(25);
 
+    await tester.pump();
     await tester.pump();
     await tester.pump();
     await tester.pump();
@@ -642,7 +724,7 @@ void main() {
       await showFilters(tester);
 
       expect(requests, hasLength(1));
-      expect(requests.single.query, const CatalogQuery());
+      expect(requests.single.query, CatalogQuery());
     });
 
     testWidgets('los filtros comienzan con los valores predeterminados', (
@@ -656,7 +738,8 @@ void main() {
       );
 
       expect(filterBar.searchController.text, isEmpty);
-      expect(filterBar.selectedType, isNull);
+      expect(filterBar.selectedTypes, isEmpty);
+      expect(filterBar.selectedGenerations, isEmpty);
       expect(filterBar.selectedSort, CatalogSort.numberAscending);
     });
   });
@@ -757,7 +840,7 @@ void main() {
   });
 
   group('debounce de búsqueda del catálogo', () {
-    testWidgets('no aplica la búsqueda antes de 300 milisegundos', (
+    testWidgets('no aplica la búsqueda antes de 400 milisegundos', (
       tester,
     ) async {
       final requests = <CatalogPageRequest>[];
@@ -767,7 +850,7 @@ void main() {
       await showFilters(tester);
 
       await tester.enterText(find.byType(TextField), 'pikachu');
-      await tester.pump(const Duration(milliseconds: 299));
+      await tester.pump(const Duration(milliseconds: 399));
 
       expect(requests, hasLength(1));
       expect(requests.last.query.search, isEmpty);
@@ -797,7 +880,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       await tester.enterText(find.byType(TextField), 'pikachu');
-      await tester.pump(const Duration(milliseconds: 299));
+      await tester.pump(const Duration(milliseconds: 399));
 
       expect(requests, hasLength(1));
 
@@ -820,7 +903,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 50));
       }
 
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
 
       expect(requests.map((request) => request.query.search).toList(), [
@@ -862,7 +945,7 @@ void main() {
       await selectType(tester, catalogL10n(tester).pokemonTypeElectric);
 
       expect(visiblePokemonIds(tester), [25, 26]);
-      expect(requests.last.query.type, 'electric');
+      expect(requests.last.query.types, {'electric'});
     });
 
     testWidgets('incluye Pokémon con más de un tipo', (tester) async {
@@ -900,7 +983,7 @@ void main() {
 
       await selectType(tester, catalogL10n(tester).catalogAllTypes);
 
-      expect(requests.last.query.type, isNull);
+      expect(requests.last.query.types, isEmpty);
       expect(find.text('Bulbasaur'), findsOneWidget);
       expect(find.text('Charmander'), findsOneWidget);
     });
@@ -918,26 +1001,33 @@ void main() {
       expect(find.text(catalogL10n(tester).catalogNoResults), findsOneWidget);
     });
 
-    testWidgets('el selector contiene los 18 tipos y la opción todos', (
-      tester,
-    ) async {
-      await pumpCatalog(tester, pokemon: testCatalog);
-      await showFilters(tester);
+    testWidgets(
+      'el selector contiene los 18 tipos y permite limpiar la selección',
+      (tester) async {
+        await pumpCatalog(tester, pokemon: testCatalog);
+        await showFilters(tester);
 
-      final dropdown = tester.widget<DropdownButton<String>>(
-        find.descendant(
-          of: typeDropdown(),
-          matching: find.byType(DropdownButton<String>),
-        ),
-      );
+        await tester.tap(typeDropdown());
+        await tester.pumpAndSettle();
 
-      expect(dropdown.items, hasLength(19));
+        expect(find.byType(CheckboxListTile), findsNWidgets(18));
 
-      expect(
-        dropdown.items!.map((item) => item.value),
-        unorderedEquals(['', ...CatalogFilterBar.types]),
-      );
-    });
+        for (final type in CatalogFilterBar.types) {
+          expect(find.byKey(ValueKey('catalog-option-$type')), findsOneWidget);
+        }
+
+        expect(
+          find.byKey(const ValueKey('catalog-selection-clear')),
+          findsOneWidget,
+        );
+
+        await tester.tap(
+          find.byKey(const ValueKey('catalog-selection-cancel')),
+        );
+
+        await tester.pumpAndSettle();
+      },
+    );
   });
 
   group('ordenamiento del catálogo', () {
@@ -1020,7 +1110,7 @@ void main() {
 
       expect(
         requests.last.query,
-        const CatalogQuery(search: 'chu', type: 'electric'),
+        CatalogQuery(search: 'chu', types: {'electric'}),
       );
     });
 
@@ -1040,9 +1130,9 @@ void main() {
 
       expect(
         requests.last.query,
-        const CatalogQuery(
+        CatalogQuery(
           search: 'chu',
-          type: 'electric',
+          types: {'electric'},
           sort: CatalogSort.numberDescending,
         ),
       );
@@ -1076,7 +1166,7 @@ void main() {
       await selectType(tester, catalogL10n(tester).catalogAllTypes);
 
       expect(requests.last.query.search, 'chu');
-      expect(requests.last.query.type, isNull);
+      expect(requests.last.query.types, isEmpty);
       expect(visiblePokemonIds(tester), [25, 26]);
     });
 
@@ -1112,7 +1202,7 @@ void main() {
       );
 
       expect(filterBar.searchController.text, 'chu');
-      expect(filterBar.selectedType, 'electric');
+      expect(filterBar.selectedTypes, {'electric'});
       expect(filterBar.selectedSort, CatalogSort.numberDescending);
 
       expect(visiblePokemonIds(tester), [26, 25]);
@@ -1158,7 +1248,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(requests.last.query, const CatalogQuery());
+      expect(requests.last.query, CatalogQuery());
       expect(requests.last.page, 0);
 
       final filterBar = tester.widget<CatalogFilterBar>(
@@ -1166,7 +1256,8 @@ void main() {
       );
 
       expect(filterBar.searchController.text, isEmpty);
-      expect(filterBar.selectedType, isNull);
+      expect(filterBar.selectedTypes, isEmpty);
+      expect(filterBar.selectedGenerations, isEmpty);
       expect(filterBar.selectedSort, CatalogSort.numberAscending);
 
       expect(find.text('Bulbasaur'), findsOneWidget);
@@ -1191,7 +1282,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
 
-      expect(requests.last.query, const CatalogQuery());
+      expect(requests.last.query, CatalogQuery());
 
       expect(
         requests.any((request) => request.query.search == 'pikachu'),
@@ -1216,7 +1307,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(requests.last.query, const CatalogQuery());
+      expect(requests.last.query, CatalogQuery());
       expect(find.byType(CatalogFilterBar), findsNothing);
       expect(find.text('Bulbasaur'), findsOneWidget);
     });
@@ -1295,7 +1386,7 @@ void main() {
       await selectType(tester, catalogL10n(tester).pokemonTypeElectric);
 
       expect(requests.last.page, 0);
-      expect(requests.last.query.type, 'electric');
+      expect(requests.last.query.types, {'electric'});
       expect(visiblePokemonIds(tester).first, 1);
     });
 
@@ -1340,7 +1431,7 @@ void main() {
       await goToSecondPage(tester);
 
       expect(requests.last.page, 1);
-      expect(requests.last.query.type, 'electric');
+      expect(requests.last.query.types, {'electric'});
 
       expect(visiblePokemonIds(tester).first, 101);
 
@@ -1377,9 +1468,9 @@ void main() {
 
       expect(
         requests.last.query,
-        const CatalogQuery(
+        CatalogQuery(
           search: 'pokemon',
-          type: 'electric',
+          types: {'electric'},
           sort: CatalogSort.numberDescending,
         ),
       );
@@ -1465,7 +1556,7 @@ void main() {
 
         await selectType(tester, catalogL10n(tester).pokemonTypeElectric);
 
-        expect(requests.last.query.type, 'electric');
+        expect(requests.last.query.types, {'electric'});
         expect(visiblePokemonIds(tester), [25, 26]);
       });
     }
@@ -1491,5 +1582,683 @@ void main() {
     expect(sortRect.right, lessThanOrEqualTo(360));
 
     expect(tester.takeException(), isNull);
+    expect(generationSelector(), findsOneWidget);
+
+    final generationRect = tester.getRect(generationSelector());
+
+    expect(generationRect.right, lessThanOrEqualTo(360));
+
+    expect(generationRect.left, greaterThanOrEqualTo(0));
+  });
+  group('selección múltiple de filtros', () {
+    testWidgets('permite seleccionar múltiples tipos', (tester) async {
+      final requests = <CatalogPageRequest>[];
+
+      await pumpCatalog(tester, pokemon: testCatalog, pageRequests: requests);
+
+      await showFilters(tester);
+
+      await selectMultiple<String>(
+        tester,
+        selector: typeDropdown(),
+        values: {'fire', 'water'},
+      );
+
+      expect(visiblePokemonIds(tester), [4, 7, 37]);
+
+      expect(requests.last.query.types, {'fire', 'water'});
+    });
+
+    testWidgets('no duplica Pokémon con dos tipos seleccionados', (
+      tester,
+    ) async {
+      await pumpCatalog(tester, pokemon: testCatalog);
+      await showFilters(tester);
+
+      await selectMultiple<String>(
+        tester,
+        selector: typeDropdown(),
+        values: {'grass', 'poison'},
+      );
+
+      expect(visiblePokemonIds(tester), [1]);
+    });
+
+    testWidgets('permite seleccionar una generación', (tester) async {
+      await pumpCatalog(tester, pokemon: multiGenerationCatalog);
+
+      await showFilters(tester);
+
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {2},
+      );
+
+      expect(visiblePokemonIds(tester), [155, 158]);
+    });
+
+    testWidgets('permite seleccionar múltiples generaciones', (tester) async {
+      final requests = <CatalogPageRequest>[];
+
+      await pumpCatalog(
+        tester,
+        pokemon: multiGenerationCatalog,
+        pageRequests: requests,
+      );
+
+      await showFilters(tester);
+
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {2, 3},
+      );
+
+      expect(visiblePokemonIds(tester), [155, 158, 255]);
+      expect(requests.last.query.generations, {2, 3});
+    });
+
+    testWidgets('combina múltiples tipos y generaciones', (tester) async {
+      final requests = <CatalogPageRequest>[];
+
+      await pumpCatalog(
+        tester,
+        pokemon: multiGenerationCatalog,
+        pageRequests: requests,
+      );
+
+      await showFilters(tester);
+
+      await selectMultiple<String>(
+        tester,
+        selector: typeDropdown(),
+        values: {'fire', 'water'},
+      );
+
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {2, 3},
+      );
+
+      expect(visiblePokemonIds(tester), [155, 158, 255]);
+
+      expect(requests.last.query.types, {'fire', 'water'});
+      expect(requests.last.query.generations, {2, 3});
+    });
+
+    testWidgets('cancelar el diálogo no modifica la consulta', (tester) async {
+      final requests = <CatalogPageRequest>[];
+
+      await pumpCatalog(tester, pokemon: testCatalog, pageRequests: requests);
+
+      await showFilters(tester);
+
+      await tester.tap(typeDropdown());
+      await tester.pumpAndSettle();
+
+      final option = find.byKey(const ValueKey('catalog-option-fire'));
+
+      await tester.ensureVisible(option);
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+
+      expect(requests, hasLength(1));
+
+      await tester.tap(find.byKey(const ValueKey('catalog-selection-cancel')));
+
+      await tester.pumpAndSettle();
+
+      expect(requests, hasLength(1));
+      expect(requests.last.query.types, isEmpty);
+    });
+
+    testWidgets('aplicar sin cambios no genera otra consulta', (tester) async {
+      final requests = <CatalogPageRequest>[];
+
+      await pumpCatalog(tester, pokemon: testCatalog, pageRequests: requests);
+
+      await showFilters(tester);
+
+      await tester.tap(typeDropdown());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('catalog-selection-apply')));
+
+      await tester.pumpAndSettle();
+
+      expect(requests, hasLength(1));
+    });
+
+    testWidgets('el selector contiene las nueve generaciones', (tester) async {
+      await pumpCatalog(tester, pokemon: testCatalog);
+      await showFilters(tester);
+
+      await tester.tap(generationSelector());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CheckboxListTile), findsNWidgets(9));
+
+      for (var generation = 1; generation <= 9; generation++) {
+        expect(
+          find.byKey(ValueKey('catalog-option-$generation')),
+          findsOneWidget,
+        );
+      }
+
+      await tester.tap(find.byKey(const ValueKey('catalog-selection-cancel')));
+
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('una generación sin coincidencias muestra el estado vacío', (
+      tester,
+    ) async {
+      await pumpCatalog(tester, pokemon: multiGenerationCatalog);
+
+      await showFilters(tester);
+
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {9},
+      );
+
+      expect(find.byType(PokemonListItem), findsNothing);
+
+      expect(find.text(catalogL10n(tester).catalogNoResults), findsOneWidget);
+    });
+
+    testWidgets('limpiar filtros elimina tipos y generaciones', (tester) async {
+      final requests = <CatalogPageRequest>[];
+
+      await pumpCatalog(
+        tester,
+        pokemon: multiGenerationCatalog,
+        pageRequests: requests,
+      );
+
+      await showFilters(tester);
+
+      await selectMultiple<String>(
+        tester,
+        selector: typeDropdown(),
+        values: {'electric'},
+      );
+
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {3},
+      );
+
+      await tester.tap(find.text(catalogL10n(tester).catalogClearFilters));
+
+      await tester.pumpAndSettle();
+
+      expect(requests.last.query, CatalogQuery());
+      expect(requests.last.page, 0);
+
+      final filterBar = tester.widget<CatalogFilterBar>(
+        find.byType(CatalogFilterBar),
+      );
+
+      expect(filterBar.selectedTypes, isEmpty);
+      expect(filterBar.selectedGenerations, isEmpty);
+      expect(filterBar.selectedSort, CatalogSort.numberAscending);
+    });
+  });
+  group('comportamiento avanzado de filtros múltiples', () {
+    Finder option(Object value) =>
+        find.byKey(ValueKey('catalog-option-$value'));
+    Finder action(String name) =>
+        find.byKey(ValueKey('catalog-selection-$name'));
+
+    Future<void> open(WidgetTester tester, Finder selector) async {
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> toggle(WidgetTester tester, Object value) async {
+      await tester.ensureVisible(option(value));
+      await tester.tap(option(value));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> finish(WidgetTester tester, String name) async {
+      await tester.tap(action(name));
+      await tester.pumpAndSettle();
+    }
+
+    for (final category in ['types', 'generations']) {
+      final isType = category == 'types';
+      Finder selector() => isType ? typeDropdown() : generationSelector();
+      final Object first = isType ? 'fire' : 1;
+      final Object second = isType ? 'water' : 2;
+
+      testWidgets('$category: contador y selección provisional', (
+        tester,
+      ) async {
+        final requests = <CatalogPageRequest>[];
+        await pumpCatalog(
+          tester,
+          pokemon: multiGenerationCatalog,
+          pageRequests: requests,
+        );
+        await showFilters(tester);
+        await open(tester, selector());
+        final l10n = catalogL10n(tester);
+        expect(find.text(l10n.catalogSelectedCount(0)), findsOneWidget);
+        await toggle(tester, first);
+        await toggle(tester, second);
+        expect(find.text(l10n.catalogSelectedCount(2)), findsOneWidget);
+        expect(requests, hasLength(1));
+        await toggle(tester, first);
+        expect(find.text(l10n.catalogSelectedCount(1)), findsOneWidget);
+        await finish(tester, 'apply');
+        expect(
+          isType ? requests.last.query.types : requests.last.query.generations,
+          {second},
+        );
+      });
+
+      testWidgets(
+        '$category: reabrir conserva las casillas y cancelar conserva la consulta',
+        (tester) async {
+          final requests = <CatalogPageRequest>[];
+          await pumpCatalog(
+            tester,
+            pokemon: multiGenerationCatalog,
+            pageRequests: requests,
+          );
+          await showFilters(tester);
+          await open(tester, selector());
+          await toggle(tester, first);
+          await finish(tester, 'apply');
+          final previous = requests.last;
+          final count = requests.length;
+          await open(tester, selector());
+          expect(tester.widget<CheckboxListTile>(option(first)).value, isTrue);
+          expect(
+            tester.widget<CheckboxListTile>(option(second)).value,
+            isFalse,
+          );
+          await toggle(tester, first);
+          await toggle(tester, second);
+          await finish(tester, 'cancel');
+          expect(requests.length, count);
+          expect(requests.last, previous);
+        },
+      );
+
+      testWidgets('$category: limpiar es provisional hasta aplicar', (
+        tester,
+      ) async {
+        final requests = <CatalogPageRequest>[];
+        await pumpCatalog(
+          tester,
+          pokemon: multiGenerationCatalog,
+          pageRequests: requests,
+        );
+        await showFilters(tester);
+        await open(tester, selector());
+        expect(tester.widget<TextButton>(action('clear')).onPressed, isNull);
+        await toggle(tester, first);
+        await toggle(tester, second);
+        await finish(tester, 'apply');
+        final previous = requests.last;
+        await open(tester, selector());
+        await finish(tester, 'clear');
+        expect(tester.widget<CheckboxListTile>(option(first)).value, isFalse);
+        expect(tester.widget<CheckboxListTile>(option(second)).value, isFalse);
+        expect(requests.last, previous);
+        await finish(tester, 'apply');
+        expect(
+          isType ? requests.last.query.types : requests.last.query.generations,
+          isEmpty,
+        );
+      });
+    }
+
+    testWidgets('eliminar un chip de tipo conserva los demás filtros', (
+      tester,
+    ) async {
+      final requests = <CatalogPageRequest>[];
+      await pumpCatalog(
+        tester,
+        pokemon: multiGenerationCatalog,
+        pageRequests: requests,
+      );
+      await showFilters(tester);
+      await selectMultiple<String>(
+        tester,
+        selector: typeDropdown(),
+        values: {'fire', 'water'},
+      );
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {2},
+      );
+      final chip = find.widgetWithText(
+        InputChip,
+        catalogL10n(tester).pokemonTypeFire,
+      );
+      expect(chip, findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: chip,
+          matching: find.byTooltip(
+            MaterialLocalizations.of(tester.element(chip)).deleteButtonTooltip,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(requests.last.query.types, {'water'});
+      expect(requests.last.query.generations, {2});
+      expect(visiblePokemonIds(tester), [158]);
+    });
+
+    testWidgets('eliminar un chip de generación conserva los tipos', (
+      tester,
+    ) async {
+      final requests = <CatalogPageRequest>[];
+      await pumpCatalog(
+        tester,
+        pokemon: multiGenerationCatalog,
+        pageRequests: requests,
+      );
+      await showFilters(tester);
+      await selectMultiple<String>(
+        tester,
+        selector: typeDropdown(),
+        values: {'fire'},
+      );
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {2, 3},
+      );
+      final chip = find.widgetWithText(
+        InputChip,
+        catalogL10n(tester).catalogGenerationLabel('II'),
+      );
+      await tester.ensureVisible(chip);
+      await tester.tap(
+        find.descendant(
+          of: chip,
+          matching: find.byTooltip(
+            MaterialLocalizations.of(tester.element(chip)).deleteButtonTooltip,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(requests.last.query.types, {'fire'});
+      expect(requests.last.query.generations, {3});
+      expect(visiblePokemonIds(tester), [255]);
+    });
+
+    testWidgets('ocultar y mostrar conserva ambos conjuntos', (tester) async {
+      await pumpCatalog(tester, pokemon: multiGenerationCatalog);
+      await showFilters(tester);
+      await selectMultiple<String>(
+        tester,
+        selector: typeDropdown(),
+        values: {'fire', 'water'},
+      );
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {2, 3},
+      );
+      await hideFilters(tester);
+      await showFilters(tester);
+      final bar = tester.widget<CatalogFilterBar>(
+        find.byType(CatalogFilterBar),
+      );
+      expect(bar.selectedTypes, {'fire', 'water'});
+      expect(bar.selectedGenerations, {2, 3});
+      expect(visiblePokemonIds(tester), [155, 158, 255]);
+    });
+
+    testWidgets('combina búsqueda, tipos, generaciones y orden', (
+      tester,
+    ) async {
+      final requests = <CatalogPageRequest>[];
+      await pumpCatalog(
+        tester,
+        pokemon: multiGenerationCatalog,
+        pageRequests: requests,
+      );
+      await showFilters(tester);
+      await selectMultiple<String>(
+        tester,
+        selector: typeDropdown(),
+        values: {'fire', 'water'},
+      );
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {2, 3},
+      );
+      await searchFor(tester, 't');
+      await selectSort(tester, catalogL10n(tester).catalogSortNumberDesc);
+      expect(
+        requests.last.query,
+        CatalogQuery(
+          search: 't',
+          types: {'fire', 'water'},
+          generations: {2, 3},
+          sort: CatalogSort.numberDescending,
+        ),
+      );
+      expect(visiblePokemonIds(tester), [255, 158]);
+    });
+
+    testWidgets('cambiar generaciones restablece la página inicial', (
+      tester,
+    ) async {
+      final requests = <CatalogPageRequest>[];
+      final pokemon = List.generate(
+        160,
+        (i) => Pokemon(
+          id: i + 1,
+          name: 'pokemon${i + 1}',
+          imageUrl: '',
+          typeNames: const ['fire'],
+        ),
+      );
+      await pumpCatalog(tester, pokemon: pokemon, pageRequests: requests);
+      await scrollToPagination(tester);
+      await tester.tap(find.byTooltip(catalogL10n(tester).nextPage));
+      await tester.pumpAndSettle();
+      expect(requests.last.page, 1);
+      await showFilters(tester);
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {2},
+      );
+      expect(requests.last.page, 0);
+      expect(requests.last.query.generations, {2});
+      expect(visiblePokemonIds(tester).first, 152);
+    });
+
+    for (final language in ['es', 'en']) {
+      testWidgets('diálogos de selección localizados en $language', (
+        tester,
+      ) async {
+        await pumpCatalog(
+          tester,
+          pokemon: multiGenerationCatalog,
+          locale: Locale(language),
+        );
+        await showFilters(tester);
+        final l10n = catalogL10n(tester);
+        expect(find.text(l10n.catalogGenerationFilter), findsOneWidget);
+        await open(tester, generationSelector());
+        expect(find.text(l10n.catalogSelectGenerations), findsOneWidget);
+        expect(find.text(l10n.catalogGenerationLabel('IX')), findsOneWidget);
+        expect(find.text(l10n.catalogApplySelection), findsOneWidget);
+        expect(find.text(l10n.catalogCancelSelection), findsOneWidget);
+        expect(find.text(l10n.catalogClearSelection), findsOneWidget);
+        await finish(tester, 'cancel');
+        await open(tester, typeDropdown());
+        expect(find.text(l10n.catalogSelectTypes), findsOneWidget);
+        expect(
+          find.widgetWithText(CheckboxListTile, l10n.pokemonTypeFire),
+          findsOneWidget,
+        );
+        await finish(tester, 'cancel');
+      });
+    }
+
+    testWidgets('muchos filtros activos caben en teléfono estrecho', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 3;
+      tester.view.physicalSize = const Size(360 * 3, 740 * 3);
+      addTearDown(tester.view.reset);
+      await pumpCatalog(tester, pokemon: multiGenerationCatalog);
+      await showFilters(tester);
+      await selectMultiple<String>(
+        tester,
+        selector: typeDropdown(),
+        values: CatalogFilterBar.types.toSet(),
+      );
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: CatalogFilterBar.generations.toSet(),
+      );
+      final bar = tester.widget<CatalogFilterBar>(
+        find.byType(CatalogFilterBar),
+      );
+      expect(bar.selectedTypes, hasLength(18));
+      expect(bar.selectedGenerations, hasLength(9));
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('persistencia de consulta', () {
+    testWidgets('restaura todos los criterios antes de consultar', (
+      tester,
+    ) async {
+      final initial = CatalogQueryState(
+        query: CatalogQuery(
+          search: 'chu',
+          types: {'electric'},
+          generations: {1},
+          sort: CatalogSort.numberDescending,
+        ),
+      );
+      final repository = FakeCatalogQueryRepository(initialState: initial);
+      final requests = <CatalogPageRequest>[];
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        queryRepository: repository,
+        pageRequests: requests,
+      );
+      await tester.pumpAndSettle();
+      expect(requests.single.query, initial.query);
+      expect(visiblePokemonIds(tester), [26, 25]);
+      await showFilters(tester);
+      final bar = tester.widget<CatalogFilterBar>(
+        find.byType(CatalogFilterBar),
+      );
+      expect(bar.searchController.text, 'chu');
+      expect(bar.selectedTypes, {'electric'});
+      expect(bar.selectedGenerations, {1});
+      expect(bar.selectedSort, CatalogSort.numberDescending);
+      expect(repository.saveCalls, 0);
+    });
+    testWidgets('guarda criterios y los restaura en un nuevo scope', (
+      tester,
+    ) async {
+      final repository = FakeCatalogQueryRepository();
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        queryRepository: repository,
+      );
+      await showFilters(tester);
+      await searchFor(tester, 'chu');
+      await selectType(tester, catalogL10n(tester).pokemonTypeElectric);
+      await selectMultiple<int>(
+        tester,
+        selector: generationSelector(),
+        values: {1},
+      );
+      await selectSort(tester, catalogL10n(tester).catalogSortNumberDesc);
+      final saved = repository.storedState!;
+      expect(
+        saved.query,
+        CatalogQuery(
+          search: 'chu',
+          types: {'electric'},
+          generations: {1},
+          sort: CatalogSort.numberDescending,
+        ),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        queryRepository: repository,
+      );
+      await tester.pumpAndSettle();
+      expect(visiblePokemonIds(tester), [26, 25]);
+      expect(repository.loadCalls, 2);
+    });
+    testWidgets('restaura una segunda pagina', (tester) async {
+      final repository = FakeCatalogQueryRepository(
+        initialState: CatalogQueryState(query: CatalogQuery(), page: 1),
+      );
+      final pokemon = List.generate(
+        51,
+        (i) => Pokemon(
+          id: i + 1,
+          name: 'pokemon${i + 1}',
+          imageUrl: '',
+          typeNames: const ['normal'],
+        ),
+      );
+      await pumpCatalog(tester, pokemon: pokemon, queryRepository: repository);
+      await tester.pumpAndSettle();
+      expect(visiblePokemonIds(tester), [51]);
+      expect(repository.saveCalls, 0);
+    });
+    testWidgets('corrige y guarda una pagina inexistente', (tester) async {
+      final repository = FakeCatalogQueryRepository(
+        initialState: CatalogQueryState(query: CatalogQuery(), page: 9),
+      );
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        queryRepository: repository,
+      );
+      await tester.pumpAndSettle();
+      expect(repository.storedState!.page, 0);
+      expect(find.text('Bulbasaur'), findsOneWidget);
+    });
+    testWidgets('limpiar filtros guarda estado inicial', (tester) async {
+      final repository = FakeCatalogQueryRepository(
+        initialState: CatalogQueryState(
+          query: CatalogQuery(search: 'inexistente'),
+        ),
+      );
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        queryRepository: repository,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(catalogL10n(tester).catalogClearFilters));
+      await tester.pumpAndSettle();
+      expect(repository.storedState, CatalogQueryState.initial());
+    });
   });
 }

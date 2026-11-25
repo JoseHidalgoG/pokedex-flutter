@@ -138,12 +138,16 @@ void main() {
   ];
 
   Future<List<CatalogEntry>> filteredPage({
-    CatalogQuery query = const CatalogQuery(),
+    CatalogQuery? query,
     int limit = 50,
     int offset = 0,
   }) {
     return catalogDao
-        .watchFilteredCatalogPage(limit: limit, offset: offset, query: query)
+        .watchFilteredCatalogPage(
+          limit: limit,
+          offset: offset,
+          query: query ?? CatalogQuery(),
+        )
         .first;
   }
 
@@ -708,7 +712,7 @@ void main() {
       expect(idsOf(entries), [1, 2, 4, 7, 25, 26]);
 
       expect(
-        await catalogDao.watchFilteredCatalogCount(const CatalogQuery()).first,
+        await catalogDao.watchFilteredCatalogCount(CatalogQuery()).first,
         6,
       );
     });
@@ -716,23 +720,21 @@ void main() {
     group('búsqueda', () {
       test('encuentra un Pokémon por su nombre completo', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(search: 'pikachu'),
+          query: CatalogQuery(search: 'pikachu'),
         );
 
         expect(idsOf(entries), [25]);
       });
 
       test('encuentra Pokémon por una parte de su nombre', () async {
-        final entries = await filteredPage(
-          query: const CatalogQuery(search: 'saur'),
-        );
+        final entries = await filteredPage(query: CatalogQuery(search: 'saur'));
 
         expect(idsOf(entries), [1, 2]);
       });
 
       test('la búsqueda no distingue mayúsculas y minúsculas', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(search: 'PiKaChU'),
+          query: CatalogQuery(search: 'PiKaChU'),
         );
 
         expect(idsOf(entries), [25]);
@@ -740,47 +742,39 @@ void main() {
 
       test('ignora los espacios al inicio y al final', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(search: '  pikachu  '),
+          query: CatalogQuery(search: '  pikachu  '),
         );
 
         expect(idsOf(entries), [25]);
       });
 
       test('una búsqueda con solo espacios devuelve el catálogo', () async {
-        final entries = await filteredPage(
-          query: const CatalogQuery(search: '   '),
-        );
+        final entries = await filteredPage(query: CatalogQuery(search: '   '));
 
         expect(idsOf(entries), [1, 2, 4, 7, 25, 26]);
       });
 
       test('encuentra un Pokémon por su número exacto', () async {
-        final entries = await filteredPage(
-          query: const CatalogQuery(search: '25'),
-        );
+        final entries = await filteredPage(query: CatalogQuery(search: '25'));
 
         expect(idsOf(entries), [25]);
       });
 
       test('acepta números con ceros a la izquierda', () async {
-        final entries = await filteredPage(
-          query: const CatalogQuery(search: '0025'),
-        );
+        final entries = await filteredPage(query: CatalogQuery(search: '0025'));
 
         expect(idsOf(entries), [25]);
       });
 
       test('la búsqueda numérica no utiliza coincidencias parciales', () async {
-        final entries = await filteredPage(
-          query: const CatalogQuery(search: '2'),
-        );
+        final entries = await filteredPage(query: CatalogQuery(search: '2'));
 
         expect(idsOf(entries), [2]);
       });
 
       test('devuelve una lista vacía si el nombre no existe', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(search: 'inexistente'),
+          query: CatalogQuery(search: 'inexistente'),
         );
 
         expect(entries, isEmpty);
@@ -788,32 +782,26 @@ void main() {
 
       test('devuelve una lista vacía si el número no existe', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(search: '99999'),
+          query: CatalogQuery(search: '99999'),
         );
 
         expect(entries, isEmpty);
       });
 
       test('interpreta el porcentaje como un carácter literal', () async {
-        final entries = await filteredPage(
-          query: const CatalogQuery(search: '%'),
-        );
+        final entries = await filteredPage(query: CatalogQuery(search: '%'));
 
         expect(entries, isEmpty);
       });
 
       test('interpreta el guion bajo como un carácter literal', () async {
-        final entries = await filteredPage(
-          query: const CatalogQuery(search: '_'),
-        );
+        final entries = await filteredPage(query: CatalogQuery(search: '_'));
 
         expect(entries, isEmpty);
       });
 
       test('interpreta la barra invertida como un carácter literal', () async {
-        final entries = await filteredPage(
-          query: const CatalogQuery(search: r'\'),
-        );
+        final entries = await filteredPage(query: CatalogQuery(search: r'\'));
 
         expect(entries, isEmpty);
       });
@@ -843,7 +831,7 @@ void main() {
 
       for (final entry in expectedIdsByType.entries) {
         test('filtra correctamente por el tipo ${entry.key}', () async {
-          final query = CatalogQuery(type: entry.key);
+          final query = CatalogQuery(types: {entry.key});
 
           final entries = await filteredPage(query: query);
 
@@ -856,7 +844,7 @@ void main() {
 
       test('encuentra Pokémon por su segundo tipo', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(type: 'poison'),
+          query: CatalogQuery(types: {'poison'}),
         );
 
         expect(idsOf(entries), [1, 2]);
@@ -866,15 +854,15 @@ void main() {
 
       test('no duplica Pokémon que tienen varios tipos', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(type: 'grass'),
+          query: CatalogQuery(types: {'grass'}),
         );
 
         expect(entries.length, 2);
         expect(idsOf(entries), [1, 2]);
       });
 
-      test('un tipo vacío no restringe el catálogo', () async {
-        final entries = await filteredPage(query: const CatalogQuery(type: ''));
+      test('un conjunto de tipos vacío no restringe el catálogo', () async {
+        final entries = await filteredPage(query: CatalogQuery(types: {}));
 
         expect(idsOf(entries), [1, 2, 4, 7, 25, 26]);
       });
@@ -883,7 +871,7 @@ void main() {
     group('ordenamiento', () {
       test('ordena por número ascendente', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(sort: CatalogSort.numberAscending),
+          query: CatalogQuery(sort: CatalogSort.numberAscending),
         );
 
         expect(idsOf(entries), [1, 2, 4, 7, 25, 26]);
@@ -891,7 +879,7 @@ void main() {
 
       test('ordena por número descendente', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(sort: CatalogSort.numberDescending),
+          query: CatalogQuery(sort: CatalogSort.numberDescending),
         );
 
         expect(idsOf(entries), [26, 25, 7, 4, 2, 1]);
@@ -899,7 +887,7 @@ void main() {
 
       test('ordena por nombre ascendente', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(sort: CatalogSort.nameAscending),
+          query: CatalogQuery(sort: CatalogSort.nameAscending),
         );
 
         expect(idsOf(entries), [1, 4, 2, 25, 26, 7]);
@@ -907,7 +895,7 @@ void main() {
 
       test('ordena por nombre descendente', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(sort: CatalogSort.nameDescending),
+          query: CatalogQuery(sort: CatalogSort.nameDescending),
         );
 
         expect(idsOf(entries), [7, 26, 25, 2, 4, 1]);
@@ -930,7 +918,7 @@ void main() {
         ]);
 
         final entries = await filteredPage(
-          query: const CatalogQuery(sort: CatalogSort.nameAscending),
+          query: CatalogQuery(sort: CatalogSort.nameAscending),
         );
 
         expect(idsOf(entries), [150, 1, 4, 2, 25, 26, 7, 151]);
@@ -938,7 +926,7 @@ void main() {
 
       test('ordena por estadísticas base totales ascendentes', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(sort: CatalogSort.baseStatTotalAscending),
+          query: CatalogQuery(sort: CatalogSort.baseStatTotalAscending),
         );
 
         expect(idsOf(entries), [7, 4, 1, 2, 26, 25]);
@@ -946,7 +934,7 @@ void main() {
 
       test('ordena por estadísticas base totales descendentes', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(sort: CatalogSort.baseStatTotalDescending),
+          query: CatalogQuery(sort: CatalogSort.baseStatTotalDescending),
         );
 
         expect(idsOf(entries), [26, 2, 1, 4, 7, 25]);
@@ -958,11 +946,11 @@ void main() {
         expect(row.baseStatTotal, isNull);
 
         final ascending = await filteredPage(
-          query: const CatalogQuery(sort: CatalogSort.baseStatTotalAscending),
+          query: CatalogQuery(sort: CatalogSort.baseStatTotalAscending),
         );
 
         final descending = await filteredPage(
-          query: const CatalogQuery(sort: CatalogSort.baseStatTotalDescending),
+          query: CatalogQuery(sort: CatalogSort.baseStatTotalDescending),
         );
 
         expect(ascending.last.id, 25);
@@ -988,15 +976,15 @@ void main() {
         ]);
 
         final ascending = await filteredPage(
-          query: const CatalogQuery(
-            type: 'bug',
+          query: CatalogQuery(
+            types: {'bug'},
             sort: CatalogSort.baseStatTotalAscending,
           ),
         );
 
         final descending = await filteredPage(
-          query: const CatalogQuery(
-            type: 'bug',
+          query: CatalogQuery(
+            types: {'bug'},
             sort: CatalogSort.baseStatTotalDescending,
           ),
         );
@@ -1016,8 +1004,8 @@ void main() {
         ]);
 
         final entries = await filteredPage(
-          query: const CatalogQuery(
-            type: 'electric',
+          query: CatalogQuery(
+            types: {'electric'},
             sort: CatalogSort.baseStatTotalDescending,
           ),
         );
@@ -1029,7 +1017,7 @@ void main() {
     group('combinación de criterios', () {
       test('combina búsqueda por nombre y tipo', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(search: 'saur', type: 'grass'),
+          query: CatalogQuery(search: 'saur', types: {'grass'}),
         );
 
         expect(idsOf(entries), [1, 2]);
@@ -1037,9 +1025,9 @@ void main() {
 
       test('combina búsqueda, tipo y ordenamiento', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(
+          query: CatalogQuery(
             search: 'saur',
-            type: 'poison',
+            types: {'poison'},
             sort: CatalogSort.numberDescending,
           ),
         );
@@ -1049,7 +1037,7 @@ void main() {
 
       test('combina búsqueda numérica y tipo', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(search: '25', type: 'electric'),
+          query: CatalogQuery(search: '25', types: {'electric'}),
         );
 
         expect(idsOf(entries), [25]);
@@ -1057,7 +1045,7 @@ void main() {
 
       test('devuelve una lista vacía si los criterios no coinciden', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(search: 'pikachu', type: 'water'),
+          query: CatalogQuery(search: 'pikachu', types: {'water'}),
         );
 
         expect(entries, isEmpty);
@@ -1065,7 +1053,7 @@ void main() {
 
       test('excluye las formas alternativas al buscar por nombre', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(search: 'raichu'),
+          query: CatalogQuery(search: 'raichu'),
         );
 
         expect(idsOf(entries), [26]);
@@ -1073,7 +1061,7 @@ void main() {
 
       test('excluye las formas alternativas al buscar por número', () async {
         final entries = await filteredPage(
-          query: const CatalogQuery(search: '10100'),
+          query: CatalogQuery(search: '10100'),
         );
 
         expect(entries, isEmpty);
@@ -1082,7 +1070,7 @@ void main() {
 
     group('paginación filtrada', () {
       test('aplica el filtro antes de paginar', () async {
-        const query = CatalogQuery(type: 'electric');
+        final query = CatalogQuery(types: const {'electric'});
 
         final firstPage = await filteredPage(query: query, limit: 1, offset: 0);
 
@@ -1097,7 +1085,7 @@ void main() {
       });
 
       test('aplica el ordenamiento antes de paginar', () async {
-        const query = CatalogQuery(sort: CatalogSort.nameAscending);
+        final query = CatalogQuery(sort: CatalogSort.nameAscending);
 
         final firstPage = await filteredPage(query: query, limit: 2, offset: 0);
 
@@ -1115,7 +1103,7 @@ void main() {
       });
 
       test('pagina correctamente el ranking descendente', () async {
-        const query = CatalogQuery(sort: CatalogSort.baseStatTotalDescending);
+        final query = CatalogQuery(sort: CatalogSort.baseStatTotalDescending);
 
         final firstPage = await filteredPage(query: query, limit: 2, offset: 0);
 
@@ -1145,7 +1133,7 @@ void main() {
         'devuelve una página vacía si el offset supera los resultados',
         () async {
           final entries = await filteredPage(
-            query: const CatalogQuery(type: 'grass'),
+            query: CatalogQuery(types: {'grass'}),
             limit: 2,
             offset: 2,
           );
@@ -1158,7 +1146,7 @@ void main() {
         'un Pokémon con dos tipos ocupa un solo lugar en la página',
         () async {
           final entries = await filteredPage(
-            query: const CatalogQuery(type: 'grass'),
+            query: CatalogQuery(types: {'grass'}),
             limit: 1,
           );
 
@@ -1171,7 +1159,7 @@ void main() {
     group('conteo filtrado', () {
       test('cuenta únicamente los resultados de la búsqueda', () async {
         final count = await catalogDao
-            .watchFilteredCatalogCount(const CatalogQuery(search: 'saur'))
+            .watchFilteredCatalogCount(CatalogQuery(search: 'saur'))
             .first;
 
         expect(count, 2);
@@ -1179,7 +1167,7 @@ void main() {
 
       test('cuenta correctamente una búsqueda numérica', () async {
         final count = await catalogDao
-            .watchFilteredCatalogCount(const CatalogQuery(search: '25'))
+            .watchFilteredCatalogCount(CatalogQuery(search: '25'))
             .first;
 
         expect(count, 1);
@@ -1188,7 +1176,7 @@ void main() {
       test('combina búsqueda y tipo en el conteo', () async {
         final count = await catalogDao
             .watchFilteredCatalogCount(
-              const CatalogQuery(search: 'saur', type: 'poison'),
+              CatalogQuery(search: 'saur', types: {'poison'}),
             )
             .first;
 
@@ -1198,7 +1186,7 @@ void main() {
       test('devuelve cero cuando no existen coincidencias', () async {
         final count = await catalogDao
             .watchFilteredCatalogCount(
-              const CatalogQuery(search: 'pikachu', type: 'fire'),
+              CatalogQuery(search: 'pikachu', types: {'fire'}),
             )
             .first;
 
@@ -1209,7 +1197,7 @@ void main() {
         for (final sort in CatalogSort.values) {
           final count = await catalogDao
               .watchFilteredCatalogCount(
-                CatalogQuery(type: 'electric', sort: sort),
+                CatalogQuery(types: {'electric'}, sort: sort),
               )
               .first;
 
@@ -1218,7 +1206,7 @@ void main() {
       });
 
       test('el conteo no está limitado al tamaño de la página', () async {
-        const query = CatalogQuery(type: 'grass');
+        final query = CatalogQuery(types: {'grass'});
 
         final entries = await filteredPage(query: query, limit: 1);
 
@@ -1233,7 +1221,7 @@ void main() {
       test(
         'la búsqueda vuelve a emitir cuando aparece una coincidencia',
         () async {
-          const query = CatalogQuery(search: 'char');
+          final query = CatalogQuery(search: 'char');
 
           final updates = StreamQueue(
             catalogDao
@@ -1268,7 +1256,7 @@ void main() {
       test(
         'el filtro vuelve a emitir cuando cambia el tipo de un Pokémon',
         () async {
-          const query = CatalogQuery(type: 'fire');
+          final query = CatalogQuery(types: {'fire'});
 
           final updates = StreamQueue(
             catalogDao
@@ -1296,7 +1284,7 @@ void main() {
       test('el conteo se actualiza al guardar nuevas coincidencias', () async {
         final updates = StreamQueue(
           catalogDao
-              .watchFilteredCatalogCount(const CatalogQuery(type: 'fire'))
+              .watchFilteredCatalogCount(CatalogQuery(types: {'fire'}))
               .distinct(),
         );
 
@@ -1319,7 +1307,7 @@ void main() {
       test('el conteo disminuye cuando un Pokémon deja de coincidir', () async {
         final updates = StreamQueue(
           catalogDao
-              .watchFilteredCatalogCount(const CatalogQuery(type: 'grass'))
+              .watchFilteredCatalogCount(CatalogQuery(types: {'grass'}))
               .distinct(),
         );
 
@@ -1345,9 +1333,7 @@ void main() {
               .watchFilteredCatalogPage(
                 limit: 50,
                 offset: 0,
-                query: const CatalogQuery(
-                  sort: CatalogSort.baseStatTotalDescending,
-                ),
+                query: CatalogQuery(sort: CatalogSort.baseStatTotalDescending),
               )
               .map(idsOf),
         );
@@ -1374,6 +1360,554 @@ void main() {
         ], savedAt: savedAt.add(const Duration(minutes: 1)));
 
         expect(await updates.next, [25, 26, 2, 1, 4, 7]);
+      });
+    });
+  });
+  group('filtrado por múltiples tipos y generaciones', () {
+    const generationCatalog = [
+      bulbasaur,
+      CatalogEntry(
+        id: 4,
+        name: 'charmander',
+        imageUrl: '',
+        typeNames: ['fire'],
+        generationId: 1,
+        baseStats: {'hp': 309},
+      ),
+      CatalogEntry(
+        id: 7,
+        name: 'squirtle',
+        imageUrl: '',
+        typeNames: ['water'],
+        generationId: 1,
+        baseStats: {'hp': 314},
+      ),
+      CatalogEntry(
+        id: 25,
+        name: 'pikachu',
+        imageUrl: '',
+        typeNames: ['electric'],
+        generationId: 1,
+        baseStats: {'hp': 320},
+      ),
+      CatalogEntry(
+        id: 155,
+        name: 'cyndaquil',
+        imageUrl: '',
+        typeNames: ['fire'],
+        generationId: 2,
+        baseStats: {'hp': 309},
+      ),
+      CatalogEntry(
+        id: 158,
+        name: 'totodile',
+        imageUrl: '',
+        typeNames: ['water'],
+        generationId: 2,
+        baseStats: {'hp': 314},
+      ),
+      CatalogEntry(
+        id: 194,
+        name: 'wooper',
+        imageUrl: '',
+        typeNames: ['water', 'ground'],
+        generationId: 2,
+        baseStats: {'hp': 210},
+      ),
+      CatalogEntry(
+        id: 255,
+        name: 'torchic',
+        imageUrl: '',
+        typeNames: ['fire'],
+        generationId: 3,
+        baseStats: {'hp': 310},
+      ),
+      CatalogEntry(
+        id: 258,
+        name: 'mudkip',
+        imageUrl: '',
+        typeNames: ['water'],
+        generationId: 3,
+        baseStats: {'hp': 310},
+      ),
+      CatalogEntry(
+        id: 280,
+        name: 'ralts',
+        imageUrl: '',
+        typeNames: ['psychic', 'fairy'],
+        generationId: 3,
+        baseStats: {'hp': 198},
+      ),
+      CatalogEntry(
+        id: 9999,
+        name: 'pokemon-desconocido',
+        imageUrl: '',
+        typeNames: ['normal'],
+      ),
+      CatalogEntry(
+        id: 10100,
+        name: 'raichu-alola',
+        imageUrl: '',
+        typeNames: ['electric', 'psychic'],
+        generationId: 1,
+        isDefault: false,
+        baseStats: {'hp': 485},
+      ),
+    ];
+
+    setUp(() async {
+      await savePage(generationCatalog);
+    });
+
+    Future<void> expectFilteredResults(
+      CatalogQuery query,
+      List<int> expectedIds,
+    ) async {
+      final entries = await filteredPage(query: query);
+      final count = await catalogDao.watchFilteredCatalogCount(query).first;
+
+      expect(idsOf(entries), expectedIds);
+      expect(count, expectedIds.length);
+    }
+
+    group('generaciones', () {
+      const expectedIdsByGeneration = <int, List<int>>{
+        1: [1, 4, 7, 25],
+        2: [155, 158, 194],
+        3: [255, 258, 280],
+        9: [],
+      };
+
+      for (final entry in expectedIdsByGeneration.entries) {
+        test('filtra correctamente la generación ${entry.key}', () async {
+          await expectFilteredResults(
+            CatalogQuery(generations: {entry.key}),
+            entry.value,
+          );
+        });
+      }
+
+      test('permite seleccionar varias generaciones', () async {
+        await expectFilteredResults(CatalogQuery(generations: {1, 3}), [
+          1,
+          4,
+          7,
+          25,
+          255,
+          258,
+          280,
+        ]);
+      });
+
+      test('un conjunto vacío no restringe las generaciones', () async {
+        await expectFilteredResults(CatalogQuery(generations: {}), [
+          1,
+          4,
+          7,
+          25,
+          155,
+          158,
+          194,
+          255,
+          258,
+          280,
+          9999,
+        ]);
+      });
+
+      test('excluye generaciones desconocidas cuando hay un filtro', () async {
+        await expectFilteredResults(CatalogQuery(generations: {1, 2, 3}), [
+          1,
+          4,
+          7,
+          25,
+          155,
+          158,
+          194,
+          255,
+          258,
+          280,
+        ]);
+      });
+    });
+    group('tipos múltiples', () {
+      test(
+        'encuentra Pokémon de cualquiera de los tipos seleccionados',
+        () async {
+          await expectFilteredResults(CatalogQuery(types: {'fire', 'water'}), [
+            4,
+            7,
+            155,
+            158,
+            194,
+            255,
+            258,
+          ]);
+        },
+      );
+
+      test('permite seleccionar un único tipo mediante el conjunto', () async {
+        await expectFilteredResults(CatalogQuery(types: {'electric'}), [25]);
+      });
+
+      test('no duplica Pokémon que coinciden con ambos tipos', () async {
+        await expectFilteredResults(CatalogQuery(types: {'grass', 'poison'}), [
+          1,
+        ]);
+      });
+
+      test('encuentra coincidencias por el segundo tipo', () async {
+        await expectFilteredResults(CatalogQuery(types: {'ground', 'fairy'}), [
+          194,
+          280,
+        ]);
+      });
+
+      test('un conjunto vacío no restringe los tipos', () async {
+        await expectFilteredResults(CatalogQuery(types: {}), [
+          1,
+          4,
+          7,
+          25,
+          155,
+          158,
+          194,
+          255,
+          258,
+          280,
+          9999,
+        ]);
+      });
+
+      test('devuelve cero resultados si ningún tipo coincide', () async {
+        await expectFilteredResults(
+          CatalogQuery(types: {'steel', 'dragon'}),
+          [],
+        );
+      });
+
+      test(
+        'combina tipos eléctricos y de fuego en un mismo conjunto',
+        () async {
+          await expectFilteredResults(
+            CatalogQuery(types: {'electric', 'fire'}),
+            [4, 25, 155, 255],
+          );
+        },
+      );
+    });
+    group('combinación de tipos, generaciones y búsqueda', () {
+      test('combina un tipo con una generación', () async {
+        await expectFilteredResults(
+          CatalogQuery(types: {'fire'}, generations: {2}),
+          [155],
+        );
+      });
+
+      test('combina múltiples tipos con una generación', () async {
+        await expectFilteredResults(
+          CatalogQuery(types: {'fire', 'water'}, generations: {2}),
+          [155, 158, 194],
+        );
+      });
+
+      test('combina un tipo con múltiples generaciones', () async {
+        await expectFilteredResults(
+          CatalogQuery(types: {'water'}, generations: {1, 3}),
+          [7, 258],
+        );
+      });
+
+      test('combina múltiples tipos y múltiples generaciones', () async {
+        await expectFilteredResults(
+          CatalogQuery(types: {'fire', 'water'}, generations: {1, 2}),
+          [4, 7, 155, 158, 194],
+        );
+      });
+
+      test('combina búsqueda por nombre con ambos filtros', () async {
+        await expectFilteredResults(
+          CatalogQuery(
+            search: 'char',
+            types: {'fire', 'water'},
+            generations: {1, 2},
+          ),
+          [4],
+        );
+      });
+
+      test('combina búsqueda numérica con ambos filtros', () async {
+        await expectFilteredResults(
+          CatalogQuery(
+            search: '194',
+            types: {'water', 'ground'},
+            generations: {2, 3},
+          ),
+          [194],
+        );
+      });
+
+      test('excluye una coincidencia de nombre de otra generación', () async {
+        await expectFilteredResults(
+          CatalogQuery(
+            search: 'pikachu',
+            types: {'electric'},
+            generations: {2},
+          ),
+          [],
+        );
+      });
+
+      test('devuelve cero cuando los filtros son incompatibles', () async {
+        await expectFilteredResults(
+          CatalogQuery(types: {'electric'}, generations: {3}),
+          [],
+        );
+      });
+    });
+    group('ordenamiento con filtros múltiples', () {
+      const expectedIdsBySort = <CatalogSort, List<int>>{
+        CatalogSort.numberAscending: [155, 158, 194, 255, 258],
+        CatalogSort.numberDescending: [258, 255, 194, 158, 155],
+        CatalogSort.nameAscending: [155, 258, 255, 158, 194],
+        CatalogSort.nameDescending: [194, 158, 255, 258, 155],
+        CatalogSort.baseStatTotalAscending: [194, 155, 255, 258, 158],
+        CatalogSort.baseStatTotalDescending: [158, 255, 258, 155, 194],
+      };
+
+      for (final entry in expectedIdsBySort.entries) {
+        test('ordena correctamente mediante ${entry.key.name}', () async {
+          await expectFilteredResults(
+            CatalogQuery(
+              types: const {'fire', 'water'},
+              generations: const {2, 3},
+              sort: entry.key,
+            ),
+            entry.value,
+          );
+        });
+      }
+    });
+    group('paginación con filtros múltiples', () {
+      final query = CatalogQuery(
+        types: const {'fire', 'water'},
+        generations: const {1, 2},
+      );
+
+      test('aplica todos los filtros antes de paginar', () async {
+        final first = await filteredPage(query: query, limit: 2);
+
+        final second = await filteredPage(query: query, limit: 2, offset: 2);
+
+        expect(idsOf(first), [4, 7]);
+        expect(idsOf(second), [155, 158]);
+      });
+
+      test('la última página contiene solo los resultados restantes', () async {
+        final entries = await filteredPage(query: query, limit: 2, offset: 4);
+
+        expect(idsOf(entries), [194]);
+      });
+
+      test('devuelve una página vacía fuera del rango', () async {
+        final entries = await filteredPage(query: query, limit: 2, offset: 6);
+
+        expect(entries, isEmpty);
+      });
+
+      test(
+        'el conteo incluye todas las coincidencias y no solo la página',
+        () async {
+          final entries = await filteredPage(query: query, limit: 2);
+
+          final count = await catalogDao.watchFilteredCatalogCount(query).first;
+
+          expect(entries, hasLength(2));
+          expect(count, 5);
+        },
+      );
+
+      test(
+        'un Pokémon que coincide con dos tipos ocupa un solo lugar',
+        () async {
+          final dualTypeQuery = CatalogQuery(
+            types: const {'water', 'ground'},
+            generations: const {2},
+          );
+
+          final entries = await filteredPage(query: dualTypeQuery, limit: 2);
+
+          final count = await catalogDao
+              .watchFilteredCatalogCount(dualTypeQuery)
+              .first;
+
+          expect(idsOf(entries), [158, 194]);
+          expect(count, 2);
+        },
+      );
+    });
+    group('formas alternativas con filtros múltiples', () {
+      test('excluye formas alternativas al filtrar por generación', () async {
+        await expectFilteredResults(CatalogQuery(generations: {1}), [
+          1,
+          4,
+          7,
+          25,
+        ]);
+      });
+
+      test(
+        'excluye formas alternativas aunque coincidan con los tipos',
+        () async {
+          await expectFilteredResults(
+            CatalogQuery(types: {'electric', 'psychic'}, generations: {1}),
+            [25],
+          );
+        },
+      );
+
+      test(
+        'excluye una forma alternativa que coincide con todos los criterios',
+        () async {
+          await expectFilteredResults(
+            CatalogQuery(
+              search: 'raichu',
+              types: {'electric', 'psychic'},
+              generations: {1},
+            ),
+            [],
+          );
+        },
+      );
+    });
+    group('reactividad con filtros múltiples', () {
+      test(
+        'la página se actualiza al guardar una nueva coincidencia',
+        () async {
+          final query = CatalogQuery(
+            types: const {'fire', 'water'},
+            generations: const {2},
+          );
+
+          final updates = StreamQueue(
+            catalogDao
+                .watchFilteredCatalogPage(limit: 50, offset: 0, query: query)
+                .map(idsOf)
+                .distinct(
+                  (previous, next) =>
+                      previous.length == next.length &&
+                      previous.asMap().entries.every(
+                        (entry) => entry.value == next[entry.key],
+                      ),
+                ),
+          );
+
+          addTearDown(updates.cancel);
+
+          expect(await updates.next, [155, 158, 194]);
+
+          await savePage(const [
+            CatalogEntry(
+              id: 156,
+              name: 'quilava',
+              imageUrl: '',
+              typeNames: ['fire'],
+              generationId: 2,
+            ),
+          ]);
+
+          expect(await updates.next, [155, 156, 158, 194]);
+        },
+      );
+
+      test('la página se actualiza cuando cambia una generación', () async {
+        final query = CatalogQuery(
+          types: const {'fire', 'water'},
+          generations: const {2},
+        );
+
+        final updates = StreamQueue(
+          catalogDao
+              .watchFilteredCatalogPage(limit: 50, offset: 0, query: query)
+              .map(idsOf)
+              .distinct(
+                (previous, next) =>
+                    previous.length == next.length &&
+                    previous.asMap().entries.every(
+                      (entry) => entry.value == next[entry.key],
+                    ),
+              ),
+        );
+
+        addTearDown(updates.cancel);
+
+        expect(await updates.next, [155, 158, 194]);
+
+        await catalogDao.saveRevalidated(const [
+          CatalogEntry(
+            id: 155,
+            name: 'cyndaquil',
+            imageUrl: '',
+            typeNames: ['fire'],
+            generationId: 3,
+          ),
+        ], savedAt: savedAt.add(const Duration(minutes: 1)));
+
+        expect(await updates.next, [158, 194]);
+      });
+
+      test('el conteo aumenta cuando se descarga una coincidencia', () async {
+        final query = CatalogQuery(
+          types: const {'fire', 'water'},
+          generations: const {2},
+        );
+
+        final updates = StreamQueue(
+          catalogDao.watchFilteredCatalogCount(query).distinct(),
+        );
+
+        addTearDown(updates.cancel);
+
+        expect(await updates.next, 3);
+
+        await savePage(const [
+          CatalogEntry(
+            id: 159,
+            name: 'croconaw',
+            imageUrl: '',
+            typeNames: ['water'],
+            generationId: 2,
+          ),
+        ]);
+
+        expect(await updates.next, 4);
+      });
+
+      test('el conteo disminuye cuando un Pokémon deja de coincidir', () async {
+        final query = CatalogQuery(
+          types: const {'fire', 'water'},
+          generations: const {2},
+        );
+
+        final updates = StreamQueue(
+          catalogDao.watchFilteredCatalogCount(query).distinct(),
+        );
+
+        addTearDown(updates.cancel);
+
+        expect(await updates.next, 3);
+
+        await catalogDao.saveRevalidated(const [
+          CatalogEntry(
+            id: 194,
+            name: 'wooper',
+            imageUrl: '',
+            typeNames: ['ground'],
+            generationId: 2,
+          ),
+        ], savedAt: savedAt.add(const Duration(minutes: 1)));
+
+        expect(await updates.next, 2);
       });
     });
   });

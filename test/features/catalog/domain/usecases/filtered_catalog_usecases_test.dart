@@ -35,7 +35,7 @@ void main() {
 
   group('WatchFilteredCatalogPage', () {
     test('delega una consulta predeterminada al repositorio', () async {
-      const query = CatalogQuery();
+      final query = CatalogQuery();
 
       when(
         () => repository.watchFilteredCatalogPage(
@@ -61,9 +61,9 @@ void main() {
     });
 
     test('transmite todos los parámetros al repositorio', () async {
-      const query = CatalogQuery(
+      final query = CatalogQuery(
         search: 'rai',
-        type: 'electric',
+        types: {'electric'},
         sort: CatalogSort.nameDescending,
       );
 
@@ -91,7 +91,7 @@ void main() {
     });
 
     test('devuelve el mismo stream proporcionado por el repositorio', () {
-      const query = CatalogQuery(type: 'electric');
+      final query = CatalogQuery(types: {'electric'});
       final stream = Stream.value(const [pikachu, raichu]);
 
       when(
@@ -108,7 +108,7 @@ void main() {
     });
 
     test('propaga una lista vacía', () async {
-      const query = CatalogQuery(search: 'inexistente');
+      final query = CatalogQuery(search: 'inexistente');
 
       when(
         () => repository.watchFilteredCatalogPage(
@@ -124,7 +124,7 @@ void main() {
     });
 
     test('propaga todas las actualizaciones del repositorio', () async {
-      const query = CatalogQuery(type: 'electric');
+      final query = CatalogQuery(types: {'electric'});
 
       when(
         () => repository.watchFilteredCatalogPage(
@@ -152,7 +152,7 @@ void main() {
     });
 
     test('propaga los errores del repositorio', () async {
-      const query = CatalogQuery();
+      final query = CatalogQuery();
       final error = StateError('Error consultando el catálogo');
 
       when(
@@ -168,11 +168,93 @@ void main() {
         emitsError(same(error)),
       );
     });
+    test('transmite múltiples tipos al repositorio', () async {
+      final query = CatalogQuery(types: {'electric', 'water'});
+
+      when(
+        () => repository.watchFilteredCatalogPage(
+          page: 0,
+          pageSize: 50,
+          query: query,
+        ),
+      ).thenAnswer((_) => Stream.value(const [pikachu, raichu]));
+
+      final result = await watchPage(page: 0, pageSize: 50, query: query).first;
+
+      expect(result, [pikachu, raichu]);
+
+      verify(
+        () => repository.watchFilteredCatalogPage(
+          page: 0,
+          pageSize: 50,
+          query: query,
+        ),
+      ).called(1);
+
+      verifyNoMoreInteractions(repository);
+    });
+
+    test('transmite múltiples generaciones al repositorio', () async {
+      final query = CatalogQuery(generations: {1, 2});
+
+      when(
+        () => repository.watchFilteredCatalogPage(
+          page: 0,
+          pageSize: 50,
+          query: query,
+        ),
+      ).thenAnswer((_) => Stream.value(const [pikachu, raichu]));
+
+      final result = await watchPage(page: 0, pageSize: 50, query: query).first;
+
+      expect(result, [pikachu, raichu]);
+
+      verify(
+        () => repository.watchFilteredCatalogPage(
+          page: 0,
+          pageSize: 50,
+          query: query,
+        ),
+      ).called(1);
+
+      verifyNoMoreInteractions(repository);
+    });
+
+    test('transmite la consulta completa y la paginación', () async {
+      final query = CatalogQuery(
+        search: 'rai',
+        types: {'electric', 'water'},
+        generations: {1, 2},
+        sort: CatalogSort.nameDescending,
+      );
+
+      when(
+        () => repository.watchFilteredCatalogPage(
+          page: 2,
+          pageSize: 10,
+          query: query,
+        ),
+      ).thenAnswer((_) => Stream.value(const [raichu]));
+
+      final result = await watchPage(page: 2, pageSize: 10, query: query).first;
+
+      expect(result, [raichu]);
+
+      verify(
+        () => repository.watchFilteredCatalogPage(
+          page: 2,
+          pageSize: 10,
+          query: query,
+        ),
+      ).called(1);
+
+      verifyNoMoreInteractions(repository);
+    });
   });
 
   group('WatchFilteredCatalogCount', () {
     test('delega una consulta predeterminada al repositorio', () async {
-      const query = CatalogQuery();
+      final query = CatalogQuery();
 
       when(() => repository.watchFilteredCatalogCount(query))
           .thenAnswer((_) => Stream.value(51));
@@ -185,9 +267,9 @@ void main() {
     });
 
     test('transmite todos los criterios de la consulta', () async {
-      const query = CatalogQuery(
+      final query = CatalogQuery(
         search: 'pika',
-        type: 'electric',
+        types: {'electric'},
         sort: CatalogSort.nameAscending,
       );
 
@@ -202,7 +284,7 @@ void main() {
     });
 
     test('devuelve el mismo stream proporcionado por el repositorio', () {
-      const query = CatalogQuery(type: 'electric');
+      final query = CatalogQuery(types: {'electric'});
       final stream = Stream.value(2);
 
       when(() => repository.watchFilteredCatalogCount(query))
@@ -212,7 +294,7 @@ void main() {
     });
 
     test('propaga un conteo de cero', () async {
-      const query = CatalogQuery(search: 'inexistente');
+      final query = CatalogQuery(search: 'inexistente');
 
       when(() => repository.watchFilteredCatalogCount(query))
           .thenAnswer((_) => Stream.value(0));
@@ -221,7 +303,7 @@ void main() {
     });
 
     test('propaga todas las actualizaciones del conteo', () async {
-      const query = CatalogQuery(type: 'electric');
+      final query = CatalogQuery(types: {'electric'});
 
       when(() => repository.watchFilteredCatalogCount(query))
           .thenAnswer((_) => Stream.fromIterable([0, 1, 2, 1]));
@@ -233,13 +315,56 @@ void main() {
     });
 
     test('propaga los errores del repositorio', () async {
-      const query = CatalogQuery();
+      final query = CatalogQuery();
       final error = StateError('Error contando el catálogo');
 
       when(() => repository.watchFilteredCatalogCount(query))
           .thenAnswer((_) => Stream<int>.error(error));
 
       await expectLater(watchCount(query), emitsError(same(error)));
+    });
+    test('transmite múltiples tipos al repositorio', () async {
+      final query = CatalogQuery(types: {'electric', 'water'});
+
+      when(() => repository.watchFilteredCatalogCount(query))
+          .thenAnswer((_) => Stream.value(2));
+
+      expect(await watchCount(query).first, 2);
+
+      verify(() => repository.watchFilteredCatalogCount(query)).called(1);
+
+      verifyNoMoreInteractions(repository);
+    });
+
+    test('transmite múltiples generaciones al repositorio', () async {
+      final query = CatalogQuery(generations: {1, 2});
+
+      when(() => repository.watchFilteredCatalogCount(query))
+          .thenAnswer((_) => Stream.value(2));
+
+      expect(await watchCount(query).first, 2);
+
+      verify(() => repository.watchFilteredCatalogCount(query)).called(1);
+
+      verifyNoMoreInteractions(repository);
+    });
+
+    test('transmite todos los criterios de la consulta completa', () async {
+      final query = CatalogQuery(
+        search: 'pika',
+        types: {'electric', 'water'},
+        generations: {1, 2},
+        sort: CatalogSort.nameAscending,
+      );
+
+      when(() => repository.watchFilteredCatalogCount(query))
+          .thenAnswer((_) => Stream.value(1));
+
+      expect(await watchCount(query).first, 1);
+
+      verify(() => repository.watchFilteredCatalogCount(query)).called(1);
+
+      verifyNoMoreInteractions(repository);
     });
   });
 }
