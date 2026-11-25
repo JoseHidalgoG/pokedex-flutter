@@ -146,20 +146,30 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     );
   }
 
-  Stream<({int savedCount, int? totalCount})> watchCatalogProgress() {
+  Stream<({int savedCount, int? totalCount, bool isComplete})>
+  watchCatalogProgress() {
     final progress = customSelect(
       'SELECT '
       '(SELECT COUNT(*) FROM pokemon WHERE is_default = 1) AS saved_count, '
-      '(SELECT total_count FROM sync_metadata WHERE key = ?) AS total_count',
-      variables: [Variable.withString(catalogSyncKey)],
+      '(SELECT total_count FROM sync_metadata WHERE key = ?) AS total_count, '
+      'COALESCE('
+      '(SELECT is_complete FROM sync_metadata WHERE key = ?), '
+      '0'
+      ') AS is_complete',
+      variables: [
+        Variable.withString(catalogSyncKey),
+        Variable.withString(catalogSyncKey),
+      ],
       readsFrom: {pokemonTable, syncMetadataTable},
     );
+
     return progress
         .watchSingle()
         .map(
           (row) => (
             savedCount: row.read<int>('saved_count'),
             totalCount: row.read<int?>('total_count'),
+            isComplete: row.read<int>('is_complete') != 0,
           ),
         )
         .distinct();

@@ -16,6 +16,8 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query.d
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_page_request.dart';
 import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_filtered_catalog_page.dart';
 import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_filtered_catalog_count.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progress.dart';
+import 'package:pokedex_flutter/features/catalog/domain/usecases/watch_catalog_progress.dart';
 
 final catalogRepositoryProvider = Provider<CatalogRepository>(
   (ref) => throw UnimplementedError(
@@ -140,3 +142,11 @@ final filteredCatalogCountProvider = StreamProvider.autoDispose
     .family<int, CatalogQuery>(
       (ref, query) => ref.watch(watchFilteredCatalogCountProvider)(query),
     );
+
+final watchCatalogProgressProvider = Provider<WatchCatalogProgress>(
+  (ref) => WatchCatalogProgress(ref.watch(catalogRepositoryProvider)),
+);
+
+final catalogProgressProvider = StreamProvider<CatalogProgress>(
+  (ref) => ref.watch(watchCatalogProgressProvider)(),
+);

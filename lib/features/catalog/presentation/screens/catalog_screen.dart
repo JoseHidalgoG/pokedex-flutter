@@ -17,6 +17,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_li
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query_state.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_query_controller_provider.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/widgets/catalog_partial_notice.dart';
 import 'package:flutter/foundation.dart' show setEquals;
 
 const _maxVisiblePageButtons = 5;
@@ -443,6 +444,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       ),
       body: Column(
         children: [
+          const CatalogPartialNotice(),
           if (_showFilters)
             CatalogFilterBar(
               searchController: _searchController,

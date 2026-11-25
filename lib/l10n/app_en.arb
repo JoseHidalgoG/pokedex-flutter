@@ -238,5 +238,27 @@
         "type": "String"
       }
     }
+  },
+
+  "catalogPartialNotice": "Local catalog: {savedCount} of {totalCount} Pokémon; results may be incomplete.",
+  "@catalogPartialNotice": {
+    "description": "Partial catalog notice with a known total",
+    "placeholders": {
+      "savedCount": {
+        "type": "int"
+      },
+      "totalCount": {
+        "type": "int"
+      }
+    }
+  },
+  "catalogPartialNoticeUnknownTotal": "Local catalog: {savedCount} Pokémon saved; results may be incomplete.",
+  "@catalogPartialNoticeUnknownTotal": {
+    "description": "Partial catalog notice with an unknown total",
+    "placeholders": {
+      "savedCount": {
+        "type": "int"
+      }
+    }
   }
 }

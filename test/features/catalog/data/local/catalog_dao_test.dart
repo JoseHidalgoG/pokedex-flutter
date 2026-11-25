@@ -102,11 +102,11 @@ void main() {
   tearDown(() => database.close());
 
   Future<void> savePage(
-      List<CatalogEntry> entries, {
-        int nextOffset = 50,
-        bool isComplete = false,
-        int? totalCount,
-      }) {
+    List<CatalogEntry> entries, {
+    int nextOffset = 50,
+    bool isComplete = false,
+    int? totalCount,
+  }) {
     return catalogDao.saveCatalogPage(
       entries: entries,
       nextOffset: nextOffset,
@@ -144,10 +144,10 @@ void main() {
   }) {
     return catalogDao
         .watchFilteredCatalogPage(
-      limit: limit,
-      offset: offset,
-      query: query ?? CatalogQuery(),
-    )
+          limit: limit,
+          offset: offset,
+          query: query ?? CatalogQuery(),
+        )
         .first;
   }
 
@@ -163,7 +163,7 @@ void main() {
 
   test(
     'guarda especie, generación, medidas, total y huella de cada Pokémon',
-        () async {
+    () async {
       await savePage([bulbasaur]);
 
       final row = await savedPokemonRow(1);
@@ -181,7 +181,7 @@ void main() {
 
   test(
     'reemplaza las estadísticas y la huella cuando el Pokémon vuelve cambiado',
-        () async {
+    () async {
       const changedBulbasaur = CatalogEntry(
         id: 1,
         name: 'bulbasaur',
@@ -202,7 +202,7 @@ void main() {
 
   test(
     'guarda el total del primer lote y lo conserva en los siguientes',
-        () async {
+    () async {
       await savePage([bulbasaur], nextOffset: 100, totalCount: 1025);
       await savePage([charmander], nextOffset: 200);
 
@@ -215,7 +215,7 @@ void main() {
 
   test(
     'reemplaza los tipos de un Pokémon cuando vuelve a llegar con otros',
-        () async {
+    () async {
       await savePage([bulbasaur]);
       await savePage([
         const CatalogEntry(
@@ -234,7 +234,7 @@ void main() {
 
   test(
     'emite el catálogo ordenado por número con los tipos en orden de slot',
-        () async {
+    () async {
       await savePage([squirtle, bulbasaur, charmander]);
 
       final catalog = await catalogDao.watchCatalog().first;
@@ -261,7 +261,7 @@ void main() {
 
   test(
     'emite solo los Pokémon de la página pedida aunque tengan varios tipos',
-        () async {
+    () async {
       await savePage([squirtle, bulbasaur, charmander]);
 
       final firstPage = await catalogDao
@@ -304,7 +304,7 @@ void main() {
 
   test(
     'cuenta Pokémon y no filas de tipos, y se actualiza al guardar',
-        () async {
+    () async {
       final countUpdates = StreamQueue(catalogDao.watchCatalogCount());
       addTearDown(countUpdates.cancel);
 
@@ -320,7 +320,7 @@ void main() {
 
   test(
     'emite solo los Pokémon pedidos, con sus tipos en orden de slot',
-        () async {
+    () async {
       await savePage([bulbasaur, charmander, squirtle]);
 
       final requested = await catalogDao.watchPokemonByIds([1, 7]).first;
@@ -343,7 +343,7 @@ void main() {
 
   test(
     'omite los ids que no están en el catálogo y no repite los duplicados',
-        () async {
+    () async {
       await savePage([bulbasaur, charmander]);
 
       final requested = await catalogDao.watchPokemonByIds([4, 25, 4]).first;
@@ -406,11 +406,11 @@ void main() {
     await database
         .into(database.favoritesTable)
         .insert(
-      FavoritesTableCompanion.insert(
-        pokemonId: const Value(4),
-        createdAt: savedAt,
-      ),
-    );
+          FavoritesTableCompanion.insert(
+            pokemonId: const Value(4),
+            createdAt: savedAt,
+          ),
+        );
 
     await savePage([bulbasaur, charmander]);
     final favorites = await database.select(database.favoritesTable).get();
@@ -423,7 +423,7 @@ void main() {
 
     test(
       'staleIdsAmong devuelve solo los ids pedidos guardados antes del límite',
-          () async {
+      () async {
         await savePage([bulbasaur, charmander]);
         await catalogDao.saveRevalidated([
           squirtle,
@@ -442,7 +442,7 @@ void main() {
 
     test(
       'staleIdsAmong no cuenta los ids que no están en el catálogo',
-          () async {
+      () async {
         await savePage([bulbasaur]);
 
         expect(
@@ -522,11 +522,11 @@ void main() {
 
     test(
       'readEntriesWithFingerprint ve un UPDATE hecho por fuera de la app',
-          () async {
+      () async {
         await savePage([bulbasaur]);
         await database.customStatement(
           "UPDATE pokemon_types SET type_name = 'fire' WHERE pokemon_id = 1 "
-              'AND slot = 1',
+          'AND slot = 1',
         );
 
         final stored = await catalogDao.readEntriesWithFingerprint();
@@ -541,7 +541,7 @@ void main() {
 
     test(
       'un Pokémon sin tipos ni estadísticas sale con listas vacías',
-          () async {
+      () async {
         await savePage([bulbasaur]);
         await database.customStatement(
           'DELETE FROM pokemon_types WHERE pokemon_id = 1',
@@ -603,7 +603,7 @@ void main() {
 
     test(
       'el catálogo, sus páginas y su conteo dejan fuera las formas',
-          () async {
+      () async {
         await savePage([bulbasaur, raichu]);
         await catalogDao.saveRevalidated([alolanRaichu], savedAt: savedAt);
 
@@ -628,7 +628,7 @@ void main() {
 
     test(
       'readEntriesOfSpecies trae el Pokémon y sus formas completos',
-          () async {
+      () async {
         await savePage([bulbasaur, raichu]);
         await catalogDao.saveRevalidated([alolanRaichu], savedAt: savedAt);
 
@@ -656,13 +656,18 @@ void main() {
     test('empieza sin Pokémon guardados ni total conocido', () async {
       final progress = await catalogDao.watchCatalogProgress().first;
 
-      expect(progress, (savedCount: 0, totalCount: null));
+      expect(progress, (savedCount: 0, totalCount: null, isComplete: false));
     });
 
     test(
       'cuenta los Pokémon por defecto guardados y el total de PokeAPI',
-          () async {
-        await savePage([bulbasaur, charmander], totalCount: 3);
+      () async {
+        await savePage(
+          [bulbasaur, charmander],
+          totalCount: 3,
+          isComplete: false,
+        );
+
         await catalogDao.saveRevalidated([
           const CatalogEntry(
             id: 10001,
@@ -675,21 +680,207 @@ void main() {
 
         final progress = await catalogDao.watchCatalogProgress().first;
 
-        expect(progress, (savedCount: 2, totalCount: 3));
+        expect(progress, (savedCount: 2, totalCount: 3, isComplete: false));
       },
     );
 
     test('solo vuelve a emitir cuando el progreso cambia', () async {
-      await savePage([bulbasaur, charmander], totalCount: 3);
+      await savePage([bulbasaur, charmander], totalCount: 3, isComplete: false);
+
       final progressUpdates = StreamQueue(catalogDao.watchCatalogProgress());
+
       addTearDown(progressUpdates.cancel);
 
-      expect(await progressUpdates.next, (savedCount: 2, totalCount: 3));
+      expect(await progressUpdates.next, (
+        savedCount: 2,
+        totalCount: 3,
+        isComplete: false,
+      ));
 
       await catalogDao.recordFingerprintsVerified(at: savedAt);
+
       await savePage([squirtle], nextOffset: 3, isComplete: true);
 
-      expect(await progressUpdates.next, (savedCount: 3, totalCount: 3));
+      expect(await progressUpdates.next, (
+        savedCount: 3,
+        totalCount: 3,
+        isComplete: true,
+      ));
+    });
+
+    test('permanece incompleto aunque alcance el total esperado', () async {
+      await savePage(
+        [bulbasaur, charmander],
+        totalCount: 2,
+        nextOffset: 2,
+        isComplete: false,
+      );
+
+      final progress = await catalogDao.watchCatalogProgress().first;
+
+      expect(progress, (savedCount: 2, totalCount: 2, isComplete: false));
+    });
+
+    test('refleja el estado completo de los metadatos', () async {
+      await savePage(
+        [bulbasaur, charmander],
+        totalCount: 2,
+        nextOffset: 2,
+        isComplete: true,
+      );
+
+      final progress = await catalogDao.watchCatalogProgress().first;
+
+      expect(progress, (savedCount: 2, totalCount: 2, isComplete: true));
+    });
+
+    test('maneja Pokémon guardados con total desconocido', () async {
+      await savePage([bulbasaur], isComplete: false);
+
+      final progress = await catalogDao.watchCatalogProgress().first;
+
+      expect(progress, (savedCount: 1, totalCount: null, isComplete: false));
+    });
+
+    test('emite cuando cambia únicamente isComplete', () async {
+      await savePage(
+        [bulbasaur, charmander],
+        totalCount: 2,
+        nextOffset: 2,
+        isComplete: false,
+      );
+
+      final updates = StreamQueue(catalogDao.watchCatalogProgress());
+
+      addTearDown(updates.cancel);
+
+      expect(await updates.next, (
+        savedCount: 2,
+        totalCount: 2,
+        isComplete: false,
+      ));
+
+      await savePage(
+        [bulbasaur, charmander],
+        totalCount: 2,
+        nextOffset: 2,
+        isComplete: true,
+      );
+
+      expect(await updates.next, (
+        savedCount: 2,
+        totalCount: 2,
+        isComplete: true,
+      ));
+    });
+
+    test('emite cuando cambia únicamente el total esperado', () async {
+      await savePage([bulbasaur], totalCount: 3, isComplete: false);
+
+      final updates = StreamQueue(catalogDao.watchCatalogProgress());
+
+      addTearDown(updates.cancel);
+
+      expect(await updates.next, (
+        savedCount: 1,
+        totalCount: 3,
+        isComplete: false,
+      ));
+
+      await savePage([bulbasaur], totalCount: 4, isComplete: false);
+
+      expect(await updates.next, (
+        savedCount: 1,
+        totalCount: 4,
+        isComplete: false,
+      ));
+    });
+
+    test('actualiza la cantidad guardada durante la descarga', () async {
+      final updates = StreamQueue(catalogDao.watchCatalogProgress());
+
+      addTearDown(updates.cancel);
+
+      expect(await updates.next, (
+        savedCount: 0,
+        totalCount: null,
+        isComplete: false,
+      ));
+
+      await savePage(
+        [bulbasaur],
+        totalCount: 3,
+        nextOffset: 1,
+        isComplete: false,
+      );
+
+      expect(await updates.next, (
+        savedCount: 1,
+        totalCount: 3,
+        isComplete: false,
+      ));
+
+      await savePage(
+        [charmander],
+        totalCount: 3,
+        nextOffset: 2,
+        isComplete: false,
+      );
+
+      expect(await updates.next, (
+        savedCount: 2,
+        totalCount: 3,
+        isComplete: false,
+      ));
+
+      await savePage(
+        [squirtle],
+        totalCount: 3,
+        nextOffset: 3,
+        isComplete: true,
+      );
+
+      expect(await updates.next, (
+        savedCount: 3,
+        totalCount: 3,
+        isComplete: true,
+      ));
+    });
+
+    test('el progreso es independiente de los filtros activos', () async {
+      await savePage(
+        [bulbasaur, charmander, squirtle],
+        totalCount: 10,
+        isComplete: false,
+      );
+
+      final filteredCount = await catalogDao
+          .watchFilteredCatalogCount(CatalogQuery(types: {'fire'}))
+          .first;
+
+      final progress = await catalogDao.watchCatalogProgress().first;
+
+      expect(filteredCount, 1);
+
+      expect(progress, (savedCount: 3, totalCount: 10, isComplete: false));
+    });
+
+    test('el progreso es independiente de la paginación', () async {
+      await savePage(
+        [bulbasaur, charmander, squirtle],
+        totalCount: 10,
+        isComplete: false,
+      );
+
+      final page = await catalogDao
+          .watchFilteredCatalogPage(limit: 1, offset: 1, query: CatalogQuery())
+          .first;
+
+      final progress = await catalogDao.watchCatalogProgress().first;
+
+      expect(page.length, 1);
+
+      expect(progress, (savedCount: 3, totalCount: 10, isComplete: false));
     });
   });
 
@@ -1122,7 +1313,7 @@ void main() {
 
       test(
         'la última página devuelve únicamente los resultados restantes',
-            () async {
+        () async {
           final entries = await filteredPage(limit: 4, offset: 4);
 
           expect(idsOf(entries), [25, 26]);
@@ -1131,7 +1322,7 @@ void main() {
 
       test(
         'devuelve una página vacía si el offset supera los resultados',
-            () async {
+        () async {
           final entries = await filteredPage(
             query: CatalogQuery(types: {'grass'}),
             limit: 2,
@@ -1144,7 +1335,7 @@ void main() {
 
       test(
         'un Pokémon con dos tipos ocupa un solo lugar en la página',
-            () async {
+        () async {
           final entries = await filteredPage(
             query: CatalogQuery(types: {'grass'}),
             limit: 1,
@@ -1176,8 +1367,8 @@ void main() {
       test('combina búsqueda y tipo en el conteo', () async {
         final count = await catalogDao
             .watchFilteredCatalogCount(
-          CatalogQuery(search: 'saur', types: {'poison'}),
-        )
+              CatalogQuery(search: 'saur', types: {'poison'}),
+            )
             .first;
 
         expect(count, 2);
@@ -1186,8 +1377,8 @@ void main() {
       test('devuelve cero cuando no existen coincidencias', () async {
         final count = await catalogDao
             .watchFilteredCatalogCount(
-          CatalogQuery(search: 'pikachu', types: {'fire'}),
-        )
+              CatalogQuery(search: 'pikachu', types: {'fire'}),
+            )
             .first;
 
         expect(count, 0);
@@ -1197,8 +1388,8 @@ void main() {
         for (final sort in CatalogSort.values) {
           final count = await catalogDao
               .watchFilteredCatalogCount(
-            CatalogQuery(types: {'electric'}, sort: sort),
-          )
+                CatalogQuery(types: {'electric'}, sort: sort),
+              )
               .first;
 
           expect(count, 2);
@@ -1220,7 +1411,7 @@ void main() {
     group('actualizaciones reactivas', () {
       test(
         'la búsqueda vuelve a emitir cuando aparece una coincidencia',
-            () async {
+        () async {
           final query = CatalogQuery(search: 'char');
 
           final updates = StreamQueue(
@@ -1229,11 +1420,11 @@ void main() {
                 .map(idsOf)
                 .distinct(
                   (previous, next) =>
-              previous.length == next.length &&
-                  previous.asMap().entries.every(
+                      previous.length == next.length &&
+                      previous.asMap().entries.every(
                         (entry) => entry.value == next[entry.key],
-                  ),
-            ),
+                      ),
+                ),
           );
 
           addTearDown(updates.cancel);
@@ -1255,7 +1446,7 @@ void main() {
 
       test(
         'el filtro vuelve a emitir cuando cambia el tipo de un Pokémon',
-            () async {
+        () async {
           final query = CatalogQuery(types: {'fire'});
 
           final updates = StreamQueue(
@@ -1331,10 +1522,10 @@ void main() {
         final updates = StreamQueue(
           catalogDao
               .watchFilteredCatalogPage(
-            limit: 50,
-            offset: 0,
-            query: CatalogQuery(sort: CatalogSort.baseStatTotalDescending),
-          )
+                limit: 50,
+                offset: 0,
+                query: CatalogQuery(sort: CatalogSort.baseStatTotalDescending),
+              )
               .map(idsOf),
         );
 
@@ -1460,9 +1651,9 @@ void main() {
     });
 
     Future<void> expectFilteredResults(
-        CatalogQuery query,
-        List<int> expectedIds,
-        ) async {
+      CatalogQuery query,
+      List<int> expectedIds,
+    ) async {
       final entries = await filteredPage(query: query);
       final count = await catalogDao.watchFilteredCatalogCount(query).first;
 
@@ -1533,7 +1724,7 @@ void main() {
     group('tipos múltiples', () {
       test(
         'encuentra Pokémon de cualquiera de los tipos seleccionados',
-            () async {
+        () async {
           await expectFilteredResults(CatalogQuery(types: {'fire', 'water'}), [
             4,
             7,
@@ -1588,7 +1779,7 @@ void main() {
 
       test(
         'combina tipos eléctricos y de fuego en un mismo conjunto',
-            () async {
+        () async {
           await expectFilteredResults(
             CatalogQuery(types: {'electric', 'fire'}),
             [4, 25, 155, 255],
@@ -1717,7 +1908,7 @@ void main() {
 
       test(
         'el conteo incluye todas las coincidencias y no solo la página',
-            () async {
+        () async {
           final entries = await filteredPage(query: query, limit: 2);
 
           final count = await catalogDao.watchFilteredCatalogCount(query).first;
@@ -1729,7 +1920,7 @@ void main() {
 
       test(
         'un Pokémon que coincide con dos tipos ocupa un solo lugar',
-            () async {
+        () async {
           final dualTypeQuery = CatalogQuery(
             types: const {'water', 'ground'},
             generations: const {2},
@@ -1758,7 +1949,7 @@ void main() {
 
       test(
         'excluye formas alternativas aunque coincidan con los tipos',
-            () async {
+        () async {
           await expectFilteredResults(
             CatalogQuery(types: {'electric', 'psychic'}, generations: {1}),
             [25],
@@ -1768,7 +1959,7 @@ void main() {
 
       test(
         'excluye una forma alternativa que coincide con todos los criterios',
-            () async {
+        () async {
           await expectFilteredResults(
             CatalogQuery(
               search: 'raichu',
@@ -1783,7 +1974,7 @@ void main() {
     group('reactividad con filtros múltiples', () {
       test(
         'la página se actualiza al guardar una nueva coincidencia',
-            () async {
+        () async {
           final query = CatalogQuery(
             types: const {'fire', 'water'},
             generations: const {2},
@@ -1795,11 +1986,11 @@ void main() {
                 .map(idsOf)
                 .distinct(
                   (previous, next) =>
-              previous.length == next.length &&
-                  previous.asMap().entries.every(
+                      previous.length == next.length &&
+                      previous.asMap().entries.every(
                         (entry) => entry.value == next[entry.key],
-                  ),
-            ),
+                      ),
+                ),
           );
 
           addTearDown(updates.cancel);
@@ -1832,11 +2023,11 @@ void main() {
               .map(idsOf)
               .distinct(
                 (previous, next) =>
-            previous.length == next.length &&
-                previous.asMap().entries.every(
+                    previous.length == next.length &&
+                    previous.asMap().entries.every(
                       (entry) => entry.value == next[entry.key],
-                ),
-          ),
+                    ),
+              ),
         );
 
         addTearDown(updates.cancel);
@@ -1945,9 +2136,9 @@ void main() {
   test('el esquema crea los índices de búsqueda, filtros y ranking', () async {
     final indexes = await database
         .customSelect(
-      "SELECT name FROM sqlite_master WHERE type = 'index' "
+          "SELECT name FROM sqlite_master WHERE type = 'index' "
           "AND name NOT LIKE 'sqlite_autoindex_%'",
-    )
+        )
         .map((row) => row.read<String>('name'))
         .get();
 

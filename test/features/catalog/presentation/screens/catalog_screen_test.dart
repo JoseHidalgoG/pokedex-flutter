@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_query_providers.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query_state.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progress.dart';
 
 import '../../fakes/fake_catalog_query_repository.dart';
 import '../../../favorites/fakes/fake_favorites_repository.dart';
@@ -172,6 +173,7 @@ void main() {
     List<Pokemon> pokemon, {
     required Stream<SyncStatus> syncStatuses,
     Stream<int>? counts,
+    Stream<CatalogProgress>? progressUpdates,
     List<CatalogPageRequest>? pageRequests,
     List<CatalogQuery>? countRequests,
     FakeCatalogQueryRepository? queryRepository,
@@ -180,6 +182,19 @@ void main() {
       catalogQueryRepositoryProvider.overrideWithValue(
         queryRepository ?? FakeCatalogQueryRepository(),
       ),
+
+      catalogProgressProvider.overrideWith(
+        (ref) =>
+            progressUpdates ??
+            Stream.value(
+              CatalogProgress(
+                savedCount: pokemon.length,
+                totalCount: pokemon.length,
+                isComplete: true,
+              ),
+            ),
+      ),
+
       filteredCatalogPageProvider.overrideWith((ref, request) {
         pageRequests?.add(request);
 
@@ -210,6 +225,7 @@ void main() {
     required List<Pokemon> pokemon,
     SyncStatus syncStatus = const SyncIdle(),
     Locale locale = const Locale('es'),
+    Stream<CatalogProgress>? progressUpdates,
     List<CatalogPageRequest>? pageRequests,
     List<CatalogQuery>? countRequests,
     FakeCatalogQueryRepository? queryRepository,
@@ -219,6 +235,7 @@ void main() {
         overrides: catalogOverrides(
           pokemon,
           syncStatuses: Stream.value(syncStatus),
+          progressUpdates: progressUpdates,
           pageRequests: pageRequests,
           countRequests: countRequests,
           queryRepository: queryRepository,
@@ -2259,6 +2276,446 @@ void main() {
       await tester.tap(find.text(catalogL10n(tester).catalogClearFilters));
       await tester.pumpAndSettle();
       expect(repository.storedState, CatalogQueryState.initial());
+    });
+  });
+  group('aviso de catálogo parcial', () {
+    const noticeKey = ValueKey('catalog-partial-notice');
+
+    const partialProgress = CatalogProgress(
+      savedCount: 6,
+      totalCount: 1025,
+      isComplete: false,
+    );
+
+    Finder partialNotice() => find.byKey(noticeKey);
+
+    testWidgets('muestra el aviso junto al catálogo local', (tester) async {
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        progressUpdates: Stream.value(partialProgress),
+      );
+
+      expect(partialNotice(), findsOneWidget);
+      expect(find.byType(PokemonListItem), findsWidgets);
+
+      expect(
+        find.text(catalogL10n(tester).catalogPartialNotice(6, 1025)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('no muestra el aviso si el catálogo está completo', (
+      tester,
+    ) async {
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        progressUpdates: Stream.value(
+          const CatalogProgress(savedCount: 6, totalCount: 6, isComplete: true),
+        ),
+      );
+
+      expect(partialNotice(), findsNothing);
+      expect(find.byType(PokemonListItem), findsWidgets);
+    });
+
+    testWidgets('muestra el aviso con total desconocido', (tester) async {
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        progressUpdates: Stream.value(
+          const CatalogProgress(savedCount: 6, isComplete: false),
+        ),
+      );
+
+      expect(
+        find.text(catalogL10n(tester).catalogPartialNoticeUnknownTotal(6)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('muestra el aviso cuando el catálogo local está vacío', (
+      tester,
+    ) async {
+      await pumpCatalog(
+        tester,
+        pokemon: const [],
+        progressUpdates: Stream.value(
+          const CatalogProgress(
+            savedCount: 0,
+            totalCount: 1025,
+            isComplete: false,
+          ),
+        ),
+      );
+
+      expect(partialNotice(), findsOneWidget);
+      expect(find.byType(PokemonListItem), findsNothing);
+
+      expect(
+        find.text(catalogL10n(tester).catalogPartialNotice(0, 1025)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('conserva el aviso al mostrar y ocultar los filtros', (
+      tester,
+    ) async {
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        progressUpdates: Stream.value(partialProgress),
+      );
+
+      expect(partialNotice(), findsOneWidget);
+      expect(find.byType(CatalogFilterBar), findsNothing);
+
+      await showFilters(tester);
+
+      expect(partialNotice(), findsOneWidget);
+      expect(find.byType(CatalogFilterBar), findsOneWidget);
+
+      await hideFilters(tester);
+
+      expect(partialNotice(), findsOneWidget);
+      expect(find.byType(CatalogFilterBar), findsNothing);
+    });
+
+    testWidgets('el aviso se encuentra antes de los filtros', (tester) async {
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        progressUpdates: Stream.value(partialProgress),
+      );
+
+      await showFilters(tester);
+
+      final noticeRect = tester.getRect(partialNotice());
+
+      final filtersRect = tester.getRect(find.byType(CatalogFilterBar));
+
+      expect(noticeRect.bottom, lessThanOrEqualTo(filtersRect.top));
+    });
+
+    testWidgets('la búsqueda no modifica el progreso global', (tester) async {
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        progressUpdates: Stream.value(partialProgress),
+      );
+
+      await showFilters(tester);
+      await searchFor(tester, 'pikachu');
+
+      expect(find.byType(PokemonListItem), findsOneWidget);
+      expect(find.text('Pikachu'), findsOneWidget);
+
+      expect(
+        find.text(catalogL10n(tester).catalogPartialNotice(6, 1025)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('conserva el aviso cuando la búsqueda no tiene resultados', (
+      tester,
+    ) async {
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        progressUpdates: Stream.value(partialProgress),
+      );
+
+      await showFilters(tester);
+      await searchFor(tester, 'pokemon-inexistente');
+
+      expect(find.byType(PokemonListItem), findsNothing);
+
+      expect(find.text(catalogL10n(tester).catalogNoResults), findsOneWidget);
+
+      expect(
+        find.text(catalogL10n(tester).catalogPartialNotice(6, 1025)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('el filtro por tipo no modifica el progreso global', (
+      tester,
+    ) async {
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        progressUpdates: Stream.value(partialProgress),
+      );
+
+      await showFilters(tester);
+
+      await tester.tap(typeDropdown());
+      await tester.pumpAndSettle();
+
+      final electricOption = find.byKey(
+        const ValueKey('catalog-option-electric'),
+      );
+
+      await tester.ensureVisible(electricOption);
+      await tester.tap(electricOption);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('catalog-selection-apply')));
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pikachu'), findsOneWidget);
+      expect(find.text('Raichu'), findsOneWidget);
+      expect(find.byType(PokemonListItem), findsNWidgets(2));
+
+      expect(
+        find.text(catalogL10n(tester).catalogPartialNotice(6, 1025)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('el filtro por generación no modifica el progreso global', (
+      tester,
+    ) async {
+      await pumpCatalog(
+        tester,
+        pokemon: multiGenerationCatalog,
+        progressUpdates: Stream.value(
+          const CatalogProgress(
+            savedCount: 9,
+            totalCount: 1025,
+            isComplete: false,
+          ),
+        ),
+      );
+
+      await showFilters(tester);
+
+      await tester.tap(generationSelector());
+      await tester.pumpAndSettle();
+
+      final generationOption = find.byKey(const ValueKey('catalog-option-2'));
+
+      await tester.ensureVisible(generationOption);
+      await tester.tap(generationOption);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('catalog-selection-apply')));
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cyndaquil'), findsOneWidget);
+      expect(find.text('Totodile'), findsOneWidget);
+      expect(find.byType(PokemonListItem), findsNWidgets(2));
+
+      expect(
+        find.text(catalogL10n(tester).catalogPartialNotice(9, 1025)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('la paginación no modifica el progreso global', (tester) async {
+      final pokemon = List.generate(
+        51,
+        (index) => Pokemon(
+          id: index + 1,
+          name: 'pokemon${index + 1}',
+          imageUrl: '',
+          typeNames: const ['normal'],
+        ),
+      );
+
+      await pumpCatalog(
+        tester,
+        pokemon: pokemon,
+        progressUpdates: Stream.value(
+          const CatalogProgress(
+            savedCount: 51,
+            totalCount: 1025,
+            isComplete: false,
+          ),
+        ),
+      );
+
+      final message = catalogL10n(tester).catalogPartialNotice(51, 1025);
+
+      expect(find.text(message), findsOneWidget);
+
+      await scrollToPagination(tester);
+
+      expect(find.text(message), findsOneWidget);
+
+      await tester.tap(find.widgetWithIcon(IconButton, Icons.chevron_right));
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('#0051'), findsOneWidget);
+      expect(find.byType(PokemonListItem), findsOneWidget);
+      expect(find.text(message), findsOneWidget);
+    });
+
+    testWidgets('mantiene el aviso cuando falla la sincronización', (
+      tester,
+    ) async {
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        syncStatus: const SyncFailed(NoConnection()),
+        progressUpdates: Stream.value(partialProgress),
+      );
+
+      expect(partialNotice(), findsOneWidget);
+      expect(find.byType(PokemonListItem), findsWidgets);
+
+      expect(
+        find.text(catalogL10n(tester).catalogPartialNotice(6, 1025)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('actualiza el aviso durante la sincronización', (tester) async {
+      final controller = StreamController<CatalogProgress>.broadcast();
+
+      addTearDown(controller.close);
+
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        syncStatus: const SyncFullPassInProgress(),
+        progressUpdates: controller.stream,
+      );
+
+      controller.add(partialProgress);
+
+      await tester.pump();
+      await tester.pump();
+
+      final l10n = catalogL10n(tester);
+
+      expect(find.text(l10n.catalogPartialNotice(6, 1025)), findsOneWidget);
+
+      controller.add(
+        const CatalogProgress(
+          savedCount: 100,
+          totalCount: 1025,
+          isComplete: false,
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text(l10n.catalogPartialNotice(6, 1025)), findsNothing);
+
+      expect(find.text(l10n.catalogPartialNotice(100, 1025)), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('el aviso desaparece sin abandonar la pantalla', (
+      tester,
+    ) async {
+      final controller = StreamController<CatalogProgress>.broadcast();
+
+      addTearDown(controller.close);
+
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        progressUpdates: controller.stream,
+      );
+
+      controller.add(partialProgress);
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(partialNotice(), findsOneWidget);
+
+      controller.add(
+        const CatalogProgress(
+          savedCount: 1025,
+          totalCount: 1025,
+          isComplete: true,
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(partialNotice(), findsNothing);
+      expect(find.byType(CatalogScreen), findsOneWidget);
+      expect(find.byType(PokemonListItem), findsWidgets);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('actualizar el progreso no vuelve a consultar los filtros', (
+      tester,
+    ) async {
+      final controller = StreamController<CatalogProgress>.broadcast();
+
+      addTearDown(controller.close);
+
+      final pageRequests = <CatalogPageRequest>[];
+      final countRequests = <CatalogQuery>[];
+
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        progressUpdates: controller.stream,
+        pageRequests: pageRequests,
+        countRequests: countRequests,
+      );
+
+      final initialPageRequests = List.of(pageRequests);
+      final initialCountRequests = List.of(countRequests);
+
+      expect(initialPageRequests, isNotEmpty);
+      expect(initialCountRequests, isNotEmpty);
+
+      controller.add(partialProgress);
+
+      await tester.pump();
+      await tester.pump();
+
+      controller.add(
+        const CatalogProgress(
+          savedCount: 200,
+          totalCount: 1025,
+          isComplete: false,
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(partialNotice(), findsOneWidget);
+
+      expect(pageRequests, initialPageRequests);
+      expect(countRequests, initialCountRequests);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('muestra el aviso en inglés dentro del catálogo', (
+      tester,
+    ) async {
+      await pumpCatalog(
+        tester,
+        pokemon: testCatalog,
+        locale: const Locale('en'),
+        progressUpdates: Stream.value(partialProgress),
+      );
+
+      expect(
+        find.text(
+          'Local catalog: 6 of 1025 Pokémon; '
+          'results may be incomplete.',
+        ),
+        findsOneWidget,
+      );
     });
   });
 }

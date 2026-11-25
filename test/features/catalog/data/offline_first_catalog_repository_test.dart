@@ -319,19 +319,96 @@ void main() {
     expect(pikachu.typeNames, ['electric']);
   });
 
-  test('watchCatalogProgress entrega el progreso de dominio', () async {
-    await database.catalogDao.saveCatalogPage(
-      entries: const [bulbasaurEntry, charmanderEntry],
-      nextOffset: 2,
-      isComplete: false,
-      savedAt: DateTime(2026, 11, 23),
-      totalCount: 1025,
-    );
+  group('watchCatalogProgress', () {
+    test('entrega el progreso de dominio', () async {
+      await database.catalogDao.saveCatalogPage(
+        entries: const [bulbasaurEntry, charmanderEntry],
+        nextOffset: 2,
+        isComplete: false,
+        savedAt: DateTime(2026, 11, 23),
+        totalCount: 1025,
+      );
 
-    final progress = await repository.watchCatalogProgress().first;
+      final progress = await repository.watchCatalogProgress().first;
 
-    expect(progress, const CatalogProgress(savedCount: 2, totalCount: 1025));
-    expect(progress.isComplete, isFalse);
+      expect(
+        progress,
+        const CatalogProgress(
+          savedCount: 2,
+          totalCount: 1025,
+          isComplete: false,
+        ),
+      );
+
+      expect(progress.isComplete, isFalse);
+    });
+
+    test('entrega el progreso inicial sin metadatos', () async {
+      final progress = await repository.watchCatalogProgress().first;
+
+      expect(progress, const CatalogProgress(savedCount: 0, isComplete: false));
+    });
+
+    test('entrega el estado completo de los metadatos', () async {
+      await database.catalogDao.saveCatalogPage(
+        entries: const [bulbasaurEntry, charmanderEntry],
+        nextOffset: 2,
+        isComplete: true,
+        savedAt: DateTime(2026, 11, 23),
+        totalCount: 2,
+      );
+
+      final progress = await repository.watchCatalogProgress().first;
+
+      expect(
+        progress,
+        const CatalogProgress(savedCount: 2, totalCount: 2, isComplete: true),
+      );
+    });
+
+    test('no deduce completitud a partir de las cantidades', () async {
+      await database.catalogDao.saveCatalogPage(
+        entries: const [bulbasaurEntry, charmanderEntry],
+        nextOffset: 2,
+        isComplete: false,
+        savedAt: DateTime(2026, 11, 23),
+        totalCount: 2,
+      );
+
+      final progress = await repository.watchCatalogProgress().first;
+
+      expect(
+        progress,
+        const CatalogProgress(savedCount: 2, totalCount: 2, isComplete: false),
+      );
+    });
+
+    test('entrega el progreso cuando el total es desconocido', () async {
+      await database.catalogDao.saveCatalogPage(
+        entries: const [bulbasaurEntry],
+        nextOffset: 1,
+        isComplete: false,
+        savedAt: DateTime(2026, 11, 23),
+      );
+
+      final progress = await repository.watchCatalogProgress().first;
+
+      expect(progress, const CatalogProgress(savedCount: 1, isComplete: false));
+    });
+
+    test('consultar el progreso no genera solicitudes remotas', () async {
+      await database.catalogDao.saveCatalogPage(
+        entries: const [bulbasaurEntry],
+        nextOffset: 1,
+        isComplete: false,
+        savedAt: DateTime(2026, 11, 23),
+        totalCount: 1025,
+      );
+
+      await repository.watchCatalogProgress().first;
+
+      expectNoRemoteRequests();
+    });
   });
 
   test(
