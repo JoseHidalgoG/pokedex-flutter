@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gql/ast.dart';
 import 'package:graphql/client.dart';
@@ -19,10 +21,14 @@ import 'package:pokedex_flutter/core/sync/domain/sync_job.dart';
 import 'package:pokedex_flutter/core/sync/sync_providers.dart';
 import 'package:pokedex_flutter/core/sync/sync_scheduler.dart';
 import 'package:pokedex_flutter/features/catalog/data/catalog_data_providers.dart';
+import 'package:pokedex_flutter/features/catalog/data/local/catalog_dao.dart';
+import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/catalog_page_query.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/type_efficacy_query.dart';
+import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
+import 'package:pokedex_flutter/features/catalog/data/sync/interrupted_sync_report.dart';
 import 'package:pokedex_flutter/features/connectivity/connectivity_providers.dart';
 import 'package:pokedex_flutter/features/connectivity/domain/connectivity_status.dart';
 
@@ -66,6 +72,70 @@ class SavedBatchPokeApiLink extends Link {
   }
 }
 
+class PagedCatalogPokeApiLink extends Link {
+  PagedCatalogPokeApiLink({required this.pokemonCount})
+    : _bulbasaur = savedPokemonJson(name: 'bulbasaur');
+
+  final int pokemonCount;
+  final Map<String, Object?> _bulbasaur;
+  final receivedRequests = <Request>[];
+
+  List<int> get requestedCatalogOffsets => [
+    for (final request in requestsFor(catalogPageQuery))
+      request.variables['offset']! as int,
+  ];
+
+  List<Request> requestsFor(DocumentNode document) => [
+    for (final request in receivedRequests)
+      if (identical(request.operation.document, document)) request,
+  ];
+
+  CatalogEntry entryWithId(int id) {
+    return PokemonDto.fromJson(_pokemonJsonWithId(id)).toCatalogEntry();
+  }
+
+  @override
+  Stream<Response> request(Request request, [NextLink? forward]) {
+    receivedRequests.add(request);
+    if (identical(request.operation.document, typeEfficacyQuery)) {
+      return Stream.value(_responseWith(savedTypeEfficacyResponse()));
+    }
+    final offset = request.variables['offset']! as int;
+    final limit = request.variables['limit']! as int;
+    final lastId = min(offset + limit, pokemonCount);
+    return Stream.value(
+      _responseWith({
+        'data': {
+          'pokemon': [
+            for (var id = offset + 1; id <= lastId; id++)
+              _pokemonJsonWithId(id),
+          ],
+          if (request.variables['withTotal'] == true)
+            'pokemon_aggregate': {
+              'aggregate': {'count': pokemonCount},
+            },
+        },
+      }),
+    );
+  }
+
+  Map<String, Object?> _pokemonJsonWithId(int id) {
+    return {
+      ..._bulbasaur,
+      'id': id,
+      'name': 'pokemon-$id',
+      'pokemonspecy': {'id': id, 'generation_id': 1},
+    };
+  }
+
+  static Response _responseWith(Map<String, Object?> body) {
+    return Response(
+      data: body['data'] as Map<String, Object?>?,
+      response: body,
+    );
+  }
+}
+
 class PeriodicJobsRecordingScheduler extends SyncScheduler {
   PeriodicJobsRecordingScheduler(AppDatabase database)
     : super(
@@ -97,7 +167,10 @@ void main() {
     await database.close();
   });
 
-  ProviderContainer startAppOver(SavedBatchPokeApiLink pokeApi) {
+  ProviderContainer startAppOver(
+    Link pokeApi, {
+    List<Override> overrides = const [],
+  }) {
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
@@ -105,6 +178,7 @@ void main() {
         pokeApiGraphQLClientProvider.overrideWithValue(
           createPokeApiGraphQLClient(link: pokeApi),
         ),
+        ...overrides,
       ],
     );
     addTearDown(container.dispose);
@@ -239,6 +313,64 @@ void main() {
     await expectLater(
       database.pokemonDetailDao.watchTypeEfficacy(),
       emitsThrough(hasLength(324)),
+    );
+  });
+
+  test('una pasada interrumpida en 300 de 1025 se reanuda al arrancar y pide solo los lotes que faltan', () async {
+    final pokeApi = PagedCatalogPokeApiLink(pokemonCount: 1025);
+    await database.catalogDao.saveCatalogPage(
+      entries: [for (var id = 1; id <= 300; id++) pokeApi.entryWithId(id)],
+      nextOffset: 300,
+      isComplete: false,
+      savedAt: DateTime.now().subtract(const Duration(minutes: 5)),
+      totalCount: 1025,
+    );
+    await database.syncMetadataDao.recordStarted(CatalogDao.catalogSyncKey);
+    final logs = <String>[];
+
+    final container = startAppOver(
+      pokeApi,
+      overrides: [
+        catalogSyncServiceProvider.overrideWith(
+          (ref) => CatalogSyncService(
+            remoteDataSource: ref.watch(catalogRemoteDataSourceProvider),
+            catalogDao: ref.watch(appDatabaseProvider).catalogDao,
+            write: logs.add,
+          ),
+        ),
+        interruptedSyncReportProvider.overrideWith(
+          (ref) => InterruptedSyncReport(
+            syncMetadata: ref.watch(appDatabaseProvider).syncMetadataDao,
+            write: logs.add,
+          ),
+        ),
+      ],
+    );
+    await expectLater(
+      catalogStatusIn(container),
+      emitsThrough(isA<SyncRevalidated>()),
+    );
+    final progress = await database.catalogDao.readCatalogSyncProgress();
+    final storedIds = [
+      for (final row in await database.select(database.pokemonTable).get())
+        row.id,
+    ]..sort();
+
+    expect(pokeApi.requestedCatalogOffsets, [
+      for (var offset = 300; offset <= 1000; offset += 100) offset,
+    ]);
+    expect(pokeApi.requestsFor(pokemonByIdsQuery), isEmpty);
+    expect(progress?.status, 'idle');
+    expect(progress?.isComplete, isTrue);
+    expect(progress?.nextOffset, 1025);
+    expect(storedIds, [for (var id = 1; id <= 1025; id++) id]);
+    expect(
+      logs,
+      containsAllInOrder([
+        'catalog: la pasada anterior se interrumpió en 300 de 1025; '
+            'se reanuda',
+        'catalog: se reanuda desde 300 de 1025',
+      ]),
     );
   });
 

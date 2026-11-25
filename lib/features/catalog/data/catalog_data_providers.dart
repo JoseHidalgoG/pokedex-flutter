@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pokedex_flutter/core/database/app_database_provider.dart';
 import 'package:pokedex_flutter/core/images/pokemon_image_cache_providers.dart';
 import 'package:pokedex_flutter/core/network/pokeapi_graphql_client_provider.dart';
+import 'package:pokedex_flutter/core/sync/domain/sync_job.dart';
 import 'package:pokedex_flutter/core/sync/sync_providers.dart';
+import 'package:pokedex_flutter/core/sync/sync_scheduler.dart';
 import 'package:pokedex_flutter/features/catalog/data/cached_pokemon_image_repository.dart';
 import 'package:pokedex_flutter/features/catalog/data/offline_first_catalog_repository.dart';
 import 'package:pokedex_flutter/features/catalog/data/offline_first_pokemon_detail_repository.dart';
@@ -12,6 +14,7 @@ import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_restoration_service.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_constants.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.dart';
+import 'package:pokedex_flutter/features/catalog/data/sync/interrupted_sync_report.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/pokemon_detail_sync_service.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/pokemon_detail_repository.dart';
@@ -43,8 +46,15 @@ final pokemonDetailSyncServiceProvider = Provider<PokemonDetailSyncService>(
   ),
 );
 
+final interruptedSyncReportProvider = Provider<InterruptedSyncReport>(
+  (ref) => InterruptedSyncReport(
+    syncMetadata: ref.watch(appDatabaseProvider).syncMetadataDao,
+  ),
+);
+
 final catalogSyncTriggersProvider = Provider<void>((ref) {
   final scheduler = ref.watch(syncSchedulerProvider);
+  final interruptedSyncs = ref.watch(interruptedSyncReportProvider);
   final fullPass = ref.watch(catalogSyncServiceProvider).fullPassJob();
   final restoration = ref
       .watch(catalogRestorationServiceProvider)
@@ -58,10 +68,30 @@ final catalogSyncTriggersProvider = Provider<void>((ref) {
     ..runOnEachReconnect(typeEfficacy)
     ..runEveryWhileOnline(fullPass, catalogFullPassFreshness)
     ..runEveryWhileOnline(restoration, fingerprintVerificationInterval);
-  unawaited(scheduler.run(fullPass));
-  unawaited(scheduler.run(restoration));
-  unawaited(scheduler.run(typeEfficacy));
+  unawaited(
+    _runAfterReportingInterruptions(
+      ref,
+      interruptedSyncs: interruptedSyncs,
+      scheduler: scheduler,
+      startupJobs: [fullPass, restoration, typeEfficacy],
+    ),
+  );
 });
+
+Future<void> _runAfterReportingInterruptions(
+  Ref ref, {
+  required InterruptedSyncReport interruptedSyncs,
+  required SyncScheduler scheduler,
+  required List<SyncJob> startupJobs,
+}) async {
+  await interruptedSyncs.reportAtStartup();
+  if (!ref.mounted) {
+    return;
+  }
+  for (final job in startupJobs) {
+    unawaited(scheduler.run(job));
+  }
+}
 
 final offlineFirstCatalogRepositoryProvider = Provider<CatalogRepository>(
   (ref) => OfflineFirstCatalogRepository(
