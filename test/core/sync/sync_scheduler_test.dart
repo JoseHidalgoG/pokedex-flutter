@@ -685,6 +685,85 @@ void main() {
     );
   });
 
+  group('una vez cuando haya conexión', () {
+    test('en línea corre en el acto', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.revalidated]);
+
+        scheduler.runWhenOnline(detailJob(25, work));
+        async.flushMicrotasks();
+
+        expect(work.calls, 1);
+        expect(scheduler.statusOf('detail:25'), isA<SyncRevalidated>());
+      });
+    });
+
+    test(
+      'sin conexión espera a la próxima reconexión y corre una sola vez',
+      () {
+        fakeAsync((async) {
+          final scheduler = schedulerIn(async)
+            ..connectivityChanged(isOnline: false);
+          final work = ScriptedWork([SyncOutcome.revalidated]);
+
+          scheduler.runWhenOnline(detailJob(25, work));
+          async
+            ..flushMicrotasks()
+            ..elapse(const Duration(minutes: 10));
+          expect(work.calls, 0);
+
+          scheduler.connectivityChanged(isOnline: true);
+          async.flushMicrotasks();
+          expect(work.calls, 1);
+
+          scheduler
+            ..connectivityChanged(isOnline: false)
+            ..connectivityChanged(isOnline: true);
+          async.flushMicrotasks();
+          expect(work.calls, 1);
+        });
+      },
+    );
+
+    test('la misma clave pedida varias veces sin conexión corre una vez', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final work = ScriptedWork([SyncOutcome.revalidated]);
+
+        scheduler
+          ..runWhenOnline(detailJob(25, work))
+          ..runWhenOnline(detailJob(25, work))
+          ..connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+
+        expect(work.calls, 1);
+      });
+    });
+
+    test('stopRunningOnReconnect de la misma clave no la descarta', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final work = ScriptedWork([SyncOutcome.revalidated]);
+
+        scheduler
+          ..runOnEachReconnect(detailJob(25, work))
+          ..runWhenOnline(detailJob(25, work))
+          ..stopRunningOnReconnect('detail:25')
+          ..connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+        expect(work.calls, 1);
+
+        scheduler
+          ..connectivityChanged(isOnline: false)
+          ..connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+        expect(work.calls, 1);
+      });
+    });
+  });
+
   group('cada cierto tiempo mientras haya servicio', () {
     const period = Duration(seconds: 60);
 

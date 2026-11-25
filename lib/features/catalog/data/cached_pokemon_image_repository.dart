@@ -29,16 +29,21 @@ class CachedPokemonImageRepository implements PokemonImageRepository {
   }
 
   @override
-  Future<void> saveArtworkOf(int pokemonId) async {
+  Future<bool> saveArtworkOf(int pokemonId) async {
     final storedUrl = await _catalogDao.readImageUrlOf(pokemonId);
     final url = switch (storedUrl) {
       final url? when url.isNotEmpty => url,
       _ => officialArtworkUrlFor(pokemonId),
     };
     if (await _images.isSaved(url)) {
-      return;
+      return true;
     }
-    await _images.save(url);
+    try {
+      await _images.save(url);
+      return true;
+    } on Exception {
+      return false;
+    }
   }
 
   @override

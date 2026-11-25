@@ -3,7 +3,7 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/artwork_save_pr
 abstract interface class PokemonImageRepository {
   Future<Set<int>> pokemonIdsWithSavedArtwork();
 
-  Future<void> saveArtworkOf(int pokemonId);
+  Future<bool> saveArtworkOf(int pokemonId);
 
   Stream<ArtworkSaveProgress> saveAllArtwork();
 

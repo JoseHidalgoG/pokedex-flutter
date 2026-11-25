@@ -220,18 +220,20 @@ void main() {
       await saveCatalog([pokemonWithArtwork(25)]);
       final images = FakeImageFileCache();
 
-      await repositoryWith(images).saveArtworkOf(25);
+      final isSaved = await repositoryWith(images).saveArtworkOf(25);
 
       expect(images.requestedSaves, [artworkUrl(25)]);
+      expect(isSaved, isTrue);
     });
 
     test('no vuelve a descargar una imagen ya guardada', () async {
       await saveCatalog([pokemonWithArtwork(25)]);
       final images = FakeImageFileCache(savedUrls: {artworkUrl(25)});
 
-      await repositoryWith(images).saveArtworkOf(25);
+      final isSaved = await repositoryWith(images).saveArtworkOf(25);
 
       expect(images.requestedSaves, isEmpty);
+      expect(isSaved, isTrue);
     });
 
     test('sin el Pokémon en el catálogo usa el official-artwork', () async {
@@ -240,6 +242,16 @@ void main() {
       await repositoryWith(images).saveArtworkOf(133);
 
       expect(images.requestedSaves, [officialArtworkUrlFor(133)]);
+    });
+
+    test('si la descarga falla responde false sin lanzar', () async {
+      await saveCatalog([pokemonWithArtwork(25)]);
+      final images = FakeImageFileCache(failingUrls: {artworkUrl(25)});
+
+      final isSaved = await repositoryWith(images).saveArtworkOf(25);
+
+      expect(isSaved, isFalse);
+      expect(images.savedUrls, isEmpty);
     });
   });
 

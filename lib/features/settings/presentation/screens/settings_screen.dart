@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pokedex_flutter/features/settings/presentation/providers/settings_providers.dart';
+import 'package:pokedex_flutter/features/settings/presentation/widgets/image_storage_section.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -91,6 +92,7 @@ class SettingsScreen extends ConsumerWidget {
                     },
             ),
           ),
+          const ImageStorageSection(),
         ],
       ),
     );

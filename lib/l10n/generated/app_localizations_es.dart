@@ -478,4 +478,51 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get matchupImmunity => 'Inmune · ×0';
+
+  @override
+  String get imagesTitle => 'Imágenes';
+
+  @override
+  String imagesSavedSize(String size) {
+    return 'Imágenes guardadas: $size';
+  }
+
+  @override
+  String get imagesSaveAll => 'Guardar imágenes para usar sin conexión';
+
+  @override
+  String get imagesNeedConnection =>
+      'Sin conexión: conéctate para descargarlas';
+
+  @override
+  String imagesSaveProgress(int saved, int total) {
+    return '$saved de $total guardadas';
+  }
+
+  @override
+  String imagesSaveIncomplete(int saved, int total, int missing) {
+    return '$saved de $total guardadas · $missing sin descargar';
+  }
+
+  @override
+  String get imagesSaveNoCatalog => 'Todavía no hay catálogo guardado';
+
+  @override
+  String get imagesSaveFailed => 'No se pudieron guardar las imágenes';
+
+  @override
+  String get imagesDelete => 'Borrar imágenes';
+
+  @override
+  String get imagesDeleteQuestion => '¿Borrar las imágenes guardadas?';
+
+  @override
+  String get imagesDeleteExplanation =>
+      'Se volverán a descargar al verlas con conexión.';
+
+  @override
+  String get imagesDeleteConfirm => 'Borrar';
+
+  @override
+  String get imagesDeleteFailed => 'No se pudieron borrar las imágenes';
 }

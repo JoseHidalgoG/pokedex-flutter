@@ -473,4 +473,50 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get matchupImmunity => 'Immune · ×0';
+
+  @override
+  String get imagesTitle => 'Images';
+
+  @override
+  String imagesSavedSize(String size) {
+    return 'Saved images: $size';
+  }
+
+  @override
+  String get imagesSaveAll => 'Save images for offline use';
+
+  @override
+  String get imagesNeedConnection => 'Offline: connect to download them';
+
+  @override
+  String imagesSaveProgress(int saved, int total) {
+    return '$saved of $total saved';
+  }
+
+  @override
+  String imagesSaveIncomplete(int saved, int total, int missing) {
+    return '$saved of $total saved · $missing not downloaded';
+  }
+
+  @override
+  String get imagesSaveNoCatalog => 'No catalog saved yet';
+
+  @override
+  String get imagesSaveFailed => 'Images could not be saved';
+
+  @override
+  String get imagesDelete => 'Delete images';
+
+  @override
+  String get imagesDeleteQuestion => 'Delete saved images?';
+
+  @override
+  String get imagesDeleteExplanation =>
+      'They will download again when viewed online.';
+
+  @override
+  String get imagesDeleteConfirm => 'Delete';
+
+  @override
+  String get imagesDeleteFailed => 'Images could not be deleted';
 }

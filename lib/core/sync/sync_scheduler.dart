@@ -34,6 +34,7 @@ class SyncScheduler {
   final _scheduledStarts = <String, Timer>{};
   final _jobsForNextReconnect = <String, SyncJob>{};
   final _jobsOnEachReconnect = <String, SyncJob>{};
+  final _jobsWhenOnline = <String, SyncJob>{};
   final _jobsAfterRunning = <String, _JobAfterRunning>{};
   final _periodicJobs = <String, _PeriodicJob>{};
   final _periodicTimers = <String, Timer>{};
@@ -92,6 +93,14 @@ class SyncScheduler {
     _jobsOnEachReconnect[job.key] = job;
   }
 
+  Future<void> runWhenOnline(SyncJob job) {
+    if (_isOnline) {
+      return run(job);
+    }
+    _jobsWhenOnline[job.key] = job;
+    return Future.value();
+  }
+
   void stopRunningOnReconnect(String key) {
     _jobsOnEachReconnect.remove(key);
     _jobsForNextReconnect.remove(key);
@@ -142,7 +151,12 @@ class SyncScheduler {
   }
 
   void _runJobsAfterReconnect() {
-    final jobs = {..._jobsOnEachReconnect, ..._jobsForNextReconnect};
+    final jobs = {
+      ..._jobsOnEachReconnect,
+      ..._jobsWhenOnline,
+      ..._jobsForNextReconnect,
+    };
+    _jobsWhenOnline.clear();
     _jobsForNextReconnect.clear();
     for (final job in jobs.values) {
       unawaited(run(job));
