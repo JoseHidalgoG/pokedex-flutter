@@ -685,6 +685,322 @@ void main() {
     );
   });
 
+  group('una vez cuando haya conexión', () {
+    test('en línea corre en el acto', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.revalidated]);
+
+        scheduler.runWhenOnline(detailJob(25, work));
+        async.flushMicrotasks();
+
+        expect(work.calls, 1);
+        expect(scheduler.statusOf('detail:25'), isA<SyncRevalidated>());
+      });
+    });
+
+    test(
+      'sin conexión espera a la próxima reconexión y corre una sola vez',
+      () {
+        fakeAsync((async) {
+          final scheduler = schedulerIn(async)
+            ..connectivityChanged(isOnline: false);
+          final work = ScriptedWork([SyncOutcome.revalidated]);
+
+          scheduler.runWhenOnline(detailJob(25, work));
+          async
+            ..flushMicrotasks()
+            ..elapse(const Duration(minutes: 10));
+          expect(work.calls, 0);
+
+          scheduler.connectivityChanged(isOnline: true);
+          async.flushMicrotasks();
+          expect(work.calls, 1);
+
+          scheduler
+            ..connectivityChanged(isOnline: false)
+            ..connectivityChanged(isOnline: true);
+          async.flushMicrotasks();
+          expect(work.calls, 1);
+        });
+      },
+    );
+
+    test('la misma clave pedida varias veces sin conexión corre una vez', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final work = ScriptedWork([SyncOutcome.revalidated]);
+
+        scheduler
+          ..runWhenOnline(detailJob(25, work))
+          ..runWhenOnline(detailJob(25, work))
+          ..connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+
+        expect(work.calls, 1);
+      });
+    });
+
+    test('stopRunningOnReconnect de la misma clave no la descarta', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final work = ScriptedWork([SyncOutcome.revalidated]);
+
+        scheduler
+          ..runOnEachReconnect(detailJob(25, work))
+          ..runWhenOnline(detailJob(25, work))
+          ..stopRunningOnReconnect('detail:25')
+          ..connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+        expect(work.calls, 1);
+
+        scheduler
+          ..connectivityChanged(isOnline: false)
+          ..connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+        expect(work.calls, 1);
+      });
+    });
+  });
+
+  group('servicio caído con red', () {
+    void serviceDown(SyncScheduler scheduler) =>
+        scheduler.connectivityChanged(isOnline: false, hasNetwork: true);
+
+    test('hasNetwork distingue el servicio caído de la falta de red', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        expect(scheduler.hasNetwork, isFalse);
+
+        serviceDown(scheduler);
+        expect((scheduler.isOnline, scheduler.hasNetwork), (false, true));
+
+        scheduler.connectivityChanged(isOnline: false, hasNetwork: false);
+        expect((scheduler.isOnline, scheduler.hasNetwork), (false, false));
+
+        scheduler.connectivityChanged(isOnline: true, hasNetwork: false);
+        expect((scheduler.isOnline, scheduler.hasNetwork), (true, true));
+
+        scheduler.connectivityChanged(isOnline: false);
+        expect((scheduler.isOnline, scheduler.hasNetwork), (false, false));
+      });
+    });
+
+    test(
+      'un reintento en espera sigue su temporizador al caer el servicio',
+      () {
+        fakeAsync((async) {
+          final scheduler = schedulerIn(async)
+            ..connectivityChanged(isOnline: true);
+          final work = ScriptedWork([
+            const ServerError(503),
+            SyncOutcome.revalidated,
+          ]);
+
+          scheduler.run(catalogJob(work));
+          async.flushMicrotasks();
+          serviceDown(scheduler);
+          async.elapse(const Duration(seconds: 2));
+
+          expect(work.calls, 2);
+          expect(scheduler.statusOf('catalog'), isA<SyncRevalidated>());
+          expect(store.history, everyElement(isNot(startsWith('pending'))));
+        });
+      },
+    );
+
+    test('un ServerError se reintenta a los 2, 4, 8, 16 y 32 s y después queda failed', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        serviceDown(scheduler);
+        final work = ScriptedWork([const ServerError(503)]);
+
+        scheduler.run(catalogJob(work));
+        async.flushMicrotasks();
+        expect(work.calls, 1);
+
+        for (final (retry, seconds) in [2, 4, 8, 16, 32].indexed) {
+          async.elapse(Duration(seconds: seconds, milliseconds: -1));
+          expect(work.calls, retry + 1);
+          async.elapse(const Duration(milliseconds: 1));
+          expect(work.calls, retry + 2);
+        }
+        async.elapse(const Duration(minutes: 10));
+
+        expect(work.calls, 6);
+        expect(store.history, [
+          for (var retry = 1; retry <= 5; retry++) ...[
+            'in_progress',
+            'waiting_retry $retry',
+          ],
+          'in_progress',
+          'failed 5 ServerError(503)',
+        ]);
+        expect(scheduler.statusOf('catalog'), isA<SyncFailed>());
+      });
+    });
+
+    test('sin red un ServerError no se reintenta y queda pending', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: false, hasNetwork: false);
+        final work = ScriptedWork([const ServerError(503)]);
+
+        scheduler.run(catalogJob(work));
+        async
+          ..flushMicrotasks()
+          ..elapse(const Duration(minutes: 10));
+
+        expect(work.calls, 1);
+        expect(store.history.last, 'pending ServerError(503)');
+      });
+    });
+
+    test('perder también la red retiene el reintento hasta la reconexión', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        serviceDown(scheduler);
+        final work = ScriptedWork([
+          const ServerError(503),
+          SyncOutcome.revalidated,
+        ]);
+
+        scheduler.run(catalogJob(work));
+        async.flushMicrotasks();
+        scheduler.connectivityChanged(isOnline: false, hasNetwork: false);
+        async.elapse(const Duration(minutes: 1));
+
+        expect(work.calls, 1);
+        expect(store.history.last, 'pending NoConnection');
+        expect(scheduler.statusOf('catalog'), isA<SyncFailed>());
+
+        scheduler.connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+
+        expect(work.calls, 2);
+        expect(scheduler.statusOf('catalog'), isA<SyncRevalidated>());
+      });
+    });
+
+    test('al volver el servicio el trabajo que falló corre una sola vez', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        serviceDown(scheduler);
+        final work = ScriptedWork([
+          for (var attempt = 0; attempt < 6; attempt++) const ServerError(503),
+          SyncOutcome.revalidated,
+        ]);
+        scheduler.runOnEachReconnect(catalogJob(work));
+
+        scheduler.run(catalogJob(work, force: true));
+        async
+          ..flushMicrotasks()
+          ..elapse(const Duration(minutes: 2));
+        expect(work.calls, 6);
+        expect(scheduler.statusOf('catalog'), isA<SyncFailed>());
+
+        scheduler.connectivityChanged(isOnline: true);
+        async
+          ..flushMicrotasks()
+          ..elapse(const Duration(minutes: 10));
+
+        expect(work.calls, 7);
+        expect(scheduler.statusOf('catalog'), isA<SyncRevalidated>());
+      });
+    });
+
+    test('al volver el servicio un reintento en espera corre en el acto', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        serviceDown(scheduler);
+        final work = ScriptedWork([
+          const ServerError(503),
+          const ServerError(503),
+          const ServerError(503),
+          SyncOutcome.revalidated,
+        ]);
+
+        scheduler.run(catalogJob(work));
+        async
+          ..flushMicrotasks()
+          ..elapse(const Duration(seconds: 6));
+        expect(work.calls, 3);
+        expect(scheduler.statusOf('catalog'), isA<SyncWaitingRetry>());
+
+        scheduler.connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+        expect(work.calls, 4);
+        expect(scheduler.statusOf('catalog'), isA<SyncRevalidated>());
+
+        async.elapse(const Duration(minutes: 1));
+        expect(work.calls, 4);
+      });
+    });
+
+    test('al volver el servicio un trabajo sin presupuesto sigue en pausa', () {
+      fakeAsync((async) {
+        final clock = async.getClock(start);
+        final budget = CallBudget(now: clock.now);
+        final scheduler = schedulerIn(async, budget: budget);
+        serviceDown(scheduler);
+        final slotFrees = start.add(const Duration(minutes: 5));
+        budget.blockUntil(slotFrees);
+        final work = ScriptedWork([
+          CallBudgetExhausted(slotFrees),
+          SyncOutcome.revalidated,
+        ]);
+
+        scheduler.run(catalogJob(work));
+        async.flushMicrotasks();
+        expect(scheduler.statusOf('catalog'), isA<SyncPaused>());
+
+        scheduler.connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+        expect(work.calls, 1);
+
+        async.elapse(const Duration(minutes: 5));
+        expect(work.calls, 2);
+        expect(scheduler.statusOf('catalog'), isA<SyncRevalidated>());
+      });
+    });
+
+    test('las tareas periódicas se detienen y vuelven con el servicio', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.upToDate]);
+        scheduler.runEveryWhileOnline(
+          catalogJob(work),
+          const Duration(seconds: 60),
+        );
+
+        serviceDown(scheduler);
+        async.elapse(const Duration(minutes: 5));
+        expect(work.calls, 0);
+
+        scheduler.connectivityChanged(isOnline: true);
+        async.elapse(const Duration(seconds: 60));
+        expect(work.calls, 1);
+      });
+    });
+
+    test('sin conexión antes del primer estado no reintenta', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final work = ScriptedWork([const ServerError(503)]);
+
+        scheduler.run(catalogJob(work));
+        async
+          ..flushMicrotasks()
+          ..elapse(const Duration(minutes: 5));
+
+        expect(work.calls, 1);
+        expect(store.history.last, 'pending ServerError(503)');
+      });
+    });
+  });
+
   group('cada cierto tiempo mientras haya servicio', () {
     const period = Duration(seconds: 60);
 
@@ -773,6 +1089,57 @@ void main() {
         expect(performs, 1);
         verification.complete(SyncOutcome.upToDate);
         async.flushMicrotasks();
+      });
+    });
+
+    test('una descarga real vuelve a contar el periodo desde ese momento', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.revalidated]);
+        final fullPass = catalogJob(work);
+
+        scheduler.runEveryWhileOnline(fullPass, const Duration(hours: 1));
+        async.elapse(const Duration(minutes: 10));
+        unawaited(scheduler.run(fullPass));
+        async.flushMicrotasks();
+        expect(work.calls, 1);
+
+        async.elapse(const Duration(minutes: 59));
+        expect(work.calls, 1);
+
+        async.elapse(const Duration(minutes: 1));
+        expect(work.calls, 2);
+      });
+    });
+
+    test('una ejecución sin descarga no mueve el periodo', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.upToDate]);
+        final fullPass = catalogJob(work);
+
+        scheduler.runEveryWhileOnline(fullPass, const Duration(hours: 1));
+        async.elapse(const Duration(minutes: 10));
+        unawaited(scheduler.run(fullPass));
+        async.elapse(const Duration(minutes: 50));
+
+        expect(work.calls, 2);
+      });
+    });
+
+    test('una descarga sin conexión no arranca el temporizador', () {
+      fakeAsync((async) {
+        final scheduler = schedulerIn(async);
+        final work = ScriptedWork([SyncOutcome.revalidated]);
+        final fullPass = catalogJob(work);
+
+        scheduler.runEveryWhileOnline(fullPass, const Duration(hours: 1));
+        unawaited(scheduler.run(fullPass));
+        async.elapse(const Duration(hours: 3));
+
+        expect(work.calls, 1);
       });
     });
 

@@ -12,4 +12,6 @@ abstract interface class PokemonDetailRepository {
   Future<void> revalidatePokemonDetail(int pokemonId, {bool force = false});
 
   void stopRevalidatingPokemonDetail(int pokemonId);
+
+  Future<void> saveDetailForOffline(int pokemonId);
 }

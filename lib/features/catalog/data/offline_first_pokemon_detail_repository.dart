@@ -69,6 +69,14 @@ class OfflineFirstPokemonDetailRepository implements PokemonDetailRepository {
     _scheduler.stopRunningOnReconnect(detailSyncKey(pokemonId));
   }
 
+  @override
+  Future<void> saveDetailForOffline(int pokemonId) async {
+    if (!await _syncService.isDetailMissing(pokemonId)) {
+      return;
+    }
+    await _scheduler.runWhenOnline(_syncService.detailJob(pokemonId));
+  }
+
   Future<void> _revalidateDetail(int pokemonId, {required bool force}) async {
     if (!force && !await _syncService.needsDetailDownload(pokemonId)) {
       return;

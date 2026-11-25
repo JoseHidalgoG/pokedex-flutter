@@ -667,6 +667,527 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Generación {number}'**
   String catalogGenerationLabel(String number);
+  /// No description provided for @detailTabInfo.
+  ///
+  /// In es, this message translates to:
+  /// **'Información'**
+  String get detailTabInfo;
+
+  /// No description provided for @detailTabStats.
+  ///
+  /// In es, this message translates to:
+  /// **'Estadísticas'**
+  String get detailTabStats;
+
+  /// No description provided for @detailTabEvolutions.
+  ///
+  /// In es, this message translates to:
+  /// **'Evoluciones'**
+  String get detailTabEvolutions;
+
+  /// No description provided for @detailTabMoves.
+  ///
+  /// In es, this message translates to:
+  /// **'Movimientos'**
+  String get detailTabMoves;
+
+  /// No description provided for @detailTabMatchups.
+  ///
+  /// In es, this message translates to:
+  /// **'Matchups'**
+  String get detailTabMatchups;
+
+  /// No description provided for @detailShowShiny.
+  ///
+  /// In es, this message translates to:
+  /// **'Ver versión shiny'**
+  String get detailShowShiny;
+
+  /// No description provided for @detailShowNormal.
+  ///
+  /// In es, this message translates to:
+  /// **'Ver versión normal'**
+  String get detailShowNormal;
+
+  /// No description provided for @detailShinyUnavailable.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay imagen shiny disponible'**
+  String get detailShinyUnavailable;
+
+  /// No description provided for @detailShare.
+  ///
+  /// In es, this message translates to:
+  /// **'Compartir'**
+  String get detailShare;
+
+  /// No description provided for @detailLoadError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo cargar el detalle'**
+  String get detailLoadError;
+
+  /// No description provided for @detailSectionPending.
+  ///
+  /// In es, this message translates to:
+  /// **'Se descargará con conexión'**
+  String get detailSectionPending;
+
+  /// No description provided for @detailNoData.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin datos'**
+  String get detailNoData;
+
+  /// No description provided for @detailFreshJustNow.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizado desde PokeAPI hace un momento'**
+  String get detailFreshJustNow;
+
+  /// No description provided for @detailFreshMinutesAgo.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizado desde PokeAPI hace {minutes} min'**
+  String detailFreshMinutesAgo(int minutes);
+
+  /// No description provided for @detailFreshHoursAgo.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizado desde PokeAPI hace {hours} h'**
+  String detailFreshHoursAgo(int hours);
+
+  /// No description provided for @detailLocalData.
+  ///
+  /// In es, this message translates to:
+  /// **'Datos locales del {date}'**
+  String detailLocalData(String date);
+
+  /// No description provided for @detailNotStored.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin detalle guardado · se descargará con conexión'**
+  String get detailNotStored;
+
+  /// No description provided for @detailForms.
+  ///
+  /// In es, this message translates to:
+  /// **'Formas'**
+  String get detailForms;
+
+  /// No description provided for @detailHeight.
+  ///
+  /// In es, this message translates to:
+  /// **'Altura'**
+  String get detailHeight;
+
+  /// No description provided for @detailWeight.
+  ///
+  /// In es, this message translates to:
+  /// **'Peso'**
+  String get detailWeight;
+
+  /// No description provided for @detailEggGroups.
+  ///
+  /// In es, this message translates to:
+  /// **'Grupos huevo'**
+  String get detailEggGroups;
+
+  /// No description provided for @detailAbilities.
+  ///
+  /// In es, this message translates to:
+  /// **'Habilidades'**
+  String get detailAbilities;
+
+  /// No description provided for @detailHiddenAbility.
+  ///
+  /// In es, this message translates to:
+  /// **'Oculta'**
+  String get detailHiddenAbility;
+
+  /// No description provided for @detailGames.
+  ///
+  /// In es, this message translates to:
+  /// **'Juegos'**
+  String get detailGames;
+
+  /// No description provided for @detailStatTotal.
+  ///
+  /// In es, this message translates to:
+  /// **'Total'**
+  String get detailStatTotal;
+
+  /// No description provided for @detailNoEvolutions.
+  ///
+  /// In es, this message translates to:
+  /// **'No evoluciona'**
+  String get detailNoEvolutions;
+
+  /// No description provided for @detailMovesOf.
+  ///
+  /// In es, this message translates to:
+  /// **'Movimientos de {versionGroup}'**
+  String detailMovesOf(String versionGroup);
+
+  /// No description provided for @detailMoveLevel.
+  ///
+  /// In es, this message translates to:
+  /// **'Nv. {level}'**
+  String detailMoveLevel(int level);
+
+  /// No description provided for @detailMoveOnEvolution.
+  ///
+  /// In es, this message translates to:
+  /// **'Evo.'**
+  String get detailMoveOnEvolution;
+
+  /// No description provided for @detailSortByLevel.
+  ///
+  /// In es, this message translates to:
+  /// **'Por nivel'**
+  String get detailSortByLevel;
+
+  /// No description provided for @detailSortByName.
+  ///
+  /// In es, this message translates to:
+  /// **'Por nombre'**
+  String get detailSortByName;
+
+  /// No description provided for @detailNoMoves.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin movimientos registrados'**
+  String get detailNoMoves;
+
+  /// No description provided for @detailTypeTablePending.
+  ///
+  /// In es, this message translates to:
+  /// **'Tabla de tipos pendiente'**
+  String get detailTypeTablePending;
+
+  /// No description provided for @detailShareBaseTotal.
+  ///
+  /// In es, this message translates to:
+  /// **'Total base: {total}'**
+  String detailShareBaseTotal(int total);
+
+  /// No description provided for @statHp.
+  ///
+  /// In es, this message translates to:
+  /// **'PS'**
+  String get statHp;
+
+  /// No description provided for @statAttack.
+  ///
+  /// In es, this message translates to:
+  /// **'Ataque'**
+  String get statAttack;
+
+  /// No description provided for @statDefense.
+  ///
+  /// In es, this message translates to:
+  /// **'Defensa'**
+  String get statDefense;
+
+  /// No description provided for @statSpecialAttack.
+  ///
+  /// In es, this message translates to:
+  /// **'At. esp.'**
+  String get statSpecialAttack;
+
+  /// No description provided for @statSpecialDefense.
+  ///
+  /// In es, this message translates to:
+  /// **'Def. esp.'**
+  String get statSpecialDefense;
+
+  /// No description provided for @statSpeed.
+  ///
+  /// In es, this message translates to:
+  /// **'Velocidad'**
+  String get statSpeed;
+
+  /// No description provided for @moveMethodLevelUp.
+  ///
+  /// In es, this message translates to:
+  /// **'Nivel'**
+  String get moveMethodLevelUp;
+
+  /// No description provided for @moveMethodMachine.
+  ///
+  /// In es, this message translates to:
+  /// **'MT'**
+  String get moveMethodMachine;
+
+  /// No description provided for @moveMethodTutor.
+  ///
+  /// In es, this message translates to:
+  /// **'Tutor'**
+  String get moveMethodTutor;
+
+  /// No description provided for @moveMethodEgg.
+  ///
+  /// In es, this message translates to:
+  /// **'Huevo'**
+  String get moveMethodEgg;
+
+  /// No description provided for @eggGroupMonster.
+  ///
+  /// In es, this message translates to:
+  /// **'Monstruo'**
+  String get eggGroupMonster;
+
+  /// No description provided for @eggGroupWater1.
+  ///
+  /// In es, this message translates to:
+  /// **'Agua 1'**
+  String get eggGroupWater1;
+
+  /// No description provided for @eggGroupWater2.
+  ///
+  /// In es, this message translates to:
+  /// **'Agua 2'**
+  String get eggGroupWater2;
+
+  /// No description provided for @eggGroupWater3.
+  ///
+  /// In es, this message translates to:
+  /// **'Agua 3'**
+  String get eggGroupWater3;
+
+  /// No description provided for @eggGroupBug.
+  ///
+  /// In es, this message translates to:
+  /// **'Bicho'**
+  String get eggGroupBug;
+
+  /// No description provided for @eggGroupFlying.
+  ///
+  /// In es, this message translates to:
+  /// **'Volador'**
+  String get eggGroupFlying;
+
+  /// No description provided for @eggGroupField.
+  ///
+  /// In es, this message translates to:
+  /// **'Campo'**
+  String get eggGroupField;
+
+  /// No description provided for @eggGroupFairy.
+  ///
+  /// In es, this message translates to:
+  /// **'Hada'**
+  String get eggGroupFairy;
+
+  /// No description provided for @eggGroupGrass.
+  ///
+  /// In es, this message translates to:
+  /// **'Planta'**
+  String get eggGroupGrass;
+
+  /// No description provided for @eggGroupHumanLike.
+  ///
+  /// In es, this message translates to:
+  /// **'Humanoide'**
+  String get eggGroupHumanLike;
+
+  /// No description provided for @eggGroupMineral.
+  ///
+  /// In es, this message translates to:
+  /// **'Mineral'**
+  String get eggGroupMineral;
+
+  /// No description provided for @eggGroupAmorphous.
+  ///
+  /// In es, this message translates to:
+  /// **'Amorfo'**
+  String get eggGroupAmorphous;
+
+  /// No description provided for @eggGroupDitto.
+  ///
+  /// In es, this message translates to:
+  /// **'Ditto'**
+  String get eggGroupDitto;
+
+  /// No description provided for @eggGroupDragon.
+  ///
+  /// In es, this message translates to:
+  /// **'Dragón'**
+  String get eggGroupDragon;
+
+  /// No description provided for @eggGroupUndiscovered.
+  ///
+  /// In es, this message translates to:
+  /// **'Desconocido'**
+  String get eggGroupUndiscovered;
+
+  /// No description provided for @evolutionLevel.
+  ///
+  /// In es, this message translates to:
+  /// **'Nivel {level}'**
+  String evolutionLevel(int level);
+
+  /// No description provided for @evolutionLevelUp.
+  ///
+  /// In es, this message translates to:
+  /// **'Subir de nivel'**
+  String get evolutionLevelUp;
+
+  /// No description provided for @evolutionTrade.
+  ///
+  /// In es, this message translates to:
+  /// **'Intercambio'**
+  String get evolutionTrade;
+
+  /// No description provided for @evolutionFriendship.
+  ///
+  /// In es, this message translates to:
+  /// **'Amistad'**
+  String get evolutionFriendship;
+
+  /// No description provided for @evolutionHolding.
+  ///
+  /// In es, this message translates to:
+  /// **'con {item} equipado'**
+  String evolutionHolding(String item);
+
+  /// No description provided for @evolutionKnowingMoveType.
+  ///
+  /// In es, this message translates to:
+  /// **'con un movimiento de tipo {type}'**
+  String evolutionKnowingMoveType(String type);
+
+  /// No description provided for @evolutionOther.
+  ///
+  /// In es, this message translates to:
+  /// **'Otro método'**
+  String get evolutionOther;
+
+  /// No description provided for @timeOfDayDay.
+  ///
+  /// In es, this message translates to:
+  /// **'De día'**
+  String get timeOfDayDay;
+
+  /// No description provided for @timeOfDayNight.
+  ///
+  /// In es, this message translates to:
+  /// **'De noche'**
+  String get timeOfDayNight;
+
+  /// No description provided for @timeOfDayDusk.
+  ///
+  /// In es, this message translates to:
+  /// **'Al anochecer'**
+  String get timeOfDayDusk;
+
+  /// No description provided for @matchupQuadrupleWeakness.
+  ///
+  /// In es, this message translates to:
+  /// **'Muy débil · ×4'**
+  String get matchupQuadrupleWeakness;
+
+  /// No description provided for @matchupWeakness.
+  ///
+  /// In es, this message translates to:
+  /// **'Débil · ×2'**
+  String get matchupWeakness;
+
+  /// No description provided for @matchupResistance.
+  ///
+  /// In es, this message translates to:
+  /// **'Resiste · ×0,5'**
+  String get matchupResistance;
+
+  /// No description provided for @matchupDoubleResistance.
+  ///
+  /// In es, this message translates to:
+  /// **'Resiste mucho · ×0,25'**
+  String get matchupDoubleResistance;
+
+  /// No description provided for @matchupImmunity.
+  ///
+  /// In es, this message translates to:
+  /// **'Inmune · ×0'**
+  String get matchupImmunity;
+
+  /// No description provided for @imagesTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Imágenes'**
+  String get imagesTitle;
+
+  /// No description provided for @imagesSavedSize.
+  ///
+  /// In es, this message translates to:
+  /// **'Imágenes guardadas: {size}'**
+  String imagesSavedSize(String size);
+
+  /// No description provided for @imagesSaveAll.
+  ///
+  /// In es, this message translates to:
+  /// **'Guardar imágenes para usar sin conexión'**
+  String get imagesSaveAll;
+
+  /// No description provided for @imagesNeedConnection.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin conexión: conéctate para descargarlas'**
+  String get imagesNeedConnection;
+
+  /// No description provided for @imagesSaveProgress.
+  ///
+  /// In es, this message translates to:
+  /// **'{saved} de {total} guardadas'**
+  String imagesSaveProgress(int saved, int total);
+
+  /// No description provided for @imagesSaveIncomplete.
+  ///
+  /// In es, this message translates to:
+  /// **'{saved} de {total} guardadas · {missing} sin descargar'**
+  String imagesSaveIncomplete(int saved, int total, int missing);
+
+  /// No description provided for @imagesSaveNoCatalog.
+  ///
+  /// In es, this message translates to:
+  /// **'Todavía no hay catálogo guardado'**
+  String get imagesSaveNoCatalog;
+
+  /// No description provided for @imagesSaveFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron guardar las imágenes'**
+  String get imagesSaveFailed;
+
+  /// No description provided for @imagesDelete.
+  ///
+  /// In es, this message translates to:
+  /// **'Borrar imágenes'**
+  String get imagesDelete;
+
+  /// No description provided for @imagesDeleteQuestion.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Borrar las imágenes guardadas?'**
+  String get imagesDeleteQuestion;
+
+  /// No description provided for @imagesDeleteExplanation.
+  ///
+  /// In es, this message translates to:
+  /// **'Se volverán a descargar al verlas con conexión.'**
+  String get imagesDeleteExplanation;
+
+  /// No description provided for @imagesDeleteConfirm.
+  ///
+  /// In es, this message translates to:
+  /// **'Borrar'**
+  String get imagesDeleteConfirm;
+
+  /// No description provided for @imagesDeleteFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron borrar las imágenes'**
+  String get imagesDeleteFailed;
 }
 
 class _AppLocalizationsDelegate

@@ -1,9 +1,6 @@
 import 'package:pokedex_flutter/features/catalog/data/local/catalog_entry.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
-
-String officialArtworkUrlFor(int pokemonId) {
-  return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/$pokemonId.png';
-}
+import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon_artwork.dart';
 
 extension PokemonDtoToCatalogEntry on PokemonDto {
   CatalogEntry toCatalogEntry() {

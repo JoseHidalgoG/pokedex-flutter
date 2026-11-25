@@ -56,6 +56,9 @@ class RecordingPokemonDetailRepository implements PokemonDetailRepository {
   void stopRevalidatingPokemonDetail(int pokemonId) {
     stoppedIds.add(pokemonId);
   }
+
+  @override
+  Future<void> saveDetailForOffline(int pokemonId) async {}
 }
 
 void main() {

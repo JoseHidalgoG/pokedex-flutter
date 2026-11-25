@@ -7,6 +7,7 @@ import 'package:pokedex_flutter/features/connectivity/presentation/connectivity_
 import 'package:pokedex_flutter/features/catalog/data/catalog_data_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/catalog_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/pokemon_detail_providers.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/providers/pokemon_image_providers.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 import 'package:pokedex_flutter/features/settings/presentation/providers/settings_providers.dart';
 import 'package:pokedex_flutter/features/navigation/presentation/screens/main_navigation_screen.dart';
@@ -20,6 +21,9 @@ void main() {
         ),
         pokemonDetailRepositoryProvider.overrideWith(
           (ref) => ref.watch(offlineFirstPokemonDetailRepositoryProvider),
+        ),
+        pokemonImageRepositoryProvider.overrideWith(
+          (ref) => ref.watch(cachedPokemonImageRepositoryProvider),
         ),
       ],
       child: const MainApp(),

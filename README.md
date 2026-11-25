@@ -15,6 +15,7 @@ La aplicación sigue una arquitectura **offline-first**, por lo que los Pokémon
 - **internet_connection_checker_plus:** comprobación de acceso a Internet.
 - **cached_network_image:** almacenamiento temporal de imágenes descargadas.
 - **crypto:** huella SHA-256 de cada Pokémon, para detectar datos alterados en la base local.
+- **share_plus:** compartir un Pokémon como texto desde su detalle.
 - **flutter_test y mocktail:** pruebas automatizadas.
 - **http (solo en pruebas):** `MockClient` detrás de un `HttpLink` real, para comprobar cómo se traducen las respuestas HTTP de PokeAPI a fallos de sincronización.
 
@@ -24,9 +25,21 @@ La aplicación sigue una arquitectura **offline-first**, por lo que los Pokémon
 
 - Visualización del número, nombre, imagen y tipos de cada Pokémon.
 - Paginación del catálogo en grupos de 50 elementos.
-- Pantalla de detalles con información básica del Pokémon.
 - Estados visuales de carga, error y catálogo vacío.
 - Botón para reintentar la sincronización cuando sea necesario.
+
+### Detalle de un Pokémon
+
+- Encabezado con nombre, número, tipos y official-artwork (o el sprite `front_default` si falta), interruptor shiny, favorito y botón para compartir el Pokémon como texto.
+- El encabezado se pinta al instante con los datos del catálogo y se completa cuando llega el detalle guardado.
+- Una línea bajo el nombre dice de cuándo son los datos: «Actualizado desde PokeAPI hace 3 min» solo si el detalle se revalidó en esta sesión; si no, «Datos locales del 10/11 · 09:15», o «Sin detalle guardado · se descargará con conexión».
+- Pestañas:
+  - **Información:** altura, peso, grupos huevo, habilidades (con «Oculta» y el efecto recortado), juegos y selector de formas.
+  - **Estadísticas:** barras con el valor y el porcentaje sobre 255, y el total.
+  - **Evoluciones:** árbol desde la especie base con el trigger de cada paso.
+  - **Movimientos:** los del version group más reciente, por nivel, MT, tutor o huevo, ordenados por nivel o por nombre.
+  - **Matchups:** debilidades, resistencias e inmunidades según la tabla de tipos guardada.
+- Deslizar hacia abajo en cualquier pestaña fuerza la descarga del detalle.
 
 ### Funcionamiento offline-first
 
@@ -49,9 +62,19 @@ Para evitar cambios visuales demasiado frecuentes, el estado de conectividad uti
 
 La aplicación solicita una sincronización al iniciarse y cuando detecta que se ha recuperado la conexión.
 
-El servicio de sincronización descarga el catálogo en lotes de 100 Pokémon y omite la descarga cuando la última pasada completa tiene menos de 1 hora. Con cada Pokémon guarda la huella SHA-256 de sus datos tal como llegaron de PokeAPI.
+El servicio de sincronización descarga el catálogo en lotes de 100 Pokémon y omite la descarga cuando la última pasada completa tiene menos de 1 hora. Mientras hay servicio, repite la pasada cada hora, contada desde la última descarga. Con cada Pokémon guarda la huella SHA-256 de sus datos tal como llegaron de PokeAPI.
 
 Con servicio, la página que se está viendo se revalida aparte: si alguno de sus Pokémon se guardó hace más de 15 minutos, la app los pide de nuevo a PokeAPI en una sola consulta y la lista se actualiza sola. Sin conexión no se hace ninguna llamada, y la revalidación se repite al recuperar la conexión.
+
+El detalle de un Pokémon se pide a PokeAPI en una sola consulta cada vez que se abre con servicio, salvo que se haya descargado hace menos de 5 minutos. Si los datos locales de ese Pokémon fueron alterados, se pide siempre. La tabla de tipos, que la app usa para calcular los matchups, se descarga al iniciar o reconectar si tiene más de 24 horas, o al abrir un detalle si todavía no está guardada.
+
+Cada consulta a PokeAPI queda registrada en la consola de depuración (VS Code o DevTools) con sus variables, su prioridad y su duración, por ejemplo `[pokeapi] PokemonDetail {"id":25} (user) 812 ms`. Las decisiones de la sincronización se registran como `[sync]`.
+
+### Detección y restauración de datos alterados
+
+Con cada Pokémon se guarda una huella SHA-256 de sus datos tal como llegaron de PokeAPI. Al iniciar, al reconectar y cada 60 segundos mientras hay servicio, la app recalcula la huella con los datos locales y la compara con la guardada, sin llamar a PokeAPI.
+
+Si alguien cambió un dato local, por ejemplo con el inspector de Drift en DevTools, la app vuelve a pedir a PokeAPI solo los Pokémon alterados y los guarda en una transacción. La consola muestra cada cambio: `[sync] restauración #25 name: pikachux → pikachu`. Abrir el detalle de un Pokémon alterado también lo restaura. Los favoritos, la trivia, los logros y las preferencias nunca se tocan. Los detalles de la decisión están en el [ADR-0005](docs/adr/0005-deteccion-de-alteraciones-y-restauracion.md).
 
 ### Caché de imágenes
 
@@ -180,6 +203,10 @@ La conectividad se supervisa de forma independiente y permite solicitar una nuev
 - El tiempo de sincronización depende de la conexión y de la disponibilidad de PokéAPI.
 - PokeAPI permite 100 llamadas por hora. La app se detiene en 80 y lleva la cuenta en memoria, así que la cuenta vuelve a cero si se cierra la app, aunque PokeAPI siga contando las llamadas anteriores.
 - Los estados de sincronización guardados en `sync_metadata` no se restauran al reiniciar: la app vuelve a decidir desde cero qué sincronizar.
+- La pestaña de movimientos muestra un solo juego: el version group más reciente que tenga movimientos por nivel, sin contar los juegos Legends salvo que sean los únicos. Para Pikachu es Scarlet/Violet. Los motivos están en el [ADR-0006](docs/adr/0006-preferencia-online-dentro-del-presupuesto.md).
+- Sin conexión, un detalle que nunca se abrió con servicio muestra solo los datos del catálogo (nombre, tipos, imagen, estadísticas, altura y peso) y los matchups, si la tabla de tipos ya está guardada. Las habilidades, los movimientos y las evoluciones se descargan la primera vez que se abre con servicio.
+- Las tablas del detalle (habilidades, movimientos, evoluciones) no tienen huella propia: si se alteran, se corrigen la siguiente vez que el detalle se descarga.
+- Los objetos, juegos, version groups y métodos de evolución poco comunes se muestran con el identificador de PokeAPI en inglés, formateado (por ejemplo `thunder-stone` → «Thunder Stone»), porque la app no descarga sus nombres traducidos. Los tipos, grupos huevo, métodos de aprendizaje, momentos del día y triggers habituales sí están traducidos.
 
 ## Proyecto académico
 

@@ -6,8 +6,8 @@ import 'package:pokedex_flutter/features/catalog/data/remote/move_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_detail_dto.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_detail_dto_mapper.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto.dart';
-import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
 import 'package:pokedex_flutter/features/catalog/data/remote/species_dto.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon_artwork.dart';
 
 import '../../../../fixtures/pokemon_detail_fixture.dart';
 

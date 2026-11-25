@@ -143,6 +143,64 @@ void main() {
     });
   });
 
+  group('guardar para usar sin conexión', () {
+    test('con conexión descarga un detalle que nunca se bajó', () async {
+      scheduler.connectivityChanged(isOnline: true);
+
+      await repository.saveDetailForOffline(25);
+
+      expect(pokeApi.detailRequests, [25]);
+      expect(await database.pokemonDetailDao.readDetailSyncedAt(25), now);
+    });
+
+    test(
+      'un detalle ya descargado no se vuelve a pedir aunque tenga días',
+      () async {
+        await database.pokemonDetailDao.saveDetail(
+          PokemonDetailDto.fromJson(savedPokemonDetailJson('pikachu'))
+              .toDetailEntry(),
+          savedAt: now.subtract(const Duration(days: 3)),
+        );
+        scheduler.connectivityChanged(isOnline: true);
+
+        await repository.saveDetailForOffline(25);
+
+        expect(pokeApi.detailRequests, isEmpty);
+      },
+    );
+
+    test('sin conexión lo descarga en la próxima reconexión y no en las siguientes', () async {
+      await repository.saveDetailForOffline(25);
+      expect(pokeApi.detailRequests, isEmpty);
+
+      scheduler.connectivityChanged(isOnline: true);
+      await revalidated(25);
+      expect(pokeApi.detailRequests, [25]);
+
+      now = now.add(const Duration(minutes: 10));
+      scheduler
+        ..connectivityChanged(isOnline: false)
+        ..connectivityChanged(isOnline: true);
+      await pumpEventQueue();
+
+      expect(pokeApi.detailRequests, [25]);
+    });
+
+    test(
+      'cerrar el detalle sin conexión no cancela lo pedido por el favorito',
+      () async {
+        await repository.revalidatePokemonDetail(25);
+        await repository.saveDetailForOffline(25);
+        repository.stopRevalidatingPokemonDetail(25);
+
+        scheduler.connectivityChanged(isOnline: true);
+        await revalidated(25);
+
+        expect(pokeApi.detailRequests, [25]);
+      },
+    );
+  });
+
   group('lectura local', () {
     test('emite el Pokémon del catálogo sin detalle y después el detalle descargado', () async {
       await database.catalogDao.saveRevalidated(const [
