@@ -8,6 +8,7 @@ import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_service.
 import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_progress.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/repositories/catalog_repository.dart';
+import 'package:pokedex_flutter/features/catalog/domain/entities/catalog_query.dart';
 
 class OfflineFirstCatalogRepository implements CatalogRepository {
   OfflineFirstCatalogRepository({
@@ -38,6 +39,26 @@ class OfflineFirstCatalogRepository implements CatalogRepository {
   @override
   Stream<int> watchCatalogCount() {
     return _catalogDao.watchCatalogCount();
+  }
+
+  @override
+  Stream<List<Pokemon>> watchFilteredCatalogPage({
+    required int page,
+    required int pageSize,
+    required CatalogQuery query,
+  }) {
+    return _catalogDao
+        .watchFilteredCatalogPage(
+          limit: pageSize,
+          offset: page * pageSize,
+          query: query,
+        )
+        .map(_pokemonOf);
+  }
+
+  @override
+  Stream<int> watchFilteredCatalogCount(CatalogQuery query) {
+    return _catalogDao.watchFilteredCatalogCount(query);
   }
 
   @override

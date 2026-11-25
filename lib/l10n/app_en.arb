@@ -199,4 +199,44 @@
   "imagesDeleteConfirm": "Delete",
   "imagesDeleteFailed": "Images could not be deleted"
 
+  "catalogSearchHint": "Search by name or number",
+  "catalogTypeFilter": "Types",
+  "catalogAllTypes": "All types",
+  "catalogSortBy": "Sort by",
+  "catalogSortNumberAsc": "Number (ascending)",
+  "catalogSortNumberDesc": "Number (descending)",
+  "catalogSortNameAsc": "Name (A-Z)",
+  "catalogSortNameDesc": "Name (Z-A)",
+  "catalogSortStatsAsc": "Base stats (low to high)",
+  "catalogSortStatsDesc": "Base stats (high to low)",
+  "catalogNoResults": "No Pokémon found",
+  "catalogNoResultsMessage": "Try another search or change the filters.",
+  "catalogClearFilters": "Clear filters",
+
+  "catalogShowSearch": "Show search",
+  "catalogHideSearch": "Hide search",
+
+  "catalogGenerationFilter": "Generations",
+  "catalogAllGenerations": "All generations",
+  "catalogSelectTypes": "Select types",
+  "catalogSelectGenerations": "Select generations",
+  "catalogApplySelection": "Apply",
+  "catalogCancelSelection": "Cancel",
+  "catalogClearSelection": "Clear selection",
+  "catalogSelectedCount": "Selected: {count}",
+  "@catalogSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "catalogGenerationLabel": "Generation {number}",
+  "@catalogGenerationLabel": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  }
 }
