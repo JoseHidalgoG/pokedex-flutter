@@ -14,7 +14,7 @@ class CatalogQuery {
     Set<int> generations = const {},
     this.sort = CatalogSort.numberAscending,
   }) : types = Set<String>.unmodifiable(types),
-        generations = Set<int>.unmodifiable(generations);
+       generations = Set<int>.unmodifiable(generations);
 
   final String search;
   final Set<String> types;
@@ -36,8 +36,7 @@ class CatalogQuery {
   }
 
   static bool _sameSet<T>(Set<T> first, Set<T> second) {
-    return first.length == second.length &&
-        first.containsAll(second);
+    return first.length == second.length && first.containsAll(second);
   }
 
   @override
