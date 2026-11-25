@@ -272,4 +272,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get catalogClearFilters => 'Clear filters';
+
+  @override
+  String get catalogShowSearch => 'Show search';
+
+  @override
+  String get catalogHideSearch => 'Hide search';
 }

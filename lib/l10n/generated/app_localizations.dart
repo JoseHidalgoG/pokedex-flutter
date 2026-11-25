@@ -601,6 +601,18 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Limpiar filtros'**
   String get catalogClearFilters;
+
+  /// No description provided for @catalogShowSearch.
+  ///
+  /// In es, this message translates to:
+  /// **'Mostrar búsqueda'**
+  String get catalogShowSearch;
+
+  /// No description provided for @catalogHideSearch.
+  ///
+  /// In es, this message translates to:
+  /// **'Ocultar búsqueda'**
+  String get catalogHideSearch;
 }
 
 class _AppLocalizationsDelegate

@@ -13,6 +13,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/screens/pokemon_de
 import 'package:pokedex_flutter/features/favorites/presentation/providers/favorites_providers.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
+
 import '../../../favorites/fakes/fake_favorites_repository.dart';
 
 void main() {
@@ -24,32 +25,35 @@ void main() {
   );
 
   List<Override> catalogOverrides(
-      List<Pokemon> pokemon, {
-        required Stream<SyncStatus> syncStatuses,
-        Stream<int>? counts,
-      }) {
+    List<Pokemon> pokemon, {
+    required Stream<SyncStatus> syncStatuses,
+    Stream<int>? counts,
+  }) {
     return [
       filteredCatalogPageProvider.overrideWith((ref, request) {
         final offset = request.page * request.pageSize;
-        final pagePokemon = pokemon.skip(offset).take(request.pageSize).toList();
+        final pagePokemon = pokemon
+            .skip(offset)
+            .take(request.pageSize)
+            .toList();
 
         return Stream.value(pagePokemon);
       }),
       filteredCatalogCountProvider.overrideWith(
-            (ref, query) => counts ?? Stream.value(pokemon.length),
+        (ref, query) => counts ?? Stream.value(pokemon.length),
       ),
       catalogSyncStatusProvider.overrideWith((ref) => syncStatuses),
       favoritesRepositoryProvider.overrideWith(
-            (ref) => FakeFavoritesRepository(),
+        (ref) => FakeFavoritesRepository(),
       ),
     ];
   }
 
   Future<void> pumpCatalog(
-      WidgetTester tester, {
-        required List<Pokemon> pokemon,
-        SyncStatus syncStatus = const SyncIdle(),
-      }) async {
+    WidgetTester tester, {
+    required List<Pokemon> pokemon,
+    SyncStatus syncStatus = const SyncIdle(),
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: catalogOverrides(
@@ -69,6 +73,23 @@ void main() {
     await tester.pump();
   }
 
+  Future<void> scrollToPagination(WidgetTester tester) async {
+    final paginationFinder = find.byTooltip('Página siguiente');
+
+    await tester.scrollUntilVisible(
+      paginationFinder,
+      400,
+      scrollable: find.descendant(
+        of: find.byType(ListView),
+        matching: find.byType(Scrollable),
+      ),
+      maxScrolls: 100,
+    );
+
+    await tester.ensureVisible(paginationFinder);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('muestra el número, nombre y tipo de un Pokémon', (tester) async {
     await pumpCatalog(tester, pokemon: [pikachu]);
 
@@ -80,10 +101,9 @@ void main() {
   testWidgets('muestra el tipo de Pokémon en inglés', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: catalogOverrides(
-          [pikachu],
-          syncStatuses: Stream.value(const SyncIdle()),
-        ),
+        overrides: catalogOverrides([
+          pikachu,
+        ], syncStatuses: Stream.value(const SyncIdle())),
         child: const MaterialApp(
           locale: Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -102,8 +122,8 @@ void main() {
   });
 
   testWidgets('muestra un indicador cuando el catálogo está sincronizando', (
-      tester,
-      ) async {
+    tester,
+  ) async {
     await pumpCatalog(
       tester,
       pokemon: [],
@@ -115,8 +135,8 @@ void main() {
   });
 
   testWidgets('sigue cargando mientras espera un reintento sin datos', (
-      tester,
-      ) async {
+    tester,
+  ) async {
     await pumpCatalog(
       tester,
       pokemon: [],
@@ -134,7 +154,7 @@ void main() {
 
   testWidgets(
     'muestra un error cuando no hay datos y falla la sincronización',
-        (tester) async {
+    (tester) async {
       await pumpCatalog(
         tester,
         pokemon: [],
@@ -157,7 +177,7 @@ void main() {
   testWidgets('permite navegar entre dos páginas del catálogo', (tester) async {
     final pokemon = List.generate(
       51,
-          (index) => Pokemon(
+      (index) => Pokemon(
         id: index + 1,
         name: 'pokemon${index + 1}',
         imageUrl: '',
@@ -169,6 +189,10 @@ void main() {
 
     expect(find.text('#0001'), findsOneWidget);
     expect(find.text('Pokemon1'), findsOneWidget);
+
+    expect(find.byTooltip('Página siguiente'), findsNothing);
+
+    await scrollToPagination(tester);
 
     final previousButton = tester.widget<IconButton>(
       find.widgetWithIcon(IconButton, Icons.chevron_left),
@@ -183,6 +207,8 @@ void main() {
     expect(find.text('#0051'), findsOneWidget);
     expect(find.text('Pokemon51'), findsOneWidget);
 
+    await scrollToPagination(tester);
+
     final nextButton = tester.widget<IconButton>(
       find.widgetWithIcon(IconButton, Icons.chevron_right),
     );
@@ -193,20 +219,24 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    // Al regresar, debe mostrarse el inicio de la primera página.
     expect(find.text('#0001'), findsOneWidget);
+    expect(find.text('Pokemon1'), findsOneWidget);
   });
 
   testWidgets(
     'la paginación cabe en un teléfono estrecho con el catálogo completo',
-        (tester) async {
+    (tester) async {
       const narrowPhoneWidth = 360.0;
+
       tester.view.devicePixelRatio = 3;
       tester.view.physicalSize = const Size(narrowPhoneWidth * 3, 740 * 3);
+
       addTearDown(tester.view.reset);
 
       final fullCatalog = List.generate(
         1025,
-            (index) => Pokemon(
+        (index) => Pokemon(
           id: index + 1,
           name: 'pokemon${index + 1}',
           imageUrl: '',
@@ -216,9 +246,20 @@ void main() {
 
       await pumpCatalog(tester, pokemon: fullCatalog);
 
+      await scrollToPagination(tester);
+
       final nextPageButton = tester.getRect(find.byTooltip('Página siguiente'));
+
+      final previousPageButton = tester.getRect(
+        find.byTooltip('Página anterior'),
+      );
+
       expect(nextPageButton.right, lessThanOrEqualTo(narrowPhoneWidth));
+
+      expect(previousPageButton.left, greaterThanOrEqualTo(0));
+
       expect(find.text('1'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -235,8 +276,8 @@ void main() {
   });
 
   testWidgets('conserva los Pokémon visibles cuando falla la sincronización', (
-      tester,
-      ) async {
+    tester,
+  ) async {
     await pumpCatalog(
       tester,
       pokemon: [pikachu],
@@ -256,16 +297,15 @@ void main() {
 
   testWidgets(
     'avisa con un SnackBar cuando falla una sincronización sobre la lista visible',
-        (tester) async {
+    (tester) async {
       final syncStatusController = StreamController<SyncStatus>();
       addTearDown(syncStatusController.close);
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: catalogOverrides(
-            [pikachu],
-            syncStatuses: syncStatusController.stream,
-          ),
+          overrides: catalogOverrides([
+            pikachu,
+          ], syncStatuses: syncStatusController.stream),
           child: const MaterialApp(
             locale: Locale('es'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -297,11 +337,11 @@ void main() {
   );
 
   testWidgets('regresa a una página válida cuando disminuye el catálogo', (
-      tester,
-      ) async {
+    tester,
+  ) async {
     final pokemon = List.generate(
       51,
-          (index) => Pokemon(
+      (index) => Pokemon(
         id: index + 1,
         name: 'pokemon${index + 1}',
         imageUrl: '',
@@ -329,21 +369,26 @@ void main() {
     );
 
     countController.add(51);
+
     await tester.pump();
     await tester.pump();
 
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.chevron_right));
+    await scrollToPagination(tester);
+
+    await tester.tap(find.byTooltip('Página siguiente'));
     await tester.pump();
     await tester.pump();
 
     expect(find.text('#0051'), findsOneWidget);
 
     countController.add(25);
+
     await tester.pump();
     await tester.pump();
     await tester.pump();
 
     expect(find.text('#0001'), findsOneWidget);
     expect(find.text('#0051'), findsNothing);
+    expect(find.byTooltip('Página siguiente'), findsNothing);
   });
 }

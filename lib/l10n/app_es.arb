@@ -117,5 +117,8 @@
   "catalogSortStatsDesc": "Estadísticas base (mayor a menor)",
   "catalogNoResults": "No se encontraron Pokémon",
   "catalogNoResultsMessage": "Prueba con otra búsqueda o cambia los filtros.",
-  "catalogClearFilters": "Limpiar filtros"
+  "catalogClearFilters": "Limpiar filtros",
+
+  "catalogShowSearch": "Mostrar búsqueda",
+  "catalogHideSearch": "Ocultar búsqueda"
 }
