@@ -246,6 +246,50 @@
   "matchupWeakness": "Débil · ×2",
   "matchupResistance": "Resiste · ×0,5",
   "matchupDoubleResistance": "Resiste mucho · ×0,25",
-  "matchupImmunity": "Inmune · ×0"
+  "matchupImmunity": "Inmune · ×0",
+
+  "imagesTitle": "Imágenes",
+  "imagesSavedSize": "Imágenes guardadas: {size}",
+  "@imagesSavedSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "imagesSaveAll": "Guardar imágenes para usar sin conexión",
+  "imagesNeedConnection": "Sin conexión: conéctate para descargarlas",
+  "imagesSaveProgress": "{saved} de {total} guardadas",
+  "@imagesSaveProgress": {
+    "placeholders": {
+      "saved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imagesSaveIncomplete": "{saved} de {total} guardadas · {missing} sin descargar",
+  "@imagesSaveIncomplete": {
+    "placeholders": {
+      "saved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "missing": {
+        "type": "int"
+      }
+    }
+  },
+  "imagesSaveNoCatalog": "Todavía no hay catálogo guardado",
+  "imagesSaveFailed": "No se pudieron guardar las imágenes",
+  "imagesDelete": "Borrar imágenes",
+  "imagesDeleteQuestion": "¿Borrar las imágenes guardadas?",
+  "imagesDeleteExplanation": "Se volverán a descargar al verlas con conexión.",
+  "imagesDeleteConfirm": "Borrar",
+  "imagesDeleteFailed": "No se pudieron borrar las imágenes"
 
 }

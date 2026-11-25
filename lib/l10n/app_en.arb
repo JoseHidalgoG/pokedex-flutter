@@ -183,6 +183,20 @@
   "matchupWeakness": "Weak · ×2",
   "matchupResistance": "Resists · ×0.5",
   "matchupDoubleResistance": "Strongly resists · ×0.25",
-  "matchupImmunity": "Immune · ×0"
+  "matchupImmunity": "Immune · ×0",
+
+  "imagesTitle": "Images",
+  "imagesSavedSize": "Saved images: {size}",
+  "imagesSaveAll": "Save images for offline use",
+  "imagesNeedConnection": "Offline: connect to download them",
+  "imagesSaveProgress": "{saved} of {total} saved",
+  "imagesSaveIncomplete": "{saved} of {total} saved · {missing} not downloaded",
+  "imagesSaveNoCatalog": "No catalog saved yet",
+  "imagesSaveFailed": "Images could not be saved",
+  "imagesDelete": "Delete images",
+  "imagesDeleteQuestion": "Delete saved images?",
+  "imagesDeleteExplanation": "They will download again when viewed online.",
+  "imagesDeleteConfirm": "Delete",
+  "imagesDeleteFailed": "Images could not be deleted"
 
 }

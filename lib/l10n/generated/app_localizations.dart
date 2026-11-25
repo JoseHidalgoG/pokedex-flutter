@@ -967,6 +967,84 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Inmune · ×0'**
   String get matchupImmunity;
+
+  /// No description provided for @imagesTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Imágenes'**
+  String get imagesTitle;
+
+  /// No description provided for @imagesSavedSize.
+  ///
+  /// In es, this message translates to:
+  /// **'Imágenes guardadas: {size}'**
+  String imagesSavedSize(String size);
+
+  /// No description provided for @imagesSaveAll.
+  ///
+  /// In es, this message translates to:
+  /// **'Guardar imágenes para usar sin conexión'**
+  String get imagesSaveAll;
+
+  /// No description provided for @imagesNeedConnection.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin conexión: conéctate para descargarlas'**
+  String get imagesNeedConnection;
+
+  /// No description provided for @imagesSaveProgress.
+  ///
+  /// In es, this message translates to:
+  /// **'{saved} de {total} guardadas'**
+  String imagesSaveProgress(int saved, int total);
+
+  /// No description provided for @imagesSaveIncomplete.
+  ///
+  /// In es, this message translates to:
+  /// **'{saved} de {total} guardadas · {missing} sin descargar'**
+  String imagesSaveIncomplete(int saved, int total, int missing);
+
+  /// No description provided for @imagesSaveNoCatalog.
+  ///
+  /// In es, this message translates to:
+  /// **'Todavía no hay catálogo guardado'**
+  String get imagesSaveNoCatalog;
+
+  /// No description provided for @imagesSaveFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron guardar las imágenes'**
+  String get imagesSaveFailed;
+
+  /// No description provided for @imagesDelete.
+  ///
+  /// In es, this message translates to:
+  /// **'Borrar imágenes'**
+  String get imagesDelete;
+
+  /// No description provided for @imagesDeleteQuestion.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Borrar las imágenes guardadas?'**
+  String get imagesDeleteQuestion;
+
+  /// No description provided for @imagesDeleteExplanation.
+  ///
+  /// In es, this message translates to:
+  /// **'Se volverán a descargar al verlas con conexión.'**
+  String get imagesDeleteExplanation;
+
+  /// No description provided for @imagesDeleteConfirm.
+  ///
+  /// In es, this message translates to:
+  /// **'Borrar'**
+  String get imagesDeleteConfirm;
+
+  /// No description provided for @imagesDeleteFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron borrar las imágenes'**
+  String get imagesDeleteFailed;
 }
 
 class _AppLocalizationsDelegate
