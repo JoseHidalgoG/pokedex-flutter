@@ -86,7 +86,7 @@ class InMemoryCatalogRepository implements CatalogRepository {
           search.isEmpty ||
           (searchedId != null
               ? pokemon.id == searchedId
-              : pokemon.name.toLowerCase().contains(search));
+              : pokemon.name.toLowerCase().startsWith(search));
 
       final matchesType =
           query.types.isEmpty || pokemon.typeNames.any(query.types.contains);

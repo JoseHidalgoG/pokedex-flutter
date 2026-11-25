@@ -917,10 +917,18 @@ void main() {
         expect(idsOf(entries), [25]);
       });
 
-      test('encuentra Pokémon por una parte de su nombre', () async {
-        final entries = await filteredPage(query: CatalogQuery(search: 'saur'));
+      test('encuentra Pokémon por el prefijo de su nombre', () async {
+        final entries = await filteredPage(query: CatalogQuery(search: 'bul'));
 
-        expect(idsOf(entries), [1, 2]);
+        expect(idsOf(entries), [1]);
+      });
+
+      test('rechaza coincidencias al final o en medio del nombre', () async {
+        for (final search in ['saur', 'ka', 'chu']) {
+          final query = CatalogQuery(search: search);
+          expect(await filteredPage(query: query), isEmpty);
+          expect(await catalogDao.watchFilteredCatalogCount(query).first, 0);
+        }
       });
 
       test('la búsqueda no distingue mayúsculas y minúsculas', () async {
@@ -1208,22 +1216,22 @@ void main() {
     group('combinación de criterios', () {
       test('combina búsqueda por nombre y tipo', () async {
         final entries = await filteredPage(
-          query: CatalogQuery(search: 'saur', types: {'grass'}),
+          query: CatalogQuery(search: 'bul', types: {'grass'}),
         );
 
-        expect(idsOf(entries), [1, 2]);
+        expect(idsOf(entries), [1]);
       });
 
       test('combina búsqueda, tipo y ordenamiento', () async {
         final entries = await filteredPage(
           query: CatalogQuery(
-            search: 'saur',
+            search: 'bul',
             types: {'poison'},
             sort: CatalogSort.numberDescending,
           ),
         );
 
-        expect(idsOf(entries), [2, 1]);
+        expect(idsOf(entries), [1]);
       });
 
       test('combina búsqueda numérica y tipo', () async {
@@ -1350,10 +1358,10 @@ void main() {
     group('conteo filtrado', () {
       test('cuenta únicamente los resultados de la búsqueda', () async {
         final count = await catalogDao
-            .watchFilteredCatalogCount(CatalogQuery(search: 'saur'))
+            .watchFilteredCatalogCount(CatalogQuery(search: 'bul'))
             .first;
 
-        expect(count, 2);
+        expect(count, 1);
       });
 
       test('cuenta correctamente una búsqueda numérica', () async {
@@ -1367,11 +1375,11 @@ void main() {
       test('combina búsqueda y tipo en el conteo', () async {
         final count = await catalogDao
             .watchFilteredCatalogCount(
-              CatalogQuery(search: 'saur', types: {'poison'}),
+              CatalogQuery(search: 'bul', types: {'poison'}),
             )
             .first;
 
-        expect(count, 2);
+        expect(count, 1);
       });
 
       test('devuelve cero cuando no existen coincidencias', () async {

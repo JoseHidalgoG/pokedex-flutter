@@ -573,7 +573,7 @@ void main() {
       await saveFilteredTestCatalog();
 
       final query = CatalogQuery(
-        search: 'saur',
+        search: 'bul',
         types: {'poison'},
         sort: CatalogSort.numberDescending,
       );
@@ -582,8 +582,8 @@ void main() {
 
       final count = await repository.watchFilteredCatalogCount(query).first;
 
-      expect(idsOf(entries), [2, 1]);
-      expect(count, 2);
+      expect(idsOf(entries), [1]);
+      expect(count, 1);
       expectNoRemoteRequests();
     });
 
@@ -777,11 +777,21 @@ void main() {
     });
 
     test('transmite la búsqueda por nombre al DAO', () async {
-      final entries = await filteredPage(query: CatalogQuery(search: 'SAUR'));
+      final entries = await filteredPage(query: CatalogQuery(search: 'BUL'));
 
-      expect(idsOf(entries), [1, 2]);
+      expect(idsOf(entries), [1]);
       expectNoRemoteRequests();
     });
+
+    test(
+      'rechaza coincidencias internas del nombre sin consultar la red',
+      () async {
+        final query = CatalogQuery(search: 'saur');
+        expect(await filteredPage(query: query), isEmpty);
+        expect(await repository.watchFilteredCatalogCount(query).first, 0);
+        expectNoRemoteRequests();
+      },
+    );
 
     test('transmite la búsqueda numérica al DAO', () async {
       final entries = await filteredPage(query: CatalogQuery(search: '25'));
@@ -820,13 +830,13 @@ void main() {
     test('transmite todos los criterios de una consulta combinada', () async {
       final entries = await filteredPage(
         query: CatalogQuery(
-          search: 'saur',
+          search: 'bul',
           types: {'poison'},
           sort: CatalogSort.numberDescending,
         ),
       );
 
-      expect(idsOf(entries), [2, 1]);
+      expect(idsOf(entries), [1]);
       expectNoRemoteRequests();
     });
 
@@ -895,10 +905,10 @@ void main() {
 
     test('devuelve el conteo correspondiente a una búsqueda', () async {
       final count = await repository
-          .watchFilteredCatalogCount(CatalogQuery(search: 'saur'))
+          .watchFilteredCatalogCount(CatalogQuery(search: 'bul'))
           .first;
 
-      expect(count, 2);
+      expect(count, 1);
       expectNoRemoteRequests();
     });
 
@@ -953,7 +963,7 @@ void main() {
             .watchFilteredCatalogPage(
               page: 0,
               pageSize: 50,
-              query: CatalogQuery(search: 'saur'),
+              query: CatalogQuery(search: 'bul'),
             )
             .map(idsOf),
       );
@@ -964,7 +974,7 @@ void main() {
 
       await saveFilteredTestCatalog();
 
-      expect(await updates.next, [1, 2]);
+      expect(await updates.next, [1]);
       expectNoRemoteRequests();
     });
 

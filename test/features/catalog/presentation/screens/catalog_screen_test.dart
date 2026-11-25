@@ -119,7 +119,7 @@ void main() {
           search.isEmpty ||
           (searchedId != null
               ? item.id == searchedId
-              : item.name.toLowerCase().contains(search));
+              : item.name.toLowerCase().startsWith(search));
 
       final matchesType =
           query.types.isEmpty || item.typeNames.any(query.types.contains);
@@ -822,13 +822,21 @@ void main() {
       expect(find.text('Raichu'), findsNothing);
     });
 
-    testWidgets('permite buscar por una parte del nombre', (tester) async {
+    testWidgets('permite buscar por el prefijo del nombre', (tester) async {
       await pumpCatalog(tester, pokemon: testCatalog);
       await showFilters(tester);
 
-      await searchFor(tester, 'chu');
+      await searchFor(tester, 'pika');
 
-      expect(visiblePokemonIds(tester), [25, 26]);
+      expect(visiblePokemonIds(tester), [25]);
+    });
+
+    testWidgets('no muestra coincidencias internas del nombre', (tester) async {
+      await pumpCatalog(tester, pokemon: testCatalog);
+      await showFilters(tester);
+      await searchFor(tester, 'chu');
+      expect(visiblePokemonIds(tester), isEmpty);
+      expect(find.text(catalogL10n(tester).catalogNoResults), findsOneWidget);
     });
 
     testWidgets('permite buscar utilizando el número del Pokémon', (
@@ -896,10 +904,10 @@ void main() {
       );
 
       await showFilters(tester);
-      await searchFor(tester, 'chu');
+      await searchFor(tester, 'pika');
 
       expect(pageRequests.last.query, countRequests.last);
-      expect(countRequests.last.search, 'chu');
+      expect(countRequests.last.search, 'pika');
       expect(pageRequests.last.page, 0);
       expect(pageRequests.last.pageSize, 50);
     });
@@ -1168,15 +1176,15 @@ void main() {
       await pumpCatalog(tester, pokemon: testCatalog, pageRequests: requests);
 
       await showFilters(tester);
-      await searchFor(tester, 'chu');
+      await searchFor(tester, 'pika');
 
       await selectType(tester, catalogL10n(tester).pokemonTypeElectric);
 
-      expect(visiblePokemonIds(tester), [25, 26]);
+      expect(visiblePokemonIds(tester), [25]);
 
       expect(
         requests.last.query,
-        CatalogQuery(search: 'chu', types: {'electric'}),
+        CatalogQuery(search: 'pika', types: {'electric'}),
       );
     });
 
@@ -1186,18 +1194,18 @@ void main() {
       await pumpCatalog(tester, pokemon: testCatalog, pageRequests: requests);
 
       await showFilters(tester);
-      await searchFor(tester, 'chu');
+      await searchFor(tester, 'pika');
 
       await selectType(tester, catalogL10n(tester).pokemonTypeElectric);
 
       await selectSort(tester, catalogL10n(tester).catalogSortNumberDesc);
 
-      expect(visiblePokemonIds(tester), [26, 25]);
+      expect(visiblePokemonIds(tester), [25]);
 
       expect(
         requests.last.query,
         CatalogQuery(
-          search: 'chu',
+          search: 'pika',
           types: {'electric'},
           sort: CatalogSort.numberDescending,
         ),
@@ -1225,15 +1233,15 @@ void main() {
       await pumpCatalog(tester, pokemon: testCatalog, pageRequests: requests);
 
       await showFilters(tester);
-      await searchFor(tester, 'chu');
+      await searchFor(tester, 'pika');
 
       await selectType(tester, catalogL10n(tester).pokemonTypeElectric);
 
       await selectType(tester, catalogL10n(tester).catalogAllTypes);
 
-      expect(requests.last.query.search, 'chu');
+      expect(requests.last.query.search, 'pika');
       expect(requests.last.query.types, isEmpty);
-      expect(visiblePokemonIds(tester), [25, 26]);
+      expect(visiblePokemonIds(tester), [25]);
     });
 
     testWidgets('ocultar los filtros conserva los resultados filtrados', (
@@ -1254,7 +1262,7 @@ void main() {
     ) async {
       await pumpCatalog(tester, pokemon: testCatalog);
       await showFilters(tester);
-      await searchFor(tester, 'chu');
+      await searchFor(tester, 'pika');
 
       await selectType(tester, catalogL10n(tester).pokemonTypeElectric);
 
@@ -1267,11 +1275,11 @@ void main() {
         find.byType(CatalogFilterBar),
       );
 
-      expect(filterBar.searchController.text, 'chu');
+      expect(filterBar.searchController.text, 'pika');
       expect(filterBar.selectedTypes, {'electric'});
       expect(filterBar.selectedSort, CatalogSort.numberDescending);
 
-      expect(visiblePokemonIds(tester), [26, 25]);
+      expect(visiblePokemonIds(tester), [25]);
     });
   });
 
@@ -2213,7 +2221,7 @@ void main() {
     ) async {
       final initial = CatalogQueryState(
         query: CatalogQuery(
-          search: 'chu',
+          search: 'pika',
           types: {'electric'},
           generations: {1},
           sort: CatalogSort.numberDescending,
@@ -2229,12 +2237,12 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(requests.single.query, initial.query);
-      expect(visiblePokemonIds(tester), [26, 25]);
+      expect(visiblePokemonIds(tester), [25]);
       await showFilters(tester);
       final bar = tester.widget<CatalogFilterBar>(
         find.byType(CatalogFilterBar),
       );
-      expect(bar.searchController.text, 'chu');
+      expect(bar.searchController.text, 'pika');
       expect(bar.selectedTypes, {'electric'});
       expect(bar.selectedGenerations, {1});
       expect(bar.selectedSort, CatalogSort.numberDescending);
@@ -2250,7 +2258,7 @@ void main() {
         queryRepository: repository,
       );
       await showFilters(tester);
-      await searchFor(tester, 'chu');
+      await searchFor(tester, 'pika');
       await selectType(tester, catalogL10n(tester).pokemonTypeElectric);
       await selectMultiple<int>(
         tester,
@@ -2262,7 +2270,7 @@ void main() {
       expect(
         saved.query,
         CatalogQuery(
-          search: 'chu',
+          search: 'pika',
           types: {'electric'},
           generations: {1},
           sort: CatalogSort.numberDescending,
@@ -2276,7 +2284,7 @@ void main() {
         queryRepository: repository,
       );
       await tester.pumpAndSettle();
-      expect(visiblePokemonIds(tester), [26, 25]);
+      expect(visiblePokemonIds(tester), [25]);
       expect(repository.loadCalls, 2);
     });
     testWidgets('restaura una segunda pagina', (tester) async {

@@ -386,7 +386,7 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
 
         condition =
             condition &
-            pokemonTable.name.like('%$escapedSearch%', escapeChar: r'\');
+            pokemonTable.name.like('$escapedSearch%', escapeChar: r'\');
       }
     }
 
