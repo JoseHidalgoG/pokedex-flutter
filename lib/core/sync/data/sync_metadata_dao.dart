@@ -31,6 +31,25 @@ class SyncMetadataDao extends DatabaseAccessor<AppDatabase>
     return row.getSingleOrNull();
   }
 
+  Future<List<SyncMetadataRow>> takeInterruptedSyncs() {
+    final inProgress = StoredSyncStatus.inProgress.columnValue;
+    return transaction(() async {
+      final interrupted =
+          await (select(syncMetadataTable)
+                ..where((metadata) => metadata.status.equals(inProgress))
+                ..orderBy([(metadata) => OrderingTerm.asc(metadata.key)]))
+              .get();
+      await (update(
+        syncMetadataTable,
+      )..where((metadata) => metadata.status.equals(inProgress))).write(
+        SyncMetadataTableCompanion(
+          status: Value(StoredSyncStatus.pending.columnValue),
+        ),
+      );
+      return interrupted;
+    });
+  }
+
   @override
   Future<void> recordStarted(String key) {
     return _upsert(

@@ -1,6 +1,7 @@
 import 'dart:developer' as developer;
 
 import 'package:pokedex_flutter/core/database/app_database.dart';
+import 'package:pokedex_flutter/core/network/logging_link.dart';
 import 'package:pokedex_flutter/core/sync/data/sync_failure_translator.dart';
 import 'package:pokedex_flutter/core/sync/domain/call_budget.dart';
 import 'package:pokedex_flutter/core/sync/domain/sync_job.dart';
@@ -13,16 +14,26 @@ import 'package:pokedex_flutter/features/catalog/data/remote/catalog_remote_data
 import 'package:pokedex_flutter/features/catalog/data/remote/pokemon_dto_mapper.dart';
 import 'package:pokedex_flutter/features/catalog/data/sync/catalog_sync_constants.dart';
 
+String catalogProgressText(int savedCount, int? totalCount) {
+  return totalCount == null ? '$savedCount' : '$savedCount de $totalCount';
+}
+
+void _writeToSyncLog(String message) {
+  developer.log(message, name: 'sync');
+}
+
 class CatalogSyncService {
   CatalogSyncService({
     required this._remoteDataSource,
     required this._catalogDao,
     this._now = DateTime.now,
+    this._write = _writeToSyncLog,
   });
 
   final CatalogRemoteDataSource _remoteDataSource;
   final CatalogDao _catalogDao;
   final DateTime Function() _now;
+  final LogWriter _write;
 
   SyncJob fullPassJob({bool force = false}) {
     return SyncJob(
@@ -101,6 +112,12 @@ class CatalogSyncService {
   Future<void> _downloadBatchesAfter(SyncMetadataRow? progress) async {
     var nextOffset = _startOffsetFor(progress);
     var totalCount = nextOffset == 0 ? null : progress?.totalCount;
+    if (nextOffset > 0) {
+      _write(
+        '${CatalogDao.catalogSyncKey}: se reanuda desde '
+        '${catalogProgressText(nextOffset, totalCount)}',
+      );
+    }
     var isComplete = false;
     while (!isComplete) {
       final batch = await _remoteDataSource.fetchCatalogPage(
@@ -142,11 +159,10 @@ class CatalogSyncService {
     if (differentIds.isEmpty) {
       return;
     }
-    developer.log(
+    _write(
       'pasada completa: huella distinta en '
       '${[for (final id in differentIds) '#$id'].join(', ')}; '
       'se guarda lo de PokeAPI',
-      name: 'sync',
     );
   }
 

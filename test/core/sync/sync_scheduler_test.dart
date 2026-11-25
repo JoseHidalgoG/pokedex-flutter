@@ -57,6 +57,13 @@ class RecordingSyncStateStore implements SyncStateStore {
   }) async => history.add('failed $attempt $failure');
 }
 
+class SuccessNotSavedStore extends RecordingSyncStateStore {
+  @override
+  Future<void> recordSucceeded(String key) async {
+    throw StateError('disco lleno');
+  }
+}
+
 class ScriptedWork {
   ScriptedWork(this._results);
 
@@ -473,6 +480,36 @@ void main() {
 
         expect(work.calls, 1);
         expect(store.history.last, startsWith('failed 0'));
+      });
+    });
+
+    test('un error inesperado queda failed, sin dejar in_progress, y vuelve a correr al reconectar', () {
+      fakeAsync((async) {
+        store = SuccessNotSavedStore();
+        final scheduler = schedulerIn(async)
+          ..connectivityChanged(isOnline: true);
+        final work = ScriptedWork([SyncOutcome.revalidated]);
+        const failure = QueryError('Bad state: disco lleno');
+
+        scheduler.run(catalogJob(work));
+        async.flushMicrotasks();
+
+        expect(store.history, ['in_progress', 'failed 0 $failure']);
+        expect(
+          scheduler.statusOf('catalog'),
+          isA<SyncFailed>().having(
+            (status) => status.failure,
+            'failure',
+            failure,
+          ),
+        );
+
+        scheduler
+          ..connectivityChanged(isOnline: false)
+          ..connectivityChanged(isOnline: true);
+        async.flushMicrotasks();
+
+        expect(work.calls, 2);
       });
     });
 
