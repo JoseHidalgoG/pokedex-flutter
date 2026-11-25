@@ -42,9 +42,12 @@ class SyncScheduler {
   final _lastRevalidations = <String, DateTime>{};
   final _statusChanges = StreamController<SyncStatusChange>.broadcast();
   var _isOnline = false;
+  var _hasNetwork = false;
   var _isDisposed = false;
 
   bool get isOnline => _isOnline;
+
+  bool get hasNetwork => _hasNetwork;
 
   SyncStatus statusOf(String key) => _statuses[key] ?? const SyncIdle();
 
@@ -113,15 +116,20 @@ class SyncScheduler {
     }
   }
 
-  void connectivityChanged({required bool isOnline}) {
+  void connectivityChanged({required bool isOnline, bool? hasNetwork}) {
     final cameOnline = isOnline && !_isOnline;
     _isOnline = isOnline;
+    _hasNetwork = isOnline || (hasNetwork ?? false);
     if (cameOnline) {
       _runJobsAfterReconnect();
       _periodicJobs.keys.forEach(_startPeriodicTimer);
-    } else if (!isOnline) {
-      _holdScheduledJobsUntilReconnect();
+      return;
+    }
+    if (!_isOnline) {
       _cancelPeriodicTimers();
+    }
+    if (!_hasNetwork) {
+      _holdScheduledJobsUntilReconnect();
     }
   }
 
@@ -155,12 +163,25 @@ class SyncScheduler {
       ..._jobsOnEachReconnect,
       ..._jobsWhenOnline,
       ..._jobsForNextReconnect,
+      ..._takeRetriesTheBudgetAllowsNow(),
     };
     _jobsWhenOnline.clear();
     _jobsForNextReconnect.clear();
     for (final job in jobs.values) {
       unawaited(run(job));
     }
+  }
+
+  Map<String, SyncJob> _takeRetriesTheBudgetAllowsNow() {
+    final retries = {
+      for (final MapEntry(:key, value: job) in _scheduledJobs.entries)
+        if (_budget.nextSlotAt(job.priority) == null) key: job,
+    };
+    for (final key in retries.keys) {
+      _scheduledStarts.remove(key)?.cancel();
+      _scheduledJobs.remove(key);
+    }
+    return retries;
   }
 
   void _holdScheduledJobsUntilReconnect() {
@@ -252,7 +273,7 @@ class SyncScheduler {
     final isWorthRetrying = failure.isRetryable || failure is NoConnection;
     if (!isWorthRetrying) {
       await _fail(job, failure, attempt: retriesSoFar);
-    } else if (!_isOnline) {
+    } else if (!_hasNetwork) {
       await _waitForReconnect(job, failure);
     } else {
       await _retryLater(job, failure, retriesSoFar: retriesSoFar);
@@ -303,7 +324,7 @@ class SyncScheduler {
     DateTime until, {
     required int retriesSoFar,
   }) async {
-    if (!_isOnline) {
+    if (!_hasNetwork) {
       await _waitForReconnect(job, CallBudgetExhausted(until));
       return;
     }
