@@ -8,6 +8,7 @@ La app sigue una arquitectura por capas dentro de cada funcionalidad: `presentat
 - [ADR-0004: Reintentos con backoff, presupuesto de llamadas y una sola sincronización por recurso](adr/0004-reintentos-presupuesto-y-una-sincronizacion-por-recurso.md)
 - [ADR-0005: Detección de alteraciones por huella y restauración desde PokeAPI](adr/0005-deteccion-de-alteraciones-y-restauracion.md)
 - [ADR-0006: Preferencia online dentro del presupuesto](adr/0006-preferencia-online-dentro-del-presupuesto.md)
+- [ADR-0007: Caché de imágenes propia y acotada](adr/0007-cache-de-imagenes-propia-y-acotada.md)
 
 ## Estructura de carpetas
 
@@ -16,26 +17,35 @@ lib/
   main.dart        arranque, MainApp y SyncLifecycle
   core/
     database/      AppDatabase y su provider
-    network/       cliente GraphQL de PokeAPI, LoggingLink, CallBudgetLink y su provider
+    images/        PokemonImageCache, la caché de imágenes propia, y sus providers
+    network/       cliente GraphQL de PokeAPI, LoggingLink, CallBudgetLink,
+                   simulación de caída (SimulatedOutageHttpClient) y sus providers
+    preferences/   contrato PreferencesStore sobre user_preferences
     share/         provider para compartir texto con share_plus
     sync/          SyncScheduler y sus providers
       domain/      SyncFailure, SyncStatus, SyncJob, RetryPolicy, CallBudget
       data/        tabla sync_metadata, SyncMetadataDao, traductor de fallos
   features/
     catalog/
-      data/        huella, diferencias, repositorios offline-first
+      data/        huella, diferencias, repositorios offline-first y de imágenes
         local/     CatalogDao, PokemonDetailDao, tablas del catálogo y del detalle
+        mappers/   codificación de la búsqueda y los filtros guardados
         remote/    consultas GraphQL, DTOs y mappers
-        sync/      pasada completa, lo visible, restauración, detalle y tabla de tipos
+        repositories/ búsqueda y filtros guardados en user_preferences
+        sync/      pasada completa, lo visible, restauración, detalle, tabla de tipos
+                   y aviso de la pasada interrumpida
       domain/
-        entities/  Pokemon, PokemonDetail, árbol de evoluciones, matchups, vigencia, movimientos
-        repositories/ contratos CatalogRepository y PokemonDetailRepository
-        usecases/  casos de uso del catálogo y del detalle
+        entities/  Pokemon, PokemonDetail, árbol de evoluciones, matchups, vigencia,
+                   movimientos, búsqueda y filtros, avance de las imágenes
+        repositories/ contratos del catálogo, del detalle, de las imágenes y de la búsqueda
+        usecases/  casos de uso del catálogo, del detalle y de las imágenes
       presentation/
-        providers/ catálogo y detalle
+        controllers/ búsqueda y filtros
+        providers/ catálogo, búsqueda, detalle e imágenes
         screens/   CatalogScreen y PokemonDetailScreen
         texts/     nombres y frases traducidos del catálogo y del detalle
-        widgets/   lista del catálogo y, en detail/, el encabezado y las cinco pestañas
+        widgets/   lista del catálogo, filtros, aviso de catálogo parcial, PokemonCachedImage
+                   y, en detail/, el encabezado y las cinco pestañas
     connectivity/
       data/        ConnectivityService y repositorio
       domain/      ConnectivityStatus y contrato
@@ -49,7 +59,11 @@ lib/
     settings/
       data/        tabla user_preferences, UserPreferencesDao y repositorio
       domain/      contrato SettingsRepository
-      presentation/ SettingsScreen (idioma y tema) y providers
+      presentation/
+        providers/ idioma, tema, imágenes y simulación de caída
+        screens/   SettingsScreen
+        texts/     espacio de las imágenes en MB
+        widgets/   secciones «Imágenes» y «Herramientas de demostración»
     trivia/
       data/        tablas trivia_results, trivia_answers y achievements
   l10n/            textos en ARB (español e inglés) y AppLocalizations generado
@@ -57,7 +71,9 @@ lib/
 
 ## Capas y componentes
 
-La interfaz nunca habla con la red. Lee `Stream`s que salen de `CatalogDao` y `PokemonDetailDao`. Tres servicios de sincronización tocan GraphQL, todos a través de `CatalogRemoteDataSource`, y escriben en la base: `CatalogSyncService` (pasada completa y lo visible), `CatalogRestorationService` (huellas y restauración) y `PokemonDetailSyncService` (detalle y tabla de tipos). `SyncScheduler` decide cuándo corre cada uno. `LoggingLink` registra en consola cada consulta con sus variables y su duración, y `CallBudgetLink` la cuenta antes de que salga a PokeAPI. `main.dart` une `presentation` con `data` sobrescribiendo `catalogRepositoryProvider` y `pokemonDetailRepositoryProvider`.
+La interfaz nunca habla con la red. Lee `Stream`s que salen de `CatalogDao` y `PokemonDetailDao`. Tres servicios de sincronización tocan GraphQL, todos a través de `CatalogRemoteDataSource`, y escriben en la base: `CatalogSyncService` (pasada completa y lo visible), `CatalogRestorationService` (huellas y restauración) y `PokemonDetailSyncService` (detalle y tabla de tipos). `SyncScheduler` decide cuándo corre cada uno. `LoggingLink` registra en consola cada consulta con sus variables y su duración, y `CallBudgetLink` la cuenta antes de que salga a PokeAPI. En debug y profile, el cliente HTTP de `HttpLink` es `SimulatedOutageHttpClient`, que responde 503 sin salir a la red mientras la caída está simulada. `main.dart` une `presentation` con `data` sobrescribiendo `catalogRepositoryProvider`, `pokemonDetailRepositoryProvider` y `pokemonImageRepositoryProvider`.
+
+Las imágenes no pasan por la base. `PokemonCachedImage` y `DetailArtwork` las leen de `PokemonImageCache`, el gestor propio de `core/images` (ADR-0007). `CachedPokemonImageRepository` usa la base solo para saber las URLs del catálogo, y desde Ajustes guarda todas las imágenes, mide su espacio o las borra.
 
 ```mermaid
 flowchart LR
@@ -66,18 +82,23 @@ flowchart LR
     Detail[PokemonDetailScreen]
     Banner[ConnectivityBanner]
     Lifecycle[SyncLifecycle]
+    Settings["SettingsScreen<br/>ImageStorageSection · DemoToolsSection"]
+    Images["PokemonCachedImage · DetailArtwork"]
   end
 
   subgraph domain
     UseCases["WatchCatalogPage · WatchCatalogCount<br/>WatchPokemonByIds · WatchCatalogSyncStatus<br/>SyncCatalog · RevalidatePokemon"]
     DetailUseCases["WatchPokemonDetail · WatchPokemonDetailFreshness<br/>WatchTypeEfficacy · RevalidatePokemonDetail<br/>StopRevalidatingPokemonDetail"]
+    ImageUseCases["SaveAllArtwork · GetSavedImagesSize · DeleteSavedImages<br/>GetPokemonIdsWithSavedArtwork · KeepPokemonOffline"]
     Contract[["CatalogRepository"]]
     DetailContract[["PokemonDetailRepository"]]
+    ImageContract[["PokemonImageRepository"]]
   end
 
   subgraph data
     Repo[OfflineFirstCatalogRepository]
     DetailRepo[OfflineFirstPokemonDetailRepository]
+    ImageRepo[CachedPokemonImageRepository]
     Sync["CatalogSyncService<br/>CatalogRestorationService<br/>PokemonDetailSyncService"]
     Dao[CatalogDao]
     DetailDao[PokemonDetailDao]
@@ -88,6 +109,9 @@ flowchart LR
     Scheduler[SyncScheduler]
     Db[(AppDatabase<br/>SQLite)]
     Client["PokeAPI GraphQLClient<br/>LoggingLink → CallBudgetLink → HttpLink"]
+    Transport["SimulatedOutageHttpClient<br/>solo en debug y profile"]
+    Simulation[apiOutageSimulationProvider]
+    ImageCache["PokemonImageCache<br/>cache/pokemonImages"]
   end
 
   Screen --> UseCases
@@ -95,26 +119,37 @@ flowchart LR
   Lifecycle -- arranca --> Scheduler
   Banner --> UseCases
   Banner -- getLastSyncedAt --> Contract
+  Settings --> ImageUseCases
+  Settings -- interruptor --> Simulation
+  Images -- lee los archivos --> ImageCache
   UseCases --> Contract
   DetailUseCases --> DetailContract
+  ImageUseCases --> ImageContract
   Repo -. implementa .-> Contract
   DetailRepo -. implementa .-> DetailContract
+  ImageRepo -. implementa .-> ImageContract
   Repo -- lee --> Dao
   DetailRepo -- lee --> DetailDao
   Repo -- encola --> Scheduler
   DetailRepo -- encola --> Scheduler
+  ImageRepo -- URLs del catálogo --> Dao
+  ImageRepo -- guarda, mide y borra --> ImageCache
   Scheduler -- ejecuta --> Sync
   Sync -- escribe --> Dao
   Sync -- escribe --> DetailDao
   Sync --> Remote
   Remote --> Client
+  Client --> Transport
+  Transport -- lee en cada petición --> Simulation
   Dao --> Db
   DetailDao --> Db
 ```
 
+`KeepPokemonOffline` también usa `PokemonDetailRepository`: guarda el artwork y, si el detalle nunca se descargó, lo pide una vez.
+
 ## Sincronización al abrir la app
 
-`main` llama a `runApp` sin esperar a la red. `SyncLifecycle` arranca `SyncScheduler` y `catalogSyncTriggersProvider`, que lanzan tres trabajos al iniciar y otra vez cada vez que el estado pasa a `online`: la pasada completa del catálogo, la verificación de huellas y la tabla de tipos. Cada uno decide si hace falta llamar a PokeAPI. Si al iniciar no hay conexión, quedan pendientes hasta la reconexión; la pantalla se redibuja sola cada vez que se guarda un lote. El diagrama sigue la pasada completa; la verificación de huellas está en «Detección y restauración por huella».
+`main` llama a `runApp` sin esperar a la red. `SyncLifecycle` arranca `SyncScheduler` y `catalogSyncTriggersProvider`, que lanzan tres trabajos al iniciar y otra vez cada vez que el estado pasa a `online`: la pasada completa del catálogo, la verificación de huellas y la tabla de tipos. Al iniciar, antes de lanzarlos, informa de las sincronizaciones que quedaron interrumpidas (ver «Pasada interrumpida»). Cada trabajo decide si hace falta llamar a PokeAPI. Si al iniciar no hay conexión, quedan pendientes hasta la reconexión; la pantalla se redibuja sola cada vez que se guarda un lote. El diagrama sigue la pasada completa; la verificación de huellas está en «Detección y restauración por huella».
 
 Mientras hay servicio, `runEveryWhileOnline` repite dos de ellos: la pasada completa cada hora (`catalogFullPassFreshness`) y la verificación de huellas cada 60 s. El temporizador se detiene sin conexión y vuelve a contar al reconectar. Además, cada descarga real (`SyncOutcome.revalidated`) lo reinicia, así que el periodo se cuenta desde la última descarga: cuando la pasada vuelve a correr, el catálogo ya tiene más de 1 h y se descarga, sin un «Sincronizando...» en vano.
 
@@ -149,6 +184,52 @@ sequenceDiagram
 ```
 
 Si la descarga se corta, `sync_metadata.next_offset` guarda dónde se quedó y la siguiente sincronización continúa desde ahí.
+
+### Pasada interrumpida
+
+Cada lote se guarda en una transacción junto con `next_offset`, así que una pasada a medias deja lotes completos y tantos Pokémon por defecto como indica `next_offset`. Antes de cada intento, `SyncScheduler` guarda `status = in_progress`, y todo intento termina en otro estado, también con un error inesperado. Por eso, si al arrancar hay una fila `in_progress`, el proceso murió a mitad de esa sincronización (PS-07, PA-09).
+
+- **Al arrancar.** `InterruptedSyncReport` toma esas filas con `takeInterruptedSyncs()`, que en la misma transacción las deja en `pending`, y escribe una línea por fila antes de lanzar los trabajos de arranque.
+- **El catálogo se reanuda.** La pasada completa no se da por fresca, porque `is_complete` es falso, y sigue desde `next_offset`. Solo descarga los lotes que faltan.
+- **Las demás claves** (`detail:25`, `catalog:visible`, `catalog:restore`) se repiten con su disparador habitual.
+- **Sin red al arrancar**, el intento falla con `NoConnection`, la fila queda en `pending` y la reconexión retoma la pasada desde el mismo `next_offset`.
+
+```mermaid
+sequenceDiagram
+  participant Triggers as catalogSyncTriggersProvider
+  participant Report as InterruptedSyncReport
+  participant Meta as SyncMetadataDao
+  participant Scheduler as SyncScheduler
+  participant Sync as CatalogSyncService
+  participant Dao as CatalogDao
+  participant Remote as CatalogRemoteDataSource
+
+  Note over Meta: la app murió con catalog en in_progress, next_offset 400 de 1025
+  Triggers->>Scheduler: registra los trabajos de reconexión y los periódicos
+  Triggers->>Report: reportAtStartup()
+  Report->>Meta: takeInterruptedSyncs()
+  Meta-->>Report: las filas in_progress, ya cambiadas a pending
+  Report->>Report: consola «la pasada anterior se interrumpió en 400 de 1025»
+  Triggers->>Scheduler: run() de la pasada completa, la verificación y la tabla de tipos
+  Scheduler->>Meta: status = in_progress
+  Scheduler->>Sync: perform()
+  Sync->>Dao: readCatalogSyncProgress()
+  Dao-->>Sync: next_offset 400, total 1025, incompleto
+  Sync->>Sync: consola «se reanuda desde 400 de 1025»
+  loop offsets 400 a 1000, 7 lotes de 11
+    Sync->>Remote: fetchCatalogPage(limit 100, offset)
+    Remote-->>Sync: CatalogBatch
+    Sync->>Dao: saveCatalogPage() y next_offset en una transacción
+  end
+  Scheduler->>Meta: status = idle, catálogo completo
+```
+
+Las dos líneas de la consola son, completas:
+
+```text
+[sync] catalog: la pasada anterior se interrumpió en 400 de 1025; se reanuda
+[sync] catalog: se reanuda desde 400 de 1025
+```
 
 ## Revalidación de lo visible
 
@@ -277,7 +358,9 @@ flowchart TD
 
 `SyncRevalidated` solo aparece cuando los datos acaban de llegar de PokeAPI en esta sesión. Si el catálogo está fresco y no hace falta llamar, el estado vuelve a `SyncIdle`, o a la última revalidación si ya hubo una.
 
-Un fallo reintentable espera 2, 4, 8, 16 y 32 s (`RetryPolicy`) y después queda en `SyncFailed` hasta la siguiente reconexión o «Reintentar». Un 429 bloquea el presupuesto durante su `Retry-After`, o 10 min si no lo trae. Si se pierde la conexión durante una espera, el temporizador se cancela y la reconexión retoma el trabajo. Cada clave tiene un solo intento en curso: dos peticiones de la pasada completa comparten la misma descarga, y lo visible usa `runLatest` para que la petición más nueva espere a la que está en curso.
+Un fallo reintentable espera 2, 4, 8, 16 y 32 s (`RetryPolicy`) y después queda en `SyncFailed` hasta el siguiente paso a `online` o «Reintentar». Los reintentos siguen mientras haya red, también con «Servicio no disponible», porque la API puede volver sin que cambie la red. Solo sin red se cancela el temporizador y el trabajo queda `pending` hasta la reconexión. Al pasar a `online`, un reintento que todavía esperaba sale en ese momento si el presupuesto lo permite. Un 429 bloquea el presupuesto durante su `Retry-After`, o 10 min si no lo trae. Un error inesperado, que no es un `SyncFailure`, se guarda como `QueryError` y deja la clave en `failed`. Cada clave tiene un solo intento en curso: dos peticiones de la pasada completa comparten la misma descarga, y lo visible usa `runLatest` para que la petición más nueva espere a la que está en curso.
+
+El diagrama empieza en `SyncIdle` también cuando la app arranca después de morir a mitad de una pasada: el estado de memoria no se restaura, y la pasada de arranque sigue desde `next_offset` (ver «Pasada interrumpida»).
 
 ```mermaid
 stateDiagram-v2
@@ -285,17 +368,24 @@ stateDiagram-v2
   SyncIdle --> SyncFullPassInProgress: arranque, reconexión, cada hora o syncCatalog()
   SyncFullPassInProgress --> SyncIdle: catálogo fresco, sin llamadas
   SyncFullPassInProgress --> SyncRevalidated: descarga completa
-  SyncFullPassInProgress --> SyncWaitingRetry: fallo reintentable en línea
-  SyncWaitingRetry --> SyncFullPassInProgress: vence la espera
+  SyncFullPassInProgress --> SyncWaitingRetry: fallo reintentable con red
+  SyncWaitingRetry --> SyncFullPassInProgress: vence la espera o paso a online
   SyncFullPassInProgress --> SyncPaused: CallBudgetExhausted
   SyncPaused --> SyncFullPassInProgress: se libera un hueco
-  SyncFullPassInProgress --> SyncFailed: QueryError, 5 reintentos o sin conexión
-  SyncWaitingRetry --> SyncFailed: se pierde la conexión
+  SyncFullPassInProgress --> SyncFailed: QueryError, error inesperado, 5 reintentos o sin red
+  SyncWaitingRetry --> SyncFailed: se pierde la red
   SyncRevalidated --> SyncFullPassInProgress: reconexión, cada hora o Reintentar
-  SyncFailed --> SyncFullPassInProgress: reconexión o Reintentar
+  SyncFailed --> SyncFullPassInProgress: paso a online o Reintentar
   SyncIdle --> SyncRevalidating: página con datos de más de 15 min
   SyncRevalidated --> SyncRevalidating: página con datos de más de 15 min
   SyncRevalidating --> SyncRevalidated: PokemonByIds guardado
+  note right of SyncWaitingRetry
+    Con red, también con «Servicio no disponible»
+  end note
+  note left of SyncIdle
+    Al arrancar tras una pasada interrumpida,
+    la pasada sigue desde next_offset
+  end note
 ```
 
 La revalidación de lo visible, el detalle (`detail:{id}`), la tabla de tipos (`type_efficacy`) y la restauración (`catalog:restore`) pasan por los mismos reintentos, pausas y fallos que la pasada completa, cada uno con su clave. Mientras corren publican `SyncRevalidating`. El banner solo lee `catalog` y `catalog:visible`; la línea de vigencia del detalle lee `detail:{id}`.
@@ -317,7 +407,7 @@ La revalidación de lo visible, el detalle (`detail:{id}`), la tabla de tipos (`
 
 ## Conectividad
 
-`ConnectivityService` no se fía solo del sistema operativo: tener Wi-Fi no garantiza que la API responda. Por eso distingue tres estados. `connectivityStatusProvider` ignora los cambios que duran menos de 800 ms, y `SyncScheduler` relanza la pasada completa, los trabajos pendientes y la última revalidación de lo visible cuando el estado pasa a `online`.
+`ConnectivityService` no se fía solo del sistema operativo: tener Wi-Fi no garantiza que la API responda. Por eso distingue tres estados. `connectivityStatusProvider` ignora los cambios que duran menos de 800 ms, y `SyncScheduler` relanza la pasada completa, los trabajos pendientes y la última revalidación de lo visible cuando el estado pasa a `online`. El planificador recibe dos datos: si está en línea y si hay red. Con `serviceUnavailable` hay red, así que detiene los trabajos periódicos pero deja correr los reintentos.
 
 Mientras el estado es `serviceUnavailable`, el servicio repite la consulta de prueba, porque la API puede volver sin que cambie la red. La espera crece con cada fallo seguido: 15, 30, 60 y 120 s, y luego cada 5 min. Así, una hora sin servicio gasta 16 de las 100 llamadas por hora que permite PokeAPI, en vez de 240. Un cambio de red vuelve a empezar en 15 s. En cuanto la API responde, el estado pasa a `online` y el catálogo se sincroniza sin reiniciar la aplicación. En `online` y `offline` no repite la consulta.
 
@@ -329,27 +419,28 @@ flowchart TD
   Network -- no --> Offline[offline]
   Network -- sí --> Health["Consulta GraphQL de prueba<br/>pokemon(limit: 1), máximo 5 s"]
   Health -- responde --> Online[online]
-  Health -- error o tiempo agotado --> Unavailable[serviceUnavailable]
+  Health -- error, 503 o tiempo agotado --> Unavailable[serviceUnavailable]
   Unavailable -.->|15, 30, 60, 120 s y luego cada 5 min| Health
   Offline --> Debounce[Debounce de 800 ms]
   Online --> Debounce
   Unavailable --> Debounce
   Debounce --> Banner[ConnectivityBanner]
-  Debounce --> Transition{¿Pasó de otro estado a online?}
-  Transition -- sí --> Scheduler[SyncScheduler]
+  Debounce --> Scheduler["SyncScheduler<br/>isOnline: solo online<br/>hasNetwork: online o serviceUnavailable"]
+  Scheduler --> Transition{¿Pasó de otro estado a online?}
+  Transition -- sí --> Reconnect[Corren los trabajos de reconexión]
 ```
 
 ### Máquina de estados de la disponibilidad
 
-El estado de la disponibilidad solo cambia tras una consulta de prueba. Mientras dura la consulta no se publica nada nuevo y el banner sigue con el estado anterior. Las esperas de `serviceUnavailable` crecen con cada fallo seguido y vuelven a 15 s cuando cambia la red.
+El estado de la disponibilidad solo cambia tras una consulta de prueba. Mientras dura la consulta no se publica nada nuevo y el banner sigue con el estado anterior. Las esperas de `serviceUnavailable` crecen con cada fallo seguido y vuelven a 15 s cuando cambia la red. Cambiar el interruptor de la simulación de caída invalida `connectivityStatusProvider`, que vuelve a comprobar en ese momento.
 
 ```mermaid
 stateDiagram-v2
   [*] --> Comprobando: arranque
   Comprobando --> offline: sin ninguna red
   Comprobando --> online: la API responde
-  Comprobando --> serviceUnavailable: error o más de 5 s
-  online --> Comprobando: cambio de red
+  Comprobando --> serviceUnavailable: error, 503 o más de 5 s
+  online --> Comprobando: cambio de red o del interruptor de simulación
   offline --> Comprobando: cambio de red
   state serviceUnavailable {
     [*] --> Espera15s
@@ -360,8 +451,67 @@ stateDiagram-v2
     Espera5min --> Espera5min: sigue sin responder
   }
   serviceUnavailable --> online: la API responde
-  serviceUnavailable --> Comprobando: cambio de red, la espera vuelve a 15 s
+  serviceUnavailable --> Comprobando: cambio de red o del interruptor, la espera vuelve a 15 s
 ```
+
+### Simulación de caída de PokeAPI
+
+PA-08 pide un fallo de GraphQL con la red activa. En las compilaciones debug y profile, `HttpLink` usa `SimulatedOutageHttpClient` como cliente HTTP. Mientras la caída está simulada, responde `503 text/plain` «Servicio no disponible (simulado)» sin salir a la red. Como está debajo de `HttpLink`, el 503 sigue el mismo camino que una caída real: `LoggingLink` lo registra, `CallBudgetLink` lo cuenta y `syncFailureFrom` lo traduce a `ServerError(503)` (ADR-0004).
+
+- **Cómo se activa.** Con el interruptor de Ajustes › Herramientas de demostración, que se guarda en `user_preferences` (`simulate_api_outage`), o al lanzar con `--dart-define=SIMULATE_API_OUTAGE=true`, que lo deja activo desde el arranque. En release no existe ninguno de los dos (`ApiOutageSimulationMode.unavailable`).
+- **Sin reconstruir el cliente.** Cada petición lee el valor en ese momento con `ref.read(apiOutageSimulationProvider.future)`. La primera espera a que se lea el valor guardado.
+- **Al cambiarlo.** `simulateApiOutageProvider` cambia el valor en memoria, invalida `connectivityStatusProvider` para repetir la consulta de salud y después guarda la preferencia. Si no se puede guardar, la simulación dura hasta cerrar la app.
+
+```mermaid
+sequenceDiagram
+  participant Settings as DemoToolsSection
+  participant Sim as apiOutageSimulationProvider
+  participant Conn as connectivityStatusProvider
+  participant Http as SimulatedOutageHttpClient
+  participant Scheduler as SyncScheduler
+  participant Catalog as CatalogScreen
+
+  Settings->>Sim: switchTo(true)
+  Settings->>Conn: invalidate()
+  Settings->>Settings: guarda simulate_api_outage = true
+  Conn->>Http: consulta de salud
+  Http-->>Conn: 503, sin salir a la red
+  Conn-->>Scheduler: serviceUnavailable, hay red pero no está en línea
+  Note over Scheduler: se detienen los periódicos y los reintentos siguen
+  Catalog->>Scheduler: deslizar hacia abajo, pasada completa forzada
+  loop 1 intento y 5 reintentos
+    Scheduler->>Http: CatalogPage
+    Http-->>Scheduler: ServerError(503)
+    Scheduler->>Scheduler: espera 2, 4, 8, 16 y 32 s
+  end
+  Scheduler->>Scheduler: failed, espera el paso a online
+  Settings->>Sim: switchTo(false) e invalidate()
+  Conn->>Http: consulta de salud, llega a PokeAPI
+  Conn-->>Scheduler: online
+  Scheduler->>Scheduler: la pasada que falló corre una vez
+```
+
+## Caché de imágenes
+
+Las imágenes vienen de `raw.githubusercontent.com`, no de GraphQL, y no gastan el presupuesto. `PokemonImageCache` guarda hasta 2500 archivos en `cache/pokemonImages` y borra los que llevan 180 días sin usarse. Su índice es una base sqflite del paquete `flutter_cache_manager`, fuera de Drift. Las decisiones y el espacio medido están en el ADR-0007.
+
+```mermaid
+flowchart TD
+  Show["PokemonCachedImage o DetailArtwork<br/>memCacheWidth = lado × densidad"] --> Saved{"¿Está el archivo<br/>en cache/pokemonImages?"}
+  Saved -- sí --> Paint["Se pinta desde el disco<br/>y se anota el uso"]
+  Paint --> Expired{"¿Pasaron 5 min<br/>desde la descarga?"}
+  Expired -- no --> Done[Nada más]
+  Expired -->|sí, sin red| Done
+  Expired -->|sí, con red| Conditional["Pregunta a GitHub con If-None-Match<br/>304: solo renueva la vigencia"]
+  Saved -- no --> Network{¿Hay red?}
+  Network -- sí --> Download["Descarga de raw.githubusercontent.com<br/>y la guarda"]
+  Network -- no --> Fallback["Icono de respaldo<br/>en el detalle, antes el sprite front_default"]
+  Cleanup["Limpieza del paquete<br/>más de 180 días sin uso<br/>o por encima de 2500 archivos"] -.-> Saved
+```
+
+- **Guardar todas.** Ajustes › Imágenes › «Guardar imágenes para usar sin conexión» descarga de 4 en 4 los artworks de los Pokémon por defecto que faltan y se detiene tras 10 fallos seguidos.
+- **Borrar.** Vacía la caché propia y la del gestor por defecto, y limpia las imágenes ya decodificadas en memoria.
+- **Contrato para la trivia.** `GetPokemonIdsWithSavedArtwork` devuelve los ids cuyo artwork está en disco. Comprueba que cada archivo exista, porque Android puede vaciar la carpeta de caché y dejar el índice con filas sin archivo.
 
 ## Modelo de datos
 
@@ -374,6 +524,7 @@ Las reglas que hay que saber defender:
 - **Lo del usuario no depende del catálogo.** `favorites` y `trivia_answers` guardan el número del Pokémon sin clave foránea, para que ninguna operación sobre el catálogo borre lo que hizo el usuario.
 - **Una fila de `sync_metadata` por clave.** `catalog`, `catalog:visible`, `catalog:restore`, `type_efficacy` y cada `detail:{id}` tienen su estado, su intento y su último fallo. `last_synced_at` de `detail:{id}` es la hora de la última descarga del detalle, y `last_verified_at` de `catalog:restore`, la de la última verificación de huellas.
 - **Las formas son filas de `pokemon`.** Una forma regional tiene `is_default = false` y el mismo `species_id`; el catálogo solo muestra las filas por defecto.
+- **Las imágenes no están en esta base.** Su índice es la base sqflite de `flutter_cache_manager` y los archivos están en la carpeta de caché del sistema (ADR-0007), así que el inspector de Drift no las ve.
 
 Catálogo y detalle. Las líneas punteadas son relaciones sin clave foránea.
 
