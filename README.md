@@ -13,11 +13,12 @@ La aplicación sigue una arquitectura **offline-first**, por lo que los Pokémon
 - **gql:** lectura del nombre de cada operación GraphQL, para registrarla en consola con sus variables y su duración.
 - **connectivity_plus:** detección de cambios de conectividad.
 - **internet_connection_checker_plus:** comprobación de acceso a Internet.
-- **cached_network_image:** almacenamiento temporal de imágenes descargadas.
+- **cached_network_image:** muestra las imágenes de los Pokémon desde la caché de imágenes propia.
+- **flutter_cache_manager:** caché de imágenes propia y acotada (2500 archivos, 180 días sin uso), con su espacio y su borrado en Ajustes. Ya llegaba con `cached_network_image`; se declara directa porque la app crea su propio gestor ([ADR-0007](docs/adr/0007-cache-de-imagenes-propia-y-acotada.md)).
 - **crypto:** huella SHA-256 de cada Pokémon, para detectar datos alterados en la base local.
 - **share_plus:** compartir un Pokémon como texto desde su detalle.
+- **http:** cliente HTTP de las consultas a PokeAPI. En debug y profile lo envuelve la simulación de caída, que responde HTTP 503 sin salir a la red. En las pruebas, su `MockClient` detrás de un `HttpLink` real comprueba cómo se traducen las respuestas HTTP a fallos de sincronización.
 - **flutter_test y mocktail:** pruebas automatizadas.
-- **http (solo en pruebas):** `MockClient` detrás de un `HttpLink` real, para comprobar cómo se traducen las respuestas HTTP de PokeAPI a fallos de sincronización.
 
 ## Funcionalidades principales
 
@@ -70,6 +71,10 @@ El detalle de un Pokémon se pide a PokeAPI en una sola consulta cada vez que se
 
 Cada consulta a PokeAPI queda registrada en la consola de depuración (VS Code o DevTools) con sus variables, su prioridad y su duración, por ejemplo `[pokeapi] PokemonDetail {"id":25} (user) 812 ms`. Las decisiones de la sincronización se registran como `[sync]`.
 
+Si una sincronización falla por culpa de PokeAPI, por ejemplo con un HTTP 503 o un tiempo agotado, se reintenta a los 2, 4, 8, 16 y 32 segundos, con un ±20 % de variación. Los reintentos siguen también mientras el banner dice «Servicio no disponible», porque la API puede volver sin que cambie la red. Cada espera aparece en la consola, por ejemplo `[sync] catalog: reintento 3/5 en 8,4 s (ServerError(503))`. Tras el quinto reintento la sincronización queda en fallo y se repite al volver a «En línea» o con «Reintentar». Sin red no se gastan reintentos: la sincronización espera a la reconexión. En ningún caso se borran los datos guardados. Los detalles están en el [ADR-0004](docs/adr/0004-reintentos-presupuesto-y-una-sincronizacion-por-recurso.md).
+
+Si la app se cierra a mitad de la descarga del catálogo, al volver a abrirla la consola dice dónde se quedó, por ejemplo `[sync] catalog: la pasada anterior se interrumpió en 400 de 1025; se reanuda`. La descarga sigue desde ese punto sin repetir los lotes ya guardados, porque cada lote se guarda en una transacción junto con su posición.
+
 ### Detección y restauración de datos alterados
 
 Con cada Pokémon se guarda una huella SHA-256 de sus datos tal como llegaron de PokeAPI. Al iniciar, al reconectar y cada 60 segundos mientras hay servicio, la app recalcula la huella con los datos locales y la compara con la guardada, sin llamar a PokeAPI.
@@ -78,11 +83,15 @@ Si alguien cambió un dato local, por ejemplo con el inspector de Drift en DevTo
 
 ### Caché de imágenes
 
-Las imágenes se muestran mediante `CachedNetworkImage`.
+Las imágenes de los Pokémon se guardan en una caché propia, separada de la base de datos, con hasta 2500 archivos que se borran tras 180 días sin usarse. Una imagen vista una vez con conexión se muestra después sin conexión y tras reiniciar la app, en la lista, en favoritos y en el detalle. Cada imagen se decodifica al tamaño en que se pinta, para no ocupar más memoria de la necesaria.
 
-Las imágenes descargadas pueden reutilizarse sin Internet, tanto en el listado como en la pantalla de detalles.
+En **Ajustes › Imágenes**:
 
-**Limitación:** las imágenes se almacenan en una caché temporal. Las imágenes que nunca se descargaron o que fueron eliminadas de la caché podrían no estar disponibles sin conexión.
+- **Imágenes guardadas** muestra el espacio que ocupan, por ejemplo «Imágenes guardadas: 132,7 MB».
+- **Guardar imágenes para usar sin conexión** descarga el official-artwork de todos los Pokémon del catálogo guardado, de 4 en 4, y muestra el avance («412 de 1025 guardadas»). Necesita red, pero no PokeAPI: las imágenes vienen de GitHub y no gastan el límite de llamadas. Si se sale de Ajustes, la descarga sigue. En el emulador tardó unos 60 segundos y ocupó 132,7 MB.
+- **Borrar imágenes** vacía la caché, después de pedir confirmación.
+
+Sin conexión, una imagen que no está guardada muestra un icono en su lugar; en el detalle, antes se prueba el sprite pequeño del Pokémon. Los motivos de cada decisión están en el [ADR-0007](docs/adr/0007-cache-de-imagenes-propia-y-acotada.md).
 
 ## Instalación y ejecución
 
@@ -198,15 +207,162 @@ La conectividad se supervisa de forma independiente y permite solicitar una nuev
 
 - La primera descarga requiere acceso a Internet.
 - Los Pokémon no sincronizados previamente no estarán disponibles offline.
-- La caché de imágenes no garantiza almacenamiento permanente.
+- Las imágenes se guardan en la carpeta de caché del sistema. Android puede vaciarla si le falta espacio, y el usuario puede hacerlo con «Borrar caché» en los ajustes del sistema. Las imágenes que falten muestran el icono hasta que se vean otra vez con conexión o se vuelvan a guardar.
+- Guardar las imágenes de los 1025 Pokémon ocupa unos 133 MB (132,7 MB medidos en el emulador). Si el límite de 2500 archivos se llenara con imágenes shiny y de formas, serían unos 320 MB.
+- Una imagen que no se pudo cargar sin conexión no se vuelve a pedir sola al recuperar la conexión: aparece al cambiar de página o al volver a abrir la pantalla.
 - Los datos locales se conservan ante fallos de sincronización.
 - El tiempo de sincronización depende de la conexión y de la disponibilidad de PokéAPI.
 - PokeAPI permite 100 llamadas por hora. La app se detiene en 80 y lleva la cuenta en memoria, así que la cuenta vuelve a cero si se cierra la app, aunque PokeAPI siga contando las llamadas anteriores.
-- Los estados de sincronización guardados en `sync_metadata` no se restauran al reiniciar: la app vuelve a decidir desde cero qué sincronizar.
+- Las llamadas de la simulación de caída no llegan a PokeAPI, pero cuentan en el presupuesto de la app. Al desactivarla, la sincronización que falló se repite de verdad, así que cada ensayo de PA-08 gasta unas 13 llamadas reales a PokeAPI.
+- Los estados de sincronización guardados en `sync_metadata` no se restauran al reiniciar: la app vuelve a decidir qué sincronizar. La excepción es una sincronización que quedó a medias porque la app se cerró: se informa en la consola y la descarga del catálogo sigue desde donde se quedó.
 - La pestaña de movimientos muestra un solo juego: el version group más reciente que tenga movimientos por nivel, sin contar los juegos Legends salvo que sean los únicos. Para Pikachu es Scarlet/Violet. Los motivos están en el [ADR-0006](docs/adr/0006-preferencia-online-dentro-del-presupuesto.md).
 - Sin conexión, un detalle que nunca se abrió con servicio muestra solo los datos del catálogo (nombre, tipos, imagen, estadísticas, altura y peso) y los matchups, si la tabla de tipos ya está guardada. Las habilidades, los movimientos y las evoluciones se descargan la primera vez que se abre con servicio.
 - Las tablas del detalle (habilidades, movimientos, evoluciones) no tienen huella propia: si se alteran, se corrigen la siguiente vez que el detalle se descarga.
 - Los objetos, juegos, version groups y métodos de evolución poco comunes se muestran con el identificador de PokeAPI en inglés, formateado (por ejemplo `thunder-stone` → «Thunder Stone»), porque la app no descarga sus nombres traducidos. Los tipos, grupos huevo, métodos de aprendizaje, momentos del día y triggers habituales sí están traducidos.
+
+## Cómo provocar los estados durante la demo
+
+Pasos para provocar en vivo los escenarios que usan la simulación de caída de PokeAPI y el inspector de la base de datos. La simulación y el inspector solo existen en las compilaciones debug y profile.
+
+### Preparación
+
+- **Consola.** Ejecutar la app desde VS Code (Run › Start Debugging). Las líneas `[sync]` y `[pokeapi]` salen en la Debug Console de VS Code y en la vista Logging de DevTools; la terminal de `flutter run` no las muestra.
+- **Inspector.** Abrir DevTools desde la sesión de depuración (en VS Code, el comando «Dart: Open DevTools») y entrar en la pestaña **drift**, que solo aparece con DevTools conectado a la app. Las consultas se escriben con el lápiz: una sentencia por ejecución, sin punto y coma.
+- Una escritura hecha con el inspector no avisa a la app, así que la pantalla no se repinta sola.
+- **Nunca pulsar «Clear database»:** borra toda la base del dispositivo.
+- **Presupuesto.** Cada sincronización forzada (deslizar hacia abajo en Catálogo) gasta 11 de las 100 llamadas por hora a PokeAPI. Conviene no repetir PA-08, PA-12 y PA-13 más de lo necesario en la misma hora.
+
+### Simulación de caída de PokeAPI
+
+Mientras está activa, toda petición a PokeAPI recibe un HTTP 503 «Servicio no disponible (simulado)» sin salir a la red. La consulta de salud falla, el banner pasa a «Servicio no disponible» y las sincronizaciones se reintentan como en una caída real. Se activa de dos formas:
+
+- **Desde la app:** Ajustes › Herramientas de demostración › **Simular caída de PokeAPI**. El valor se guarda y se conserva al reiniciar.
+- **Al lanzar la app:**
+
+  ```bash
+  flutter run --dart-define=SIMULATE_API_OUTAGE=true
+  ```
+
+  El interruptor aparece activado desde el arranque, sea cual sea el valor guardado, y la primera consulta de salud ya está simulada. Para ver la consola con este comando, abrir la URL de DevTools que imprime `flutter run` y usar su vista Logging. Desde VS Code, el mismo argumento va en `"args"` de una configuración de `.vscode/launch.json`.
+
+### PA-08: fallo de GraphQL con la red activa
+
+1. En el inspector, ejecutar la consulta de conteos (ver «Consultas preparadas»).
+2. Activar **Simular caída de PokeAPI**. En uno o dos segundos el banner dice «Servicio no disponible» y «Red activa, API sin respuesta · datos locales · Última sync: …».
+3. En Catálogo, deslizar hacia abajo, o pulsar el botón de sincronizar de la barra superior. La consola muestra cada intento y cada espera; los segundos varían un ±20 %:
+
+   ```text
+   [sync] presupuesto 5/80 (background)
+   [pokeapi] CatalogPage {"limit":100,"offset":0,"withTotal":true} (background) falló en 3 ms: ResponseFormatException(…)
+   [sync] catalog: reintento 1/5 en 1,8 s (ServerError(503))
+   …
+   [sync] catalog: reintento 5/5 en 33,1 s (ServerError(503))
+   [sync] catalog: falló tras 5 reintentos (ServerError(503))
+   ```
+
+   En cada intento el banner muestra un momento «Sincronizando...». Al final dice «No se pudo sincronizar · Se conservan los datos locales». Son 6 llamadas simuladas: 1 intento y 5 reintentos.
+4. Repetir la consulta de conteos: los números no cambian.
+5. Desactivar el interruptor. El banner vuelve a «En línea» y la sincronización que falló corre una vez, ya contra PokeAPI.
+
+### PA-12: indicador en cuatro estados
+
+El banner está encima de todas las pestañas, así que cada estado se ve igual en Catálogo y en Favoritos.
+
+| Estado | Cómo provocarlo | Qué dice el banner |
+| --- | --- | --- |
+| En línea | Wi-Fi o datos, sin simulación | «En línea» · «API disponible · datos locales · Última sync: …» |
+| Sin conexión | Modo avión | «Sin conexión» · «Datos locales · Última sync: …» |
+| Servicio no disponible | Activar la simulación de caída | «Servicio no disponible» · «Red activa, API sin respuesta · datos locales · Última sync: …» |
+| Sincronizando | Con servicio, deslizar hacia abajo en Catálogo | «Sincronizando...» · «En línea · Puedes seguir navegando», con una barra de progreso |
+
+### PA-10: imágenes sin conexión
+
+1. Con red: Ajustes › Imágenes › **Guardar imágenes para usar sin conexión**, hasta «1025 de 1025 guardadas» (unos 60 s).
+2. Activar el modo avión, cerrar la app desde recientes y volver a abrirla.
+3. Cualquier página del catálogo y cualquier detalle muestran su imagen.
+
+Sin el paso 1 solo se muestran las imágenes ya vistas; las demás muestran un icono.
+
+### PA-09: interrupción durante la sincronización
+
+En un emulador, para no borrar los datos del teléfono de la demo:
+
+1. Borrar los datos de la app y abrirla desde VS Code con la Debug Console visible:
+
+   ```bash
+   adb shell pm clear com.example.pokedex_flutter
+   ```
+
+2. La primera pasada descarga 11 lotes y tarda unos 10 a 15 s. Después de 3 o 4 líneas `[sync] presupuesto n/80 (background)`, cerrar la app a la fuerza, o desde recientes:
+
+   ```bash
+   adb shell am force-stop com.example.pokedex_flutter
+   ```
+
+3. Activar el modo avión del emulador y volver a abrir la app desde VS Code; los datos se conservan. La consola dice dónde se quedó, y el intento de arranque falla por falta de red y espera la reconexión:
+
+   ```text
+   [sync] catalog: la pasada anterior se interrumpió en 400 de 1025; se reanuda
+   [sync] catalog: se reanuda desde 400 de 1025
+   ```
+
+   Si otra sincronización estaba en curso, por ejemplo `type_efficacy`, aparece una línea más que dice que se repite con su disparador habitual.
+4. En el inspector, `SELECT key, status, next_offset, total_count, is_complete FROM sync_metadata` muestra `catalog` en `pending`, con `next_offset` 400, `total_count` 1025 e `is_complete` 0. `SELECT COUNT(*) FROM pokemon WHERE is_default = 1` da 400, lo mismo que `next_offset`, porque cada lote se guarda entero o no se guarda.
+5. Quitar el modo avión. La consola vuelve a decir «se reanuda desde 400 de 1025» y solo aparecen los lotes que faltan: 7 en este ejemplo, en lugar de 11.
+6. Repetir las dos consultas: `catalog` en `idle`, `is_complete` 1 y 1025 Pokémon por defecto.
+
+### PA-16: restauración de datos alterados
+
+1. En el inspector: `UPDATE pokemon SET name = 'pikachux' WHERE id = 25`.
+2. La consulta de Pikachu (ver «Consultas preparadas») muestra `pikachux`. La lista de la app sigue mostrando el nombre anterior, porque la escritura del inspector no avisa a la app.
+3. Con servicio, esperar hasta 60 s o abrir el detalle de Pikachu. La consola muestra `[sync] restauración #25 name: pikachux → pikachu`, o `[sync] detalle #25 restaurado …` si se abrió el detalle, y la consulta vuelve a dar `pikachu`.
+
+### PA-13: sin duplicados
+
+1. Ejecutar la consulta de conteos.
+2. Deslizar hacia abajo en Catálogo tres veces, esperando a que termine cada sincronización.
+3. Repetir la consulta de conteos: los números son los mismos.
+
+### Consultas preparadas
+
+Una por ejecución, sin punto y coma.
+
+Conteos de las tablas del catálogo y de favoritos:
+
+```sql
+SELECT 'pokemon', COUNT(*) FROM pokemon
+UNION ALL SELECT 'pokemon_types', COUNT(*) FROM pokemon_types
+UNION ALL SELECT 'pokemon_stats', COUNT(*) FROM pokemon_stats
+UNION ALL SELECT 'favorites', COUNT(*) FROM favorites
+```
+
+Estado de cada sincronización:
+
+```sql
+SELECT key, status, next_offset, total_count, is_complete, attempt, last_synced_at, last_error_kind FROM sync_metadata
+```
+
+Pokémon por defecto guardados:
+
+```sql
+SELECT COUNT(*) FROM pokemon WHERE is_default = 1
+```
+
+Alterar a Pikachu, su nombre o su primer tipo:
+
+```sql
+UPDATE pokemon SET name = 'pikachux' WHERE id = 25
+```
+
+```sql
+UPDATE pokemon_types SET type_name = 'fire' WHERE pokemon_id = 25 AND slot = 1
+```
+
+Ver a Pikachu:
+
+```sql
+SELECT p.id, p.name, t.type_name FROM pokemon p JOIN pokemon_types t ON t.pokemon_id = p.id WHERE p.id = 25
+```
 
 ## Proyecto académico
 
