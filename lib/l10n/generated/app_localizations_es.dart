@@ -354,6 +354,60 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String pokemonArtworkLabel(String name) {
+    return 'Imagen de $name';
+  }
+
+  @override
+  String pokemonShinyArtworkLabel(String name) {
+    return 'Imagen shiny de $name';
+  }
+
+  @override
+  String detailNumberLabel(int number) {
+    return 'Número $number';
+  }
+
+  @override
+  String detailStatSemantics(
+    String stat,
+    int value,
+    int maximum,
+    String percent,
+  ) {
+    return '$stat: $value de $maximum, $percent';
+  }
+
+  @override
+  String detailStatTotalSemantics(int total) {
+    return 'Total: $total';
+  }
+
+  @override
+  String get detailCurrentEvolution => 'Actual';
+
+  @override
+  String detailCurrentEvolutionSemantics(String name) {
+    return '$name, actual';
+  }
+
+  @override
+  String detailMoveLevelSpoken(int level) {
+    return 'Nivel $level';
+  }
+
+  @override
+  String get detailMoveOnEvolutionSpoken => 'Al evolucionar';
+
+  @override
+  String detailMoveTypeSemantics(String move, String type) {
+    return '$move, tipo $type';
+  }
+
+  @override
+  String get detailLoading => 'Cargando';
+
+  @override
   String get statHp => 'PS';
 
   @override

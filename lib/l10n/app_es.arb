@@ -181,6 +181,85 @@
       }
     }
   },
+  "pokemonArtworkLabel": "Imagen de {name}",
+  "@pokemonArtworkLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pokemonShinyArtworkLabel": "Imagen shiny de {name}",
+  "@pokemonShinyArtworkLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "detailNumberLabel": "Número {number}",
+  "@detailNumberLabel": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "detailStatSemantics": "{stat}: {value} de {maximum}, {percent}",
+  "@detailStatSemantics": {
+    "placeholders": {
+      "stat": {
+        "type": "String"
+      },
+      "value": {
+        "type": "int"
+      },
+      "maximum": {
+        "type": "int"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "detailStatTotalSemantics": "Total: {total}",
+  "@detailStatTotalSemantics": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "detailCurrentEvolution": "Actual",
+  "detailCurrentEvolutionSemantics": "{name}, actual",
+  "@detailCurrentEvolutionSemantics": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "detailMoveLevelSpoken": "Nivel {level}",
+  "@detailMoveLevelSpoken": {
+    "placeholders": {
+      "level": {
+        "type": "int"
+      }
+    }
+  },
+  "detailMoveOnEvolutionSpoken": "Al evolucionar",
+  "detailMoveTypeSemantics": "{move}, tipo {type}",
+  "@detailMoveTypeSemantics": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      },
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "detailLoading": "Cargando",
 
   "statHp": "PS",
   "statAttack": "Ataque",
