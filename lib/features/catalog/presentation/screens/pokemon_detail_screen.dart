@@ -5,6 +5,7 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/pokemon_detail_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/texts/detail_texts.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/texts/pokemon_texts.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/theme/detail_color_scheme.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_evolutions_tab.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_header.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_info_tab.dart';
@@ -94,87 +95,90 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen> {
     final detail = detailState.value;
     final pokemon = detail?.pokemon ?? _selectedForm;
 
-    return DefaultTabController(
-      length: 5,
-      child: Scaffold(
-        appBar: AppBar(
-          actions: [
-            IconButton(
-              tooltip: _showsShiny
-                  ? l10n.detailShowNormal
-                  : l10n.detailShowShiny,
-              isSelected: _showsShiny,
-              icon: const Icon(Icons.auto_awesome_outlined),
-              selectedIcon: const Icon(Icons.auto_awesome),
-              onPressed: _toggleShiny,
-            ),
-            FavoriteButton(pokemonId: pokemon.id),
-            Builder(
-              builder: (buttonContext) => IconButton(
-                tooltip: l10n.detailShare,
-                icon: const Icon(Icons.share_outlined),
-                onPressed: () =>
-                    _share(buttonContext, pokemon, detail?.baseStatTotal),
+    return AnimatedTheme(
+      data: detailThemeOf(Theme.of(context), pokemon.typeNames),
+      child: DefaultTabController(
+        length: 5,
+        child: Scaffold(
+          appBar: AppBar(
+            actions: [
+              IconButton(
+                tooltip: _showsShiny
+                    ? l10n.detailShowNormal
+                    : l10n.detailShowShiny,
+                isSelected: _showsShiny,
+                icon: const Icon(Icons.auto_awesome_outlined),
+                selectedIcon: const Icon(Icons.auto_awesome),
+                onPressed: _toggleShiny,
               ),
-            ),
-          ],
-        ),
-        body: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) => [
-            SliverToBoxAdapter(
-              child: DetailHeader(
-                pokemon: pokemon,
-                freshness: freshness,
-                showsShiny: _showsShiny,
-                onShinyUnavailable: _showShinyUnavailable,
-              ),
-            ),
-          ],
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TabBar(
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                tabs: [
-                  Tab(text: l10n.detailTabInfo),
-                  Tab(text: l10n.detailTabStats),
-                  Tab(text: l10n.detailTabEvolutions),
-                  Tab(text: l10n.detailTabMoves),
-                  Tab(text: l10n.detailTabMatchups),
-                ],
-              ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    DetailInfoTab(
-                      detailState: detailState,
-                      forms: forms,
-                      selectedFormId: shownId,
-                      onFormSelected: _selectForm,
-                      onRefresh: _refresh,
-                    ),
-                    DetailStatsTab(
-                      detailState: detailState,
-                      onRefresh: _refresh,
-                    ),
-                    DetailEvolutionsTab(
-                      detailState: detailState,
-                      onRefresh: _refresh,
-                    ),
-                    DetailMovesTab(
-                      detailState: detailState,
-                      onRefresh: _refresh,
-                    ),
-                    DetailMatchupsTab(
-                      typeNames: pokemon.typeNames,
-                      typeEfficacyState: ref.watch(typeEfficacyProvider),
-                      onRefresh: _refresh,
-                    ),
-                  ],
+              FavoriteButton(pokemonId: pokemon.id),
+              Builder(
+                builder: (buttonContext) => IconButton(
+                  tooltip: l10n.detailShare,
+                  icon: const Icon(Icons.share_outlined),
+                  onPressed: () =>
+                      _share(buttonContext, pokemon, detail?.baseStatTotal),
                 ),
               ),
             ],
+          ),
+          body: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              SliverToBoxAdapter(
+                child: DetailHeader(
+                  pokemon: pokemon,
+                  freshness: freshness,
+                  showsShiny: _showsShiny,
+                  onShinyUnavailable: _showShinyUnavailable,
+                ),
+              ),
+            ],
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TabBar(
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  tabs: [
+                    Tab(text: l10n.detailTabInfo),
+                    Tab(text: l10n.detailTabStats),
+                    Tab(text: l10n.detailTabEvolutions),
+                    Tab(text: l10n.detailTabMoves),
+                    Tab(text: l10n.detailTabMatchups),
+                  ],
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      DetailInfoTab(
+                        detailState: detailState,
+                        forms: forms,
+                        selectedFormId: shownId,
+                        onFormSelected: _selectForm,
+                        onRefresh: _refresh,
+                      ),
+                      DetailStatsTab(
+                        detailState: detailState,
+                        onRefresh: _refresh,
+                      ),
+                      DetailEvolutionsTab(
+                        detailState: detailState,
+                        onRefresh: _refresh,
+                      ),
+                      DetailMovesTab(
+                        detailState: detailState,
+                        onRefresh: _refresh,
+                      ),
+                      DetailMatchupsTab(
+                        typeNames: pokemon.typeNames,
+                        typeEfficacyState: ref.watch(typeEfficacyProvider),
+                        onRefresh: _refresh,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
