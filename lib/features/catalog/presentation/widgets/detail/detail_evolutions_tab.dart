@@ -110,28 +110,48 @@ class _EvolutionMember extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final name = displayNameOf(node.speciesName);
 
-    return Row(
-      spacing: 12,
-      children: [
-        PokemonCachedImage(
-          imageUrl: officialArtworkUrlFor(node.speciesId),
-          size: 56,
-          errorIconSize: 32,
-        ),
-        Flexible(
-          child: Text(
-            displayNameOf(node.speciesName),
-            style: isShown
-                ? textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  )
-                : textTheme.titleMedium,
+    return Semantics(
+      container: true,
+      label: isShown ? l10n.detailCurrentEvolutionSemantics(name) : name,
+      excludeSemantics: true,
+      child: Row(
+        spacing: 12,
+        children: [
+          PokemonCachedImage(
+            imageUrl: officialArtworkUrlFor(node.speciesId),
+            size: 56,
+            errorIconSize: 32,
           ),
-        ),
-      ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: isShown
+                      ? textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        )
+                      : textTheme.titleMedium,
+                ),
+                if (isShown)
+                  Text(
+                    l10n.detailCurrentEvolution,
+                    style: textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

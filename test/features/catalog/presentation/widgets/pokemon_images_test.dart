@@ -11,6 +11,7 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_artwork.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_artwork_hero_tag.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_cached_image.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 class MockCacheManager extends Mock implements BaseCacheManager {}
 
@@ -47,6 +48,9 @@ void main() {
           pokemonImageCacheManagerProvider.overrideWithValue(cacheManager),
         ],
         child: MaterialApp(
+          locale: const Locale('es'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: MediaQuery(
             data: MediaQueryData(devicePixelRatio: devicePixelRatio),
             child: Scaffold(body: Center(child: child)),
