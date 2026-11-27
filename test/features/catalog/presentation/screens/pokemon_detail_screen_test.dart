@@ -257,7 +257,7 @@ void main() {
     'en una pantalla baja el encabezado se desplaza y deja ver la pestaña',
     (tester) async {
       tester.view
-        ..physicalSize = const Size(915, 300)
+        ..physicalSize = const Size(800, 300)
         ..devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       detailRepository.emitDetail(25, pikachuDetail);

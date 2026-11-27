@@ -728,6 +728,77 @@ abstract class AppLocalizations {
   /// **'Total base: {total}'**
   String detailShareBaseTotal(int total);
 
+  /// No description provided for @pokemonArtworkLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Imagen de {name}'**
+  String pokemonArtworkLabel(String name);
+
+  /// No description provided for @pokemonShinyArtworkLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Imagen shiny de {name}'**
+  String pokemonShinyArtworkLabel(String name);
+
+  /// No description provided for @detailNumberLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Número {number}'**
+  String detailNumberLabel(int number);
+
+  /// No description provided for @detailStatSemantics.
+  ///
+  /// In es, this message translates to:
+  /// **'{stat}: {value} de {maximum}, {percent}'**
+  String detailStatSemantics(
+    String stat,
+    int value,
+    int maximum,
+    String percent,
+  );
+
+  /// No description provided for @detailStatTotalSemantics.
+  ///
+  /// In es, this message translates to:
+  /// **'Total: {total}'**
+  String detailStatTotalSemantics(int total);
+
+  /// No description provided for @detailCurrentEvolution.
+  ///
+  /// In es, this message translates to:
+  /// **'Actual'**
+  String get detailCurrentEvolution;
+
+  /// No description provided for @detailCurrentEvolutionSemantics.
+  ///
+  /// In es, this message translates to:
+  /// **'{name}, actual'**
+  String detailCurrentEvolutionSemantics(String name);
+
+  /// No description provided for @detailMoveLevelSpoken.
+  ///
+  /// In es, this message translates to:
+  /// **'Nivel {level}'**
+  String detailMoveLevelSpoken(int level);
+
+  /// No description provided for @detailMoveOnEvolutionSpoken.
+  ///
+  /// In es, this message translates to:
+  /// **'Al evolucionar'**
+  String get detailMoveOnEvolutionSpoken;
+
+  /// No description provided for @detailMoveTypeSemantics.
+  ///
+  /// In es, this message translates to:
+  /// **'{move}, tipo {type}'**
+  String detailMoveTypeSemantics(String move, String type);
+
+  /// No description provided for @detailLoading.
+  ///
+  /// In es, this message translates to:
+  /// **'Cargando'**
+  String get detailLoading;
+
   /// No description provided for @statHp.
   ///
   /// In es, this message translates to:

@@ -39,10 +39,14 @@ class DetailSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
+          Semantics(
+            container: true,
+            header: true,
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
           ),
           const SizedBox(height: 8),
           child,
@@ -75,6 +79,22 @@ class DetailMessage extends StatelessWidget {
                 ?.copyWith(color: colorScheme.onSurfaceVariant),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class DetailLoading extends StatelessWidget {
+  const DetailLoading({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Center(
+        child: CircularProgressIndicator(
+          semanticsLabel: AppLocalizations.of(context)!.detailLoading,
+        ),
       ),
     );
   }
@@ -120,12 +140,7 @@ List<Widget> detailChildrenOf(
     ];
   }
   if (detailState.isLoading) {
-    return const [
-      Padding(
-        padding: EdgeInsets.symmetric(vertical: 32),
-        child: Center(child: CircularProgressIndicator()),
-      ),
-    ];
+    return const [DetailLoading()];
   }
   return [
     DetailMessage(

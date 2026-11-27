@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pokedex_flutter/core/images/pokemon_image_cache_providers.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon.dart';
 import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon_artwork.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/texts/pokemon_texts.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/image_decoding.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_artwork_hero_tag.dart';
+import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 const detailArtworkBackdropKey = ValueKey('detail-artwork-backdrop');
 
@@ -54,42 +56,54 @@ class DetailArtwork extends ConsumerWidget {
       );
     }
 
-    return SizedBox.square(
-      dimension: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          DecoratedBox(
-            key: detailArtworkBackdropKey,
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              shape: BoxShape.circle,
-            ),
-            child: SizedBox.square(dimension: size * 0.86),
-          ),
-          Hero(
-            tag: pokemonArtworkHeroTag(pokemon.id),
-            child: SizedBox.square(
-              dimension: size,
-              child: switch ((showsShiny, pokemon.imageUrl.isEmpty)) {
-                (true, _) => networkImage(
-                  shinyArtworkUrlFor(pokemon.id),
-                  fallback: fallbackIcon,
-                  onError: onShinyUnavailable,
+    final l10n = AppLocalizations.of(context)!;
+    final name = displayNameOf(pokemon.name);
+
+    return Semantics(
+      container: true,
+      image: true,
+      label: showsShiny
+          ? l10n.pokemonShinyArtworkLabel(name)
+          : l10n.pokemonArtworkLabel(name),
+      child: ExcludeSemantics(
+        child: SizedBox.square(
+          dimension: size,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              DecoratedBox(
+                key: detailArtworkBackdropKey,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
                 ),
-                (false, true) => fallbackIcon,
-                (false, false) => networkImage(
-                  pokemon.imageUrl,
-                  fallback: networkImage(
-                    frontSpriteUrlFor(pokemon.id),
-                    fallback: fallbackIcon,
-                    filterQuality: FilterQuality.none,
-                  ),
+                child: SizedBox.square(dimension: size * 0.86),
+              ),
+              Hero(
+                tag: pokemonArtworkHeroTag(pokemon.id),
+                child: SizedBox.square(
+                  dimension: size,
+                  child: switch ((showsShiny, pokemon.imageUrl.isEmpty)) {
+                    (true, _) => networkImage(
+                      shinyArtworkUrlFor(pokemon.id),
+                      fallback: fallbackIcon,
+                      onError: onShinyUnavailable,
+                    ),
+                    (false, true) => fallbackIcon,
+                    (false, false) => networkImage(
+                      pokemon.imageUrl,
+                      fallback: networkImage(
+                        frontSpriteUrlFor(pokemon.id),
+                        fallback: fallbackIcon,
+                        filterQuality: FilterQuality.none,
+                      ),
+                    ),
+                  },
                 ),
-              },
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

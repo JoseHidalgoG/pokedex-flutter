@@ -43,12 +43,7 @@ class DetailMatchupsTab extends StatelessWidget {
         AsyncValue(hasError: true) => [
           DetailMessage(icon: Icons.error_outline, text: l10n.detailLoadError),
         ],
-        AsyncValue(isLoading: true, hasValue: false) => const [
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: 32),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-        ],
+        AsyncValue(isLoading: true, hasValue: false) => const [DetailLoading()],
         _ => [
           DetailMessage(
             icon: Icons.grid_off,

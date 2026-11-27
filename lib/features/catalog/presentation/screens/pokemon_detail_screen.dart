@@ -9,6 +9,7 @@ import 'package:pokedex_flutter/features/catalog/presentation/theme/detail_color
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_evolutions_tab.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_header.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_info_tab.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_layout.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_matchups_tab.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_moves_tab.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_stats_tab.dart';
@@ -122,63 +123,92 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen> {
               ),
             ],
           ),
-          body: NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) => [
-              SliverToBoxAdapter(
-                child: DetailHeader(
-                  pokemon: pokemon,
-                  freshness: freshness,
-                  showsShiny: _showsShiny,
-                  onShinyUnavailable: _showShinyUnavailable,
-                ),
-              ),
-            ],
-            body: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TabBar(
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  tabs: [
-                    Tab(text: l10n.detailTabInfo),
-                    Tab(text: l10n.detailTabStats),
-                    Tab(text: l10n.detailTabEvolutions),
-                    Tab(text: l10n.detailTabMoves),
-                    Tab(text: l10n.detailTabMatchups),
-                  ],
-                ),
-                Expanded(
-                  child: TabBarView(
-                    children: [
-                      DetailInfoTab(
-                        detailState: detailState,
-                        forms: forms,
-                        selectedFormId: shownId,
-                        onFormSelected: _selectForm,
-                        onRefresh: _refresh,
-                      ),
-                      DetailStatsTab(
-                        detailState: detailState,
-                        onRefresh: _refresh,
-                      ),
-                      DetailEvolutionsTab(
-                        detailState: detailState,
-                        onRefresh: _refresh,
-                      ),
-                      DetailMovesTab(
-                        detailState: detailState,
-                        onRefresh: _refresh,
-                      ),
-                      DetailMatchupsTab(
-                        typeNames: pokemon.typeNames,
-                        typeEfficacyState: ref.watch(typeEfficacyProvider),
-                        onRefresh: _refresh,
-                      ),
-                    ],
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              final tabBar = TabBar(
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                tabs: [
+                  Tab(text: l10n.detailTabInfo),
+                  Tab(text: l10n.detailTabStats),
+                  Tab(text: l10n.detailTabEvolutions),
+                  Tab(text: l10n.detailTabMoves),
+                  Tab(text: l10n.detailTabMatchups),
+                ],
+              );
+              final tabs = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  tabBar,
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        DetailInfoTab(
+                          detailState: detailState,
+                          forms: forms,
+                          selectedFormId: shownId,
+                          onFormSelected: _selectForm,
+                          onRefresh: _refresh,
+                        ),
+                        DetailStatsTab(
+                          detailState: detailState,
+                          onRefresh: _refresh,
+                        ),
+                        DetailEvolutionsTab(
+                          detailState: detailState,
+                          onRefresh: _refresh,
+                        ),
+                        DetailMovesTab(
+                          detailState: detailState,
+                          onRefresh: _refresh,
+                        ),
+                        DetailMatchupsTab(
+                          typeNames: pokemon.typeNames,
+                          typeEfficacyState: ref.watch(typeEfficacyProvider),
+                          onRefresh: _refresh,
+                        ),
+                      ],
+                    ),
                   ),
+                ],
+              );
+
+              if (showsDetailInTwoPanes(constraints.maxWidth)) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: detailSidePanelWidth,
+                      child: DetailSidePanel(
+                        pokemon: pokemon,
+                        freshness: freshness,
+                        showsShiny: _showsShiny,
+                        onShinyUnavailable: _showShinyUnavailable,
+                      ),
+                    ),
+                    const VerticalDivider(width: 1),
+                    Expanded(child: tabs),
+                  ],
+                );
+              }
+
+              return NestedScrollView(
+                headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                  SliverToBoxAdapter(
+                    child: DetailHeader(
+                      pokemon: pokemon,
+                      freshness: freshness,
+                      showsShiny: _showsShiny,
+                      onShinyUnavailable: _showShinyUnavailable,
+                    ),
+                  ),
+                ],
+                body: MinimumHeightBox(
+                  minHeight: tabBar.preferredSize.height,
+                  child: tabs,
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
