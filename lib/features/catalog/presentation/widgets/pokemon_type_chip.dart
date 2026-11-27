@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pokedex_flutter/core/theme/color_contrast.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/texts/pokemon_texts.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/theme/pokemon_type_palette.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
 class PokemonTypeChip extends StatelessWidget {
@@ -7,46 +9,25 @@ class PokemonTypeChip extends StatelessWidget {
 
   final String typeName;
 
-  static const Map<String, Color> _typeColors = {
-    'normal': Color(0xFFA8A77A),
-    'fire': Color(0xFFEE8130),
-    'water': Color(0xFF6390F0),
-    'electric': Color(0xFFF7D02C),
-    'grass': Color(0xFF7AC74C),
-    'ice': Color(0xFF96D9D6),
-    'fighting': Color(0xFFC22E28),
-    'poison': Color(0xFFA33EA1),
-    'ground': Color(0xFFE2BF65),
-    'flying': Color(0xFFA98FF3),
-    'psychic': Color(0xFFF95587),
-    'bug': Color(0xFFA6B91A),
-    'rock': Color(0xFFB6A136),
-    'ghost': Color(0xFF735797),
-    'dragon': Color(0xFF6F35FC),
-    'dark': Color(0xFF705746),
-    'steel': Color(0xFFB7B7CE),
-    'fairy': Color(0xFFD685AD),
-  };
-
   @override
   Widget build(BuildContext context) {
     final normalizedName = typeName.trim().toLowerCase();
-    final color = _typeColors[normalizedName] ?? Colors.grey;
+    final color = pokemonTypeColorOf(normalizedName);
     final l10n = AppLocalizations.of(context)!;
     final displayName = localizedTypeName(normalizedName, l10n);
+    final labelStyle = Theme.of(context).textTheme.labelMedium;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
+        color: color,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         displayName,
-        style: TextStyle(
-          color: color,
+        style: labelStyle?.copyWith(
+          color: readableTextColorOn(color),
           fontWeight: FontWeight.w600,
-          fontSize: 12,
         ),
       ),
     );
