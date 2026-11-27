@@ -43,6 +43,12 @@ La aplicación sigue una arquitectura **offline-first**, por lo que los Pokémon
   - **Movimientos:** los del version group más reciente, por nivel, MT, tutor o huevo, ordenados por nivel o por nombre.
   - **Matchups:** debilidades, resistencias e inmunidades según la tabla de tipos guardada.
 - Deslizar hacia abajo en cualquier pestaña fuerza la descarga del detalle.
+- Diseño adaptable: con 840 dp de ancho o más (la clase «expandida» de Material 3: una tableta, o el emulador de 914 dp en horizontal) la pantalla se divide en dos paneles, con la imagen, el número, el nombre, los tipos y la vigencia a la izquierda y las pestañas a la derecha. Por debajo, el encabezado se desplaza y deja sitio a las pestañas. Al girar el teléfono se conservan la pestaña, la forma, el modo shiny y el filtro de movimientos.
+- Accesibilidad:
+  - El lector de pantalla anuncia «Pikachu» al abrir el detalle, lee la imagen como «Imagen de Pikachu» (o «Imagen shiny de Pikachu»), el número como «Número 25», cada estadística como una frase («Ataque: 55 de 255, 22 %») y cada movimiento con su nivel, nombre y tipo; los títulos de las secciones son encabezados.
+  - En Evoluciones, el Pokémon que se está viendo lleva la etiqueta «Actual» además del color.
+  - Con texto grande (más del 130 %), las estadísticas pasan a dos líneas y los controles de Movimientos se desplazan con la lista, así que nada se corta al 200 %.
+  - Las pruebas de widget comprueban el texto al 200 % en las cinco pestañas, en español e inglés y en los dos temas, y las guías de Flutter de tamaño táctil (48 dp), etiquetas y contraste de texto.
 
 ### Funcionamiento offline-first
 
