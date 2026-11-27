@@ -34,6 +34,8 @@ La aplicación sigue una arquitectura **offline-first**, por lo que los Pokémon
 - Encabezado con nombre, número, tipos y official-artwork (o el sprite `front_default` si falta), interruptor shiny, favorito y botón para compartir el Pokémon como texto.
 - El encabezado se pinta al instante con los datos del catálogo y se completa cuando llega el detalle guardado.
 - Una línea bajo el nombre dice de cuándo son los datos: «Actualizado desde PokeAPI hace 3 min» solo si el detalle se revalidó en esta sesión; si no, «Datos locales del 10/11 · 09:15», o «Sin detalle guardado · se descargará con conexión».
+- El color del detalle sale del tipo principal del Pokémon: la pantalla usa un esquema de Material 3 generado desde el color del tipo (`ColorScheme.fromSeed` con la variante `fidelity`), en claro u oscuro según el tema de la app. Se ve en el círculo detrás de la imagen, la pestaña activa, las barras de estadísticas y los controles seleccionados; al elegir una forma con otro tipo principal (Marowak de Alola) el color cambia con una transición. Una prueba comprueba el contraste AA de cada par de colores que usa la pantalla en los 18 tipos y los dos temas.
+- Los chips de tipo son del color del tipo con el texto en negro o blanco, el que más contraste dé; así cumplen 4,5:1 en los dos temas.
 - Pestañas:
   - **Información:** altura, peso, grupos huevo, habilidades (con «Oculta» y el efecto recortado), juegos y selector de formas.
   - **Estadísticas:** barras con el valor y el porcentaje sobre 255, y el total.

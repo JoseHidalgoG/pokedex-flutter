@@ -7,6 +7,8 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon_artwork
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/image_decoding.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/widgets/pokemon_artwork_hero_tag.dart';
 
+const detailArtworkBackdropKey = ValueKey('detail-artwork-backdrop');
+
 class DetailArtwork extends ConsumerWidget {
   const DetailArtwork({
     super.key,
@@ -24,7 +26,13 @@ class DetailArtwork extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cacheManager = ref.watch(pokemonImageCacheManagerProvider);
+    final colorScheme = Theme.of(context).colorScheme;
     final decodedWidth = decodedPixelsFor(context, size);
+    final fallbackIcon = Icon(
+      Icons.catching_pokemon,
+      size: size * 0.6,
+      color: colorScheme.onPrimaryContainer,
+    );
 
     Widget networkImage(
       String imageUrl, {
@@ -46,31 +54,43 @@ class DetailArtwork extends ConsumerWidget {
       );
     }
 
-    return Hero(
-      tag: pokemonArtworkHeroTag(pokemon.id),
-      child: SizedBox.square(
-        dimension: size,
-        child: switch ((showsShiny, pokemon.imageUrl.isEmpty)) {
-          (true, _) => networkImage(
-            shinyArtworkUrlFor(pokemon.id),
-            fallback: _fallbackIcon(),
-            onError: onShinyUnavailable,
+    return SizedBox.square(
+      dimension: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          DecoratedBox(
+            key: detailArtworkBackdropKey,
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: SizedBox.square(dimension: size * 0.86),
           ),
-          (false, true) => _fallbackIcon(),
-          (false, false) => networkImage(
-            pokemon.imageUrl,
-            fallback: networkImage(
-              frontSpriteUrlFor(pokemon.id),
-              fallback: _fallbackIcon(),
-              filterQuality: FilterQuality.none,
+          Hero(
+            tag: pokemonArtworkHeroTag(pokemon.id),
+            child: SizedBox.square(
+              dimension: size,
+              child: switch ((showsShiny, pokemon.imageUrl.isEmpty)) {
+                (true, _) => networkImage(
+                  shinyArtworkUrlFor(pokemon.id),
+                  fallback: fallbackIcon,
+                  onError: onShinyUnavailable,
+                ),
+                (false, true) => fallbackIcon,
+                (false, false) => networkImage(
+                  pokemon.imageUrl,
+                  fallback: networkImage(
+                    frontSpriteUrlFor(pokemon.id),
+                    fallback: fallbackIcon,
+                    filterQuality: FilterQuality.none,
+                  ),
+                ),
+              },
             ),
           ),
-        },
+        ],
       ),
     );
-  }
-
-  Widget _fallbackIcon() {
-    return Icon(Icons.catching_pokemon, size: size * 0.6);
   }
 }

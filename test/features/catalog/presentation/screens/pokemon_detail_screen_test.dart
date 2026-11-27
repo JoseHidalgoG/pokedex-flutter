@@ -8,6 +8,8 @@ import 'package:pokedex_flutter/features/catalog/domain/entities/pokemon_detail.
 import 'package:pokedex_flutter/features/catalog/domain/entities/type_matchups.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/providers/pokemon_detail_providers.dart';
 import 'package:pokedex_flutter/features/catalog/presentation/screens/pokemon_detail_screen.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/theme/detail_color_scheme.dart';
+import 'package:pokedex_flutter/features/catalog/presentation/widgets/detail/detail_artwork.dart';
 import 'package:pokedex_flutter/features/favorites/presentation/providers/favorites_providers.dart';
 import 'package:pokedex_flutter/l10n/generated/app_localizations.dart';
 
@@ -35,6 +37,7 @@ void main() {
     WidgetTester tester, {
     Pokemon pokemon = pikachu,
     Locale locale = const Locale('es'),
+    ThemeData? theme,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -53,6 +56,7 @@ void main() {
         ],
         child: MaterialApp(
           locale: locale,
+          theme: theme,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: PokemonDetailScreen(pokemon: pokemon),
@@ -368,5 +372,114 @@ void main() {
     await tester.pump();
 
     expect(detailRepository.stoppedIds, contains(25));
+  });
+
+  group('color del detalle según el tipo', () {
+    const charmander = Pokemon(
+      id: 4,
+      name: 'charmander',
+      imageUrl: '',
+      typeNames: ['fire'],
+    );
+    const marowak = Pokemon(
+      id: 105,
+      name: 'marowak',
+      imageUrl: '',
+      typeNames: ['ground'],
+    );
+    const alolanMarowak = Pokemon(
+      id: 10115,
+      name: 'marowak-alola',
+      imageUrl: '',
+      typeNames: ['fire', 'ghost'],
+    );
+    const shadowOnly = Pokemon(
+      id: 9999,
+      name: 'missingno',
+      imageUrl: '',
+      typeNames: ['shadow'],
+    );
+
+    ColorScheme detailSchemeIn(WidgetTester tester) {
+      return Theme.of(tester.element(find.byType(TabBar))).colorScheme;
+    }
+
+    Color backdropColorIn(WidgetTester tester) {
+      final backdrop = tester.widget<DecoratedBox>(
+        find.byKey(detailArtworkBackdropKey),
+      );
+      return (backdrop.decoration as BoxDecoration).color!;
+    }
+
+    testWidgets('Pikachu toma el esquema del tipo eléctrico', (tester) async {
+      await pumpDetail(tester);
+
+      final electric = detailColorSchemeOf('electric', Brightness.light)!;
+      expect(detailSchemeIn(tester), electric);
+      expect(backdropColorIn(tester), electric.primaryContainer);
+    });
+
+    testWidgets('Charmander toma el esquema del fuego', (tester) async {
+      await pumpDetail(tester, pokemon: charmander);
+
+      expect(
+        detailSchemeIn(tester),
+        detailColorSchemeOf('fire', Brightness.light),
+      );
+    });
+
+    testWidgets('elegir una forma con otro tipo principal cambia el color', (
+      tester,
+    ) async {
+      detailRepository.emitDetail(
+        105,
+        const PokemonDetail(pokemon: marowak, forms: [marowak, alolanMarowak]),
+      );
+      await pumpDetail(tester, pokemon: marowak);
+
+      expect(
+        detailSchemeIn(tester),
+        detailColorSchemeOf('ground', Brightness.light),
+      );
+
+      await tester.tap(find.text('Alola'));
+      await tester.pump();
+      await tester.pump(kThemeAnimationDuration);
+
+      expect(
+        detailSchemeIn(tester),
+        detailColorSchemeOf('fire', Brightness.light),
+      );
+    });
+
+    testWidgets('con el tema oscuro de la app usa el esquema oscuro del tipo', (
+      tester,
+    ) async {
+      await pumpDetail(
+        tester,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.red,
+            brightness: Brightness.dark,
+          ),
+        ),
+      );
+
+      expect(
+        detailSchemeIn(tester),
+        detailColorSchemeOf('electric', Brightness.dark),
+      );
+    });
+
+    testWidgets('con un tipo desconocido conserva los colores de la app', (
+      tester,
+    ) async {
+      final appTheme = ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.red),
+      );
+      await pumpDetail(tester, pokemon: shadowOnly, theme: appTheme);
+
+      expect(detailSchemeIn(tester), appTheme.colorScheme);
+    });
   });
 }
